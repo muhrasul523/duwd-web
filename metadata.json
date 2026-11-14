@@ -1,6 +1,6 @@
 {
-  "name": "DUWD Wahdah Islamiyah — duwd.web.id",
-  "description": "Portal Transformasi Digital dan Penguatan Tata Kelola Wilayah dan Daerah DPP Wahdah Islamiyah terintegrasi Google Apps Script, Google Sheets, dan Google Drive.",
+  "name": "DUWD DPP WI",
+  "description": "Aplikasi pendataan pengurus internal Departemen Urusan Wilayah dan Daerah DPP Wahdah Islamiyah (duwd.web.id) terintegrasi Google Sheets.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

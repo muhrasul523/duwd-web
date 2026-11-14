@@ -1,17 +1,23 @@
-# Backend Google Apps Script (GAS) — duwd.web.id
+# Backend Google Apps Script — DUWD DPP WI
 
-Folder `/backend-gas/` berisi skrip backend terpusat untuk portal **Departemen Urusan Wilayah dan Daerah (DUWD) DPP Wahdah Islamiyah** yang di-deploy sebagai **Google Apps Script Web App**, terhubung ke **Google Sheets** dan **Google Drive**.
+File `/backend-gas/Code.gs` dirancang untuk dipasang langsung di dalam **Google Spreadsheet yang sudah Anda buat** (Container-bound Script).
 
-## Struktur Modul
-1. `code.js` — Router Web App (`doGet` & `doPost`), validasi token opsional, pencatat log otomatis (`SYSTEM_LOGS`), dan fungsi inisialisasi struktur (`initializeDUWDStructure`).
-2. `sheet-handler.js` — Operasi baca/tulis Google Sheets, pencarian & filter multi-kriteria (`dpw`, `status`, `jenis`, `kategori`, `search`), serta agregasi KPI.
-3. `drive-connector.js` — Ekstraktor Google Drive File ID dinamis, generator URL pratinjau/unduh aman untuk semua jenis berkas (`PDF`, `PPT`, `DOCX`, `Gambar`, `Audio MP3`, `Video MP4`, `Arsip ZIP`), pemindai folder rekursif, dan pengunggah base64.
+## Langkah Pemasangan
+1. Buka Google Spreadsheet Anda.
+2. Klik menu **Extensions (Ekstensi)** > **Apps Script**.
+3. Hapus isi bawaan `Code.gs`, lalu salin-tempel seluruh isi file `/backend-gas/Code.gs`.
+4. Simpan (**Ctrl + S**).
+5. Di toolbar atas editor Apps Script, pilih fungsi **`setupDatabase`** lalu klik **Run** (cukup 1 kali).
+   - Skrip otomatis membuat 4 tab sheet:
+     - `UNIT` (Daftar unit/bidang internal DUWD)
+     - `PENGURUS` (Nama Lengkap, Nama Panggilan, WhatsApp `628...`, Unit)
+     - `PENGATURAN` (PIN Super Admin, PIN Admin, Nama Aplikasi, Logo)
+     - `SYSTEM_LOGS` (Catatan aktivitas otomatis)
+6. Klik **Deploy** > **New deployment** > pilih jenis **Web app**:
+   - **Execute as:** `Me`
+   - **Who has access:** `Anyone`
+7. Salin **Web app URL** (berakhiran `/exec`), lalu tempelkan di menu **Super Admin > Pengaturan & Koneksi** pada aplikasi web.
 
-## Langkah Deploy ke Google Apps Script
-1. Buka [script.google.com](https://script.google.com) dan buat proyek baru bernama **DUWD Wahdah Islamiyah API**.
-2. Buat 3 file skrip di editor Apps Script (`Code.gs`, `sheet-handler.gs`, `drive-connector.gs`) lalu salin isi masing-masing file dari folder `/backend-gas/`.
-3. Jalankan fungsi `initializeDUWDStructure()` satu kali dari menu **Run** di editor Apps Script. Skrip otomatis membuat Google Spreadsheet induk (6 tab lengkap) dan Folder Google Drive beserta 5 subfoldernya, lalu menyimpannya ke `ScriptProperties`.
-4. Klik **Deploy > New deployment > Web app**:
-   - **Execute as**: `Me`
-   - **Who has access**: `Anyone`
-5. Salin **Web App URL** (`https://script.google.com/macros/s/.../exec`), lalu tempelkan ke menu **Backend GAS** di portal web `duwd.web.id` atau atur pada `VITE_GAS_WEBAPP_URL` saat build statis ke GitHub Pages.
+## PIN Bawaan (Dapat Diubah Kapan Saja)
+- **Super Admin PIN:** `duwd-super-2026`
+- **Admin PIN:** `duwd-admin-2026`

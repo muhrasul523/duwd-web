@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="wiTeal" x1="12" y1="8" x2="116" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0C7A89" />
+      <stop offset="100%" stop-color="#07525E" />
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="32" fill="url(#wiTeal)" />
+  <polygon
+    points="64,20 95,33 108,64 95,95 64,108 33,95 20,64 33,33"
+    stroke="rgba(255,255,255,0.35)"
+    stroke-width="3"
+    fill="none"
+  />
+  <rect
+    x="41"
+    y="41"
+    width="46"
+    height="46"
+    rx="6"
+    transform="rotate(45 64 64)"
+    stroke="#D88B15"
+    stroke-width="4"
+    fill="rgba(255,255,255,0.08)"
+  />
+  <circle cx="64" cy="64" r="9" fill="#D88B15" />
+</svg>
