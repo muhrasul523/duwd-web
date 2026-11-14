@@ -1,5 +1,6 @@
-import { Check, CheckCircle2, Code2, Copy, Link, RefreshCw, AlertCircle } from 'lucide-react';
+import { AlertCircle, Check, CheckCircle2, Code2, Copy, Link, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
+import allInOneRaw from '../../backend-gas/Code-AllInOne.gs?raw';
 import codeJsRaw from '../../backend-gas/code.js?raw';
 import driveConnectorJsRaw from '../../backend-gas/drive-connector.js?raw';
 import readmeGasRaw from '../../backend-gas/README.md?raw';
@@ -7,9 +8,15 @@ import sheetHandlerJsRaw from '../../backend-gas/sheet-handler.js?raw';
 import { loadGasConfig, saveGasConfig } from '../config/driveConfig';
 import { pingGasBackend } from '../services/gasClient';
 
-type GasFileKey = 'code' | 'sheet' | 'drive' | 'readme';
+type GasFileKey = 'all-in-one' | 'code' | 'sheet' | 'drive' | 'readme';
 
 const GAS_FILES: { key: GasFileKey; label: string; path: string; content: string }[] = [
+  {
+    key: 'all-in-one',
+    label: 'Code.gs (1 File Siap Copas)',
+    path: '/backend-gas/Code-AllInOne.gs',
+    content: allInOneRaw,
+  },
   { key: 'code', label: 'code.js', path: '/backend-gas/code.js', content: codeJsRaw },
   {
     key: 'sheet',
@@ -23,7 +30,7 @@ const GAS_FILES: { key: GasFileKey; label: string; path: string; content: string
     path: '/backend-gas/drive-connector.js',
     content: driveConnectorJsRaw,
   },
-  { key: 'readme', label: 'README.md', path: '/backend-gas/README.md', content: readmeGasRaw },
+  { key: 'readme', label: 'Panduan', path: '/backend-gas/README.md', content: readmeGasRaw },
 ];
 
 export function GasBackendExplorer() {
@@ -31,7 +38,7 @@ export function GasBackendExplorer() {
   const [webAppUrl, setWebAppUrl] = useState(initialConfig.webAppUrl);
   const [driveRootFolderUrl, setDriveRootFolderUrl] = useState(initialConfig.driveRootFolderUrl);
   const [apiToken, setApiToken] = useState(initialConfig.apiToken);
-  const [activeTab, setActiveTab] = useState<GasFileKey>('code');
+  const [activeTab, setActiveTab] = useState<GasFileKey>('all-in-one');
   const [copiedKey, setCopiedKey] = useState<GasFileKey | null>(null);
   const [testing, setTesting] = useState(false);
   const [connectionState, setConnectionState] = useState<{
@@ -52,7 +59,7 @@ export function GasBackendExplorer() {
     if (!webAppUrl.trim()) {
       setConnectionState({
         status: 'error',
-        message: 'Konfigurasi disimpan. Masukkan URL Web App Google Apps Script untuk menguji koneksi live.',
+        message: 'Konfigurasi disimpan. Tempelkan URL Web App (/exec) dari Google Apps Script setelah Anda melakukan Deploy.',
       });
       return;
     }
@@ -93,14 +100,48 @@ export function GasBackendExplorer() {
               Arsitektur Serverless Terintegrasi
             </p>
             <h2 className="mt-1.5 text-2xl font-bold tracking-tight text-[#07525E] sm:text-3xl">
-              Konfigurasi &amp; Kode Sumber Google Apps Script
+              Panduan Salin Kode &amp; Koneksi Google Apps Script
             </h2>
             <p className="mt-2 max-w-2xl text-sm text-[#526A70]">
-              Seluruh skrip backend tersedia di direktori{' '}
-              <span className="font-mono text-xs font-semibold text-[#07525E]">/backend-gas/</span>{' '}
-              untuk disalin langsung ke Editor Google Apps Script dan dihubungkan dengan GitHub Pages.
+              Pilih tab{' '}
+              <span className="font-mono text-xs font-semibold text-[#07525E]">Code.gs (1 File Siap Copas)</span>{' '}
+              di sebelah kanan untuk langsung ditempel ke Google Apps Script tanpa perlu membuat banyak file.
             </p>
           </div>
+        </div>
+
+        {/* Step-by-Step Guide Strip */}
+        <div className="mb-6 grid grid-cols-1 gap-3 glass-surface p-5 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              step: '1.',
+              title: 'Salin Code.gs',
+              desc: 'Klik "Salin Kode" pada tab Code.gs (1 File Siap Copas), lalu buka script.google.com > New project.',
+            },
+            {
+              step: '2.',
+              title: 'Tempel & Simpan',
+              desc: 'Hapus isi Code.gs bawaan, tempel seluruh kode yang disalin, lalu tekan Ctrl+S.',
+            },
+            {
+              step: '3.',
+              title: 'Jalankan Setup 1x',
+              desc: 'Pilih fungsi initializeDUWDStructure di toolbar atas lalu klik Run untuk membuat Google Sheets otomatis.',
+            },
+            {
+              step: '4.',
+              title: 'Deploy Web App',
+              desc: 'Klik Deploy > New deployment > Web app (Anyone), lalu tempel URL /exec ke form di bawah.',
+            },
+          ].map((item) => (
+            <div key={item.step} className="rounded-xl bg-[#F6FAFB] p-3.5">
+              <div className="text-xs font-bold text-[#07525E]">
+                <span className="mr-1.5 text-[#D88B15] tabular-nums">{item.step}</span>
+                {item.title}
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-[#526A70]">{item.desc}</p>
+            </div>
+          ))}
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -113,7 +154,7 @@ export function GasBackendExplorer() {
               <div className="flex items-center gap-2.5 border-b border-[#07525E]/10 pb-3">
                 <Link className="h-4.5 w-4.5 text-[#0C7A89]" />
                 <h3 className="text-base font-bold text-[#07525E]">
-                  Koneksi Web App GAS &amp; Drive Root
+                  Koneksi Web App GAS
                 </h3>
               </div>
 
@@ -139,14 +180,14 @@ export function GasBackendExplorer() {
                   htmlFor="drive-root-url"
                   className="mb-1 block text-xs font-semibold text-[#355158]"
                 >
-                  URL Folder Induk Google Drive DUWD
+                  URL Folder Google Drive (Opsional — isi nanti jika dibutuhkan)
                 </label>
                 <input
                   id="drive-root-url"
                   type="url"
                   value={driveRootFolderUrl}
                   onChange={(e) => setDriveRootFolderUrl(e.target.value)}
-                  placeholder="https://drive.google.com/drive/folders/..."
+                  placeholder="Biarkan kosong jika belum digunakan"
                   className="w-full rounded-xl border border-[#07525E]/15 bg-white px-3.5 py-2.5 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
                 />
               </div>
@@ -163,7 +204,7 @@ export function GasBackendExplorer() {
                   type="password"
                   value={apiToken}
                   onChange={(e) => setApiToken(e.target.value)}
-                  placeholder="Kosongkan jika mode terbuka internal"
+                  placeholder="Kosongkan jika mode standar"
                   className="w-full rounded-xl border border-[#07525E]/15 bg-white px-3.5 py-2.5 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
                 />
               </div>

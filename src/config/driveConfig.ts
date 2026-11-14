@@ -5,8 +5,7 @@ const GAS_CONFIG_STORAGE_KEY = 'duwd_gas_endpoint_config_v1';
 export const DEFAULT_GAS_CONFIG: GasEndpointConfig = {
   webAppUrl: (import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined) || '',
   driveRootFolderUrl:
-    (import.meta.env.VITE_DUWD_DRIVE_ROOT_URL as string | undefined) ||
-    'https://drive.google.com/drive/folders/DUWD-DPP-WAHDAH-2030',
+    (import.meta.env.VITE_DUWD_DRIVE_ROOT_URL as string | undefined) || '',
   apiToken: '',
 };
 

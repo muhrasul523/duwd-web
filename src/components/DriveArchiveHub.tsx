@@ -143,15 +143,17 @@ export function DriveArchiveHub({ assets, onAddAsset }: DriveArchiveHubProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            <a
-              href={gasConfig.driveRootFolderUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#0C7A89]/25 bg-white/80 px-4 py-2.5 text-xs font-semibold text-[#07525E] transition-colors hover:bg-white"
-            >
-              <ExternalLink className="h-3.5 w-3.5 text-[#0C7A89]" />
-              <span>Buka Folder Induk Drive</span>
-            </a>
+            {gasConfig.driveRootFolderUrl && (
+              <a
+                href={gasConfig.driveRootFolderUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#0C7A89]/25 bg-white/80 px-4 py-2.5 text-xs font-semibold text-[#07525E] transition-colors hover:bg-white"
+              >
+                <ExternalLink className="h-3.5 w-3.5 text-[#0C7A89]" />
+                <span>Buka Folder Induk Drive</span>
+              </a>
+            )}
 
             <button
               type="button"
