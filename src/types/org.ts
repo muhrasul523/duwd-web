@@ -62,7 +62,7 @@ export interface KodeWilayahItem {
   parentKode?: string;
 }
 
-export type StatusTerbentuk = 'Sudah Terbentuk' | 'Persiapan' | 'Belum Terbentuk';
+export type StatusTerbentuk = 'Sudah Terbentuk' | 'Belum Terbentuk';
 
 export type JenisLembaga = 'DPW' | 'DPD' | 'DPC' | 'DPR';
 

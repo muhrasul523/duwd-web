@@ -1,12 +1,12 @@
-import { Check, Copy, FileText, X } from 'lucide-react';
+import { Check, Copy, FileText, SlidersHorizontal, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { KelembagaanUnifiedRow } from '../types/org';
 
 export type CopyFormatMode =
-  | 'nama_saja'
+  | 'ketua_sekretaris'
   | 'ketua_saja'
   | 'sekretaris_saja'
-  | 'ketua_sekretaris'
+  | 'nama_saja'
   | 'lengkap'
   | 'wa_saja'
   | 'tsv_tabel';
@@ -16,6 +16,8 @@ interface WilayahCopyModalProps {
   subtitle?: string;
   rows: KelembagaanUnifiedRow[];
   initialMode?: CopyFormatMode;
+  defaultIncludeWi?: boolean;
+  defaultGroupByParent?: boolean;
   onClose: () => void;
 }
 
@@ -29,20 +31,108 @@ const MODE_LABELS: { id: CopyFormatMode; label: string }[] = [
   { id: 'tsv_tabel', label: 'Tabel Excel (TSV)' },
 ];
 
+export function formatEntityDisplayName(
+  row: KelembagaanUnifiedRow,
+  includeWi = false,
+): string {
+  const baseWilayah = row.namaWilayah || row.namaLembaga;
+  if (row.statusTerbentuk === 'Sudah Terbentuk') {
+    return includeWi
+      ? `${row.jenis} Wahdah Islamiyah ${baseWilayah}`
+      : `${row.jenis} ${baseWilayah}`;
+  }
+  return baseWilayah;
+}
+
+function getParentGroupHeading(row: KelembagaanUnifiedRow): string {
+  if (row.jenis === 'DPW') {
+    return row.pulau ? `Pulau ${row.pulau}` : 'Lainnya';
+  }
+  if (row.jenis === 'DPD') {
+    return row.namaProvinsi ? `Provinsi ${row.namaProvinsi}` : 'Lainnya';
+  }
+  if (row.jenis === 'DPC') {
+    return row.namaKabKota || 'Lainnya';
+  }
+  return row.namaKecamatan ? `Kec. ${row.namaKecamatan}` : 'Lainnya';
+}
+
+function formatSingleRowLines(
+  row: KelembagaanUnifiedRow,
+  mode: CopyFormatMode,
+  indexInList: number,
+  options: {
+    includeKode: boolean;
+    includeNumbering: boolean;
+    includeWi: boolean;
+  },
+): string {
+  const { includeKode, includeNumbering, includeWi } = options;
+  const prefix = includeNumbering ? `${indexInList + 1}. ` : '';
+  const kodePrefix = includeKode ? `[${row.kodeWilayah}] ` : '';
+  const displayName = formatEntityDisplayName(row, includeWi);
+
+  const ketuaText = row.ketuaNama
+    ? `${row.ketuaNama}${row.ketuaWa ? ` (${row.ketuaWa})` : ''}`
+    : row.ketuaWa || '-';
+  const sekText = row.sekretarisNama
+    ? `${row.sekretarisNama}${row.sekretarisWa ? ` (${row.sekretarisWa})` : ''}`
+    : row.sekretarisWa || '-';
+
+  if (mode === 'nama_saja') {
+    return `${prefix}${kodePrefix}${displayName}`;
+  }
+
+  if (mode === 'ketua_saja') {
+    return `${prefix}${kodePrefix}${displayName}\n   Ketua: ${ketuaText}`;
+  }
+
+  if (mode === 'sekretaris_saja') {
+    return `${prefix}${kodePrefix}${displayName}\n   Sekretaris: ${sekText}`;
+  }
+
+  if (mode === 'ketua_sekretaris') {
+    return `${prefix}${kodePrefix}${displayName}\n   Ketua: ${ketuaText}\n   Sekretaris: ${sekText}`;
+  }
+
+  // mode === 'lengkap'
+  const wilayahTrail = [
+    row.pulau,
+    row.namaProvinsi,
+    row.namaKabKota,
+    row.namaKecamatan,
+    row.namaKelDesa,
+  ]
+    .filter(Boolean)
+    .join(' / ');
+  const parts = [
+    `${prefix}${kodePrefix}${displayName}`,
+    `   Wilayah: ${wilayahTrail}`,
+    `   Status: ${row.statusTerbentuk}`,
+    `   Ketua: ${ketuaText}`,
+    `   Sekretaris: ${sekText}`,
+  ];
+  if (row.alamatKantor) parts.push(`   Alamat: ${row.alamatKantor}`);
+  if (row.tautanDrive) parts.push(`   Drive SK: ${row.tautanDrive}`);
+  return parts.join('\n');
+}
+
 export function formatKelembagaanRowsText(
   rows: KelembagaanUnifiedRow[],
   mode: CopyFormatMode,
   options: {
     includeKode?: boolean;
-    includeStatus?: boolean;
     includeNumbering?: boolean;
+    includeWi?: boolean;
+    groupByParent?: boolean;
     headerTitle?: string;
   } = {},
 ): string {
   const {
-    includeKode = true,
-    includeStatus = true,
+    includeKode = false,
     includeNumbering = true,
+    includeWi = false,
+    groupByParent = true,
     headerTitle = '',
   } = options;
 
@@ -57,7 +147,7 @@ export function formatKelembagaanRowsText(
       'Kab/Kota',
       'Kecamatan',
       'Kel/Desa',
-      'Nama Lembaga',
+      'Nama',
       'Status Terbentuk',
       'Ketua',
       'WA Ketua',
@@ -75,7 +165,7 @@ export function formatKelembagaanRowsText(
         r.namaKabKota || '',
         r.namaKecamatan || '',
         r.namaKelDesa || '',
-        r.namaLembaga,
+        formatEntityDisplayName(r, includeWi),
         r.statusTerbentuk,
         r.ketuaNama,
         r.ketuaWa,
@@ -94,64 +184,59 @@ export function formatKelembagaanRowsText(
     const waSet = new Set<string>();
     const lines: string[] = [];
     rows.forEach((r) => {
+      const entityLabel = formatEntityDisplayName(r, includeWi);
       if (r.ketuaWa && !waSet.has(r.ketuaWa)) {
         waSet.add(r.ketuaWa);
-        lines.push(`${r.ketuaWa} (${r.ketuaNama || 'Ketua'} - ${r.namaLembaga})`);
+        lines.push(`${r.ketuaWa} (${r.ketuaNama || 'Ketua'} - ${entityLabel})`);
       }
       if (r.sekretarisWa && !waSet.has(r.sekretarisWa)) {
         waSet.add(r.sekretarisWa);
-        lines.push(`${r.sekretarisWa} (${r.sekretarisNama || 'Sekretaris'} - ${r.namaLembaga})`);
+        lines.push(`${r.sekretarisWa} (${r.sekretarisNama || 'Sekretaris'} - ${entityLabel})`);
       }
     });
     return lines.join('\n');
   }
 
-  const lines = rows.map((r, idx) => {
-    const prefix = includeNumbering ? `${idx + 1}. ` : '';
-    const kodePrefix = includeKode ? `[${r.kodeWilayah}] ` : '';
-    const statusSuffix = includeStatus ? ` (${r.statusTerbentuk})` : '';
-    const ketuaText = r.ketuaNama
-      ? `${r.ketuaNama}${r.ketuaWa ? ` (${r.ketuaWa})` : ''}`
-      : r.ketuaWa || '-';
-    const sekText = r.sekretarisNama
-      ? `${r.sekretarisNama}${r.sekretarisWa ? ` (${r.sekretarisWa})` : ''}`
-      : r.sekretarisWa || '-';
+  const shouldGroup = groupByParent && rows.length > 1;
+  let bodyText = '';
 
-    if (mode === 'nama_saja') {
-      return `${prefix}${kodePrefix}${r.namaLembaga}${statusSuffix}`;
-    }
+  if (shouldGroup) {
+    const groups = new Map<string, KelembagaanUnifiedRow[]>();
+    rows.forEach((r) => {
+      const heading = getParentGroupHeading(r);
+      const list = groups.get(heading);
+      if (list) list.push(r);
+      else groups.set(heading, [r]);
+    });
 
-    if (mode === 'ketua_saja') {
-      return `${prefix}${kodePrefix}${r.namaLembaga}${statusSuffix} — Ketua: ${ketuaText}`;
-    }
-
-    if (mode === 'sekretaris_saja') {
-      return `${prefix}${kodePrefix}${r.namaLembaga}${statusSuffix} — Sekretaris: ${sekText}`;
-    }
-
-    if (mode === 'ketua_sekretaris') {
-      return `${prefix}${kodePrefix}${r.namaLembaga}${statusSuffix}\n   Ketua: ${ketuaText}\n   Sekretaris: ${sekText}`;
-    }
-
-    // mode === 'lengkap'
-    const wilayahTrail = [r.pulau, r.namaProvinsi, r.namaKabKota, r.namaKecamatan, r.namaKelDesa]
-      .filter(Boolean)
-      .join(' / ');
-    const parts = [
-      `${prefix}${kodePrefix}${r.namaLembaga} [${r.jenis}]${statusSuffix}`,
-      `   Wilayah: ${wilayahTrail}`,
-      `   Ketua: ${ketuaText}`,
-      `   Sekretaris: ${sekText}`,
-    ];
-    if (r.alamatKantor) parts.push(`   Alamat: ${r.alamatKantor}`);
-    if (r.tautanDrive) parts.push(`   Drive SK: ${r.tautanDrive}`);
-    return parts.join('\n');
-  });
+    const sections: string[] = [];
+    groups.forEach((groupRows, heading) => {
+      const itemLines = groupRows.map((row, idx) =>
+        formatSingleRowLines(row, mode, idx, {
+          includeKode,
+          includeNumbering,
+          includeWi,
+        }),
+      );
+      sections.push(`${heading}\n${itemLines.join('\n')}`);
+    });
+    bodyText = sections.join('\n\n');
+  } else {
+    bodyText = rows
+      .map((row, idx) =>
+        formatSingleRowLines(row, mode, idx, {
+          includeKode,
+          includeNumbering,
+          includeWi,
+        }),
+      )
+      .join('\n');
+  }
 
   if (headerTitle.trim()) {
-    return `${headerTitle.trim()}\n${lines.join('\n')}`;
+    return `${headerTitle.trim()}\n\n${bodyText}`;
   }
-  return lines.join('\n');
+  return bodyText;
 }
 
 export function WilayahCopyModal({
@@ -159,23 +244,28 @@ export function WilayahCopyModal({
   subtitle,
   rows,
   initialMode = 'ketua_sekretaris',
+  defaultIncludeWi = false,
+  defaultGroupByParent = true,
   onClose,
 }: WilayahCopyModalProps) {
   const [mode, setMode] = useState<CopyFormatMode>(initialMode);
-  const [includeKode, setIncludeKode] = useState(true);
-  const [includeStatus, setIncludeStatus] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [groupByParent, setGroupByParent] = useState(defaultGroupByParent);
+  const [includeWi, setIncludeWi] = useState(defaultIncludeWi);
   const [includeNumbering, setIncludeNumbering] = useState(true);
+  const [includeKode, setIncludeKode] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const generatedText = useMemo(
     () =>
       formatKelembagaanRowsText(rows, mode, {
         includeKode,
-        includeStatus,
         includeNumbering,
+        includeWi,
+        groupByParent,
         headerTitle: mode === 'tsv_tabel' || mode === 'wa_saja' ? '' : title,
       }),
-    [rows, mode, includeKode, includeStatus, includeNumbering, title],
+    [rows, mode, includeKode, includeNumbering, includeWi, groupByParent, title],
   );
 
   const handleCopy = async () => {
@@ -214,7 +304,8 @@ export function WilayahCopyModal({
               {title}
             </h2>
             <p className="mt-0.5 text-xs text-[#526A70]">
-              {subtitle || `${rows.length} data terpilih siap disalin ke WhatsApp, dokumen, atau Excel.`}
+              {subtitle ||
+                `${rows.length.toLocaleString('id-ID')} data terpilih siap disalin ke WhatsApp, dokumen, atau Excel.`}
             </p>
           </div>
         </div>
@@ -226,7 +317,7 @@ export function WilayahCopyModal({
               key={item.id}
               type="button"
               onClick={() => setMode(item.id)}
-              className={`cursor-pointer whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              className={`cursor-pointer whitespace-nowrap shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                 mode === item.id
                   ? 'bg-white text-[#07525E] shadow-xs'
                   : 'text-[#526A70] hover:text-[#07525E]'
@@ -237,36 +328,96 @@ export function WilayahCopyModal({
           ))}
         </div>
 
-        {/* Options */}
-        {mode !== 'tsv_tabel' && mode !== 'wa_saja' && (
-          <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-[#355158]">
-            <label className="inline-flex cursor-pointer items-center gap-1.5 font-medium">
-              <input
-                type="checkbox"
-                checked={includeNumbering}
-                onChange={(e) => setIncludeNumbering(e.target.checked)}
-                className="rounded border-[#07525E]/30 accent-[#0C7A89]"
-              />
-              <span>Nomor urut</span>
-            </label>
-            <label className="inline-flex cursor-pointer items-center gap-1.5 font-medium">
-              <input
-                type="checkbox"
-                checked={includeKode}
-                onChange={(e) => setIncludeKode(e.target.checked)}
-                className="rounded border-[#07525E]/30 accent-[#0C7A89]"
-              />
-              <span>Kode wilayah</span>
-            </label>
-            <label className="inline-flex cursor-pointer items-center gap-1.5 font-medium">
-              <input
-                type="checkbox"
-                checked={includeStatus}
-                onChange={(e) => setIncludeStatus(e.target.checked)}
-                className="rounded border-[#07525E]/30 accent-[#0C7A89]"
-              />
-              <span>Status terbentuk</span>
-            </label>
+        {/* Quick Toggles + Tombol Pengaturan */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-[#355158]">
+            <button
+              type="button"
+              onClick={() => setIncludeWi((prev) => !prev)}
+              className={`inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                includeWi
+                  ? 'border-[#0C7A89]/40 bg-[#EBF5F8] text-[#07525E]'
+                  : 'border-[#07525E]/15 bg-white text-[#526A70] hover:text-[#07525E]'
+              }`}
+            >
+              <span>{includeWi ? '✓ ' : ''}Sertakan "Wahdah Islamiyah"</span>
+            </button>
+
+            {mode !== 'tsv_tabel' && mode !== 'wa_saja' && (
+              <button
+                type="button"
+                onClick={() => setGroupByParent((prev) => !prev)}
+                className={`inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                  groupByParent
+                    ? 'border-[#0C7A89]/40 bg-[#EBF5F8] text-[#07525E]'
+                    : 'border-[#07525E]/15 bg-white text-[#526A70] hover:text-[#07525E]'
+                }`}
+              >
+                <span>{groupByParent ? '✓ ' : ''}Kelompokkan per Induk</span>
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSettingsOpen((prev) => !prev)}
+            className={`inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              settingsOpen
+                ? 'border-[#0C7A89] bg-[#07525E] text-white'
+                : 'border-[#07525E]/15 bg-white text-[#07525E] hover:bg-[#F4FAFB]'
+            }`}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span>Pengaturan</span>
+          </button>
+        </div>
+
+        {/* Panel Pengaturan Detail */}
+        {settingsOpen && (
+          <div className="mt-2.5 rounded-xl border border-[#07525E]/12 bg-[#F4FAFB] p-3 text-xs text-[#355158]">
+            <div className="font-bold text-[#07525E]">Pengaturan Format Salin</div>
+            <div className="mt-2 flex flex-wrap items-center gap-4">
+              {mode !== 'tsv_tabel' && mode !== 'wa_saja' && (
+                <>
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={groupByParent}
+                      onChange={(e) => setGroupByParent(e.target.checked)}
+                      className="rounded border-[#07525E]/30 accent-[#0C7A89]"
+                    />
+                    <span>Kelompokkan per Induk (Pulau/Prov/Kab/Kec)</span>
+                  </label>
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={includeNumbering}
+                      onChange={(e) => setIncludeNumbering(e.target.checked)}
+                      className="rounded border-[#07525E]/30 accent-[#0C7A89]"
+                    />
+                    <span>Nomor urut</span>
+                  </label>
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={includeKode}
+                      onChange={(e) => setIncludeKode(e.target.checked)}
+                      className="rounded border-[#07525E]/30 accent-[#0C7A89]"
+                    />
+                    <span>Kode wilayah</span>
+                  </label>
+                </>
+              )}
+              <label className="inline-flex cursor-pointer items-center gap-1.5 font-medium">
+                <input
+                  type="checkbox"
+                  checked={includeWi}
+                  onChange={(e) => setIncludeWi(e.target.checked)}
+                  className="rounded border-[#07525E]/30 accent-[#0C7A89]"
+                />
+                <span>Tampilkan kata "Wahdah Islamiyah"</span>
+              </label>
+            </div>
           </div>
         )}
 
@@ -282,7 +433,8 @@ export function WilayahCopyModal({
 
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#07525E]/10 pt-3.5">
           <span className="text-xs font-medium text-[#526A70] tabular-nums">
-            Total {rows.length} entri · {generatedText.length} karakter
+            Total {rows.length.toLocaleString('id-ID')} entri ·{' '}
+            {generatedText.length.toLocaleString('id-ID')} karakter
           </span>
           <div className="flex items-center gap-2">
             <button
@@ -296,7 +448,7 @@ export function WilayahCopyModal({
               type="button"
               disabled={!generatedText}
               onClick={() => void handleCopy()}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#0C7A89] to-[#07525E] px-4 py-2 text-xs font-semibold text-white shadow-sm disabled:opacity-50"
+              className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-[#0C7A89] to-[#07525E] px-4 py-2 text-xs font-semibold text-white shadow-sm disabled:opacity-50"
             >
               {copied ? (
                 <>

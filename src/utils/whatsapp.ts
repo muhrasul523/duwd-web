@@ -83,48 +83,63 @@ export function processLogoFileToDataUrl(file: File, maxDim = 256): Promise<stri
 }
 
 /**
- * Memperbarui semua tag favicon browser secara dinamis setiap kali logo diganti.
+ * Memperbarui tag favicon browser secara dinamis setiap kali logo kustom diunggah,
+ * atau mempertahankan /logo_wi.png & /favicon.ico bawaan ketika logo kustom kosong.
  */
 export function applyBrowserFavicon(logoUrl: string): void {
   const cleanUrl = logoUrl.trim();
-  const isValidLogo =
+  const isValidCustom =
     cleanUrl.startsWith('data:image/') ||
     cleanUrl.startsWith('/') ||
     cleanUrl.startsWith('https://') ||
     cleanUrl.startsWith('http://');
-  const href = isValidLogo ? cleanUrl : defaultLogoWi;
 
-  let mimeType = 'image/png';
-  if (href.startsWith('data:image/svg+xml') || href.endsWith('.svg')) {
-    mimeType = 'image/svg+xml';
-  } else if (href.startsWith('data:image/jpeg') || href.endsWith('.jpg') || href.endsWith('.jpeg')) {
-    mimeType = 'image/jpeg';
-  } else if (href.startsWith('data:image/webp') || href.endsWith('.webp')) {
-    mimeType = 'image/webp';
-  }
+  const applyHref = (href: string, mimeType: string) => {
+    let iconLink = document.querySelector<HTMLLinkElement>("link#app-favicon");
+    if (!iconLink) {
+      iconLink = document.createElement('link');
+      iconLink.id = 'app-favicon';
+      iconLink.rel = 'icon';
+      document.head.appendChild(iconLink);
+    }
+    iconLink.type = mimeType;
+    iconLink.href = href;
 
-  const existingIcons = document.querySelectorAll<HTMLLinkElement>(
-    "link[rel='icon'], link[rel='shortcut icon']",
-  );
-  existingIcons.forEach((node) => node.remove());
-
-  const iconLink = document.createElement('link');
-  iconLink.id = 'app-favicon';
-  iconLink.rel = 'icon';
-  iconLink.type = mimeType;
-  iconLink.href = href;
-  document.head.appendChild(iconLink);
-
-  const shortcutLink = document.createElement('link');
-  shortcutLink.rel = 'shortcut icon';
-  shortcutLink.type = mimeType;
-  shortcutLink.href = href;
-  document.head.appendChild(shortcutLink);
-
-  if (isValidLogo) {
     const appleIcon = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
     if (appleIcon) {
       appleIcon.href = href;
     }
+  };
+
+  if (!isValidCustom) {
+    applyHref('/logo_wi.png?v=4', 'image/png');
+    return;
   }
+
+  let mimeType = 'image/png';
+  if (cleanUrl.startsWith('data:image/svg+xml') || cleanUrl.endsWith('.svg')) {
+    mimeType = 'image/svg+xml';
+  } else if (
+    cleanUrl.startsWith('data:image/jpeg') ||
+    cleanUrl.endsWith('.jpg') ||
+    cleanUrl.endsWith('.jpeg')
+  ) {
+    mimeType = 'image/jpeg';
+  } else if (cleanUrl.startsWith('data:image/webp') || cleanUrl.endsWith('.webp')) {
+    mimeType = 'image/webp';
+  }
+
+  if (cleanUrl.startsWith('data:image/')) {
+    applyHref(cleanUrl, mimeType);
+    return;
+  }
+
+  const probe = new Image();
+  probe.onload = () => {
+    applyHref(cleanUrl, mimeType);
+  };
+  probe.onerror = () => {
+    applyHref(defaultLogoWi, 'image/png');
+  };
+  probe.src = cleanUrl;
 }
