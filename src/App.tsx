@@ -9,7 +9,9 @@ import { TopBar, type ActiveView } from './components/TopBar';
 import { UnitManager } from './components/UnitManager';
 import {
   fetchAllOrgData,
+  loadLocalDpc,
   loadLocalDpd,
+  loadLocalDpr,
   loadLocalDpw,
   loadLocalKegiatan,
   loadLocalKodeWilayah,
@@ -17,7 +19,9 @@ import {
   loadLocalProker,
   loadLocalSettings,
   loadLocalUnits,
+  saveLocalDpc,
   saveLocalDpd,
+  saveLocalDpr,
   saveLocalDpw,
   saveLocalKegiatan,
   saveLocalKodeWilayah,
@@ -25,7 +29,9 @@ import {
   saveLocalUnits,
 } from './services/orgService';
 import type {
+  DpcItem,
   DpdItem,
+  DprItem,
   DpwItem,
   KegiatanRpkaItem,
   KodeWilayahItem,
@@ -63,6 +69,8 @@ export default function App() {
   );
   const [dpwList, setDpwList] = useState<DpwItem[]>(() => loadLocalDpw());
   const [dpdList, setDpdList] = useState<DpdItem[]>(() => loadLocalDpd());
+  const [dpcList, setDpcList] = useState<DpcItem[]>(() => loadLocalDpc());
+  const [dprList, setDprList] = useState<DprItem[]>(() => loadLocalDpr());
   const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
@@ -87,6 +95,8 @@ export default function App() {
         setKodeWilayahList(dataset.kodeWilayah);
         setDpwList(dataset.dpw);
         setDpdList(dataset.dpd);
+        setDpcList(dataset.dpc);
+        setDprList(dataset.dpr);
         setWilayahConnected(dataset.wilayahConnected);
 
         if (dataset.settings.namaAplikasi) {
@@ -229,6 +239,48 @@ export default function App() {
     });
   };
 
+  const handleSaveDpc = (saved: DpcItem) => {
+    setDpcList((prev) => {
+      const exists = prev.some((d) => d.id === saved.id || d.kodeWilayah === saved.kodeWilayah);
+      const next = exists
+        ? prev.map((d) =>
+            d.id === saved.id || d.kodeWilayah === saved.kodeWilayah ? saved : d,
+          )
+        : [...prev, saved];
+      saveLocalDpc(next);
+      return next;
+    });
+  };
+
+  const handleDeleteDpc = (id: string) => {
+    setDpcList((prev) => {
+      const next = prev.filter((d) => d.id !== id);
+      saveLocalDpc(next);
+      return next;
+    });
+  };
+
+  const handleSaveDpr = (saved: DprItem) => {
+    setDprList((prev) => {
+      const exists = prev.some((d) => d.id === saved.id || d.kodeWilayah === saved.kodeWilayah);
+      const next = exists
+        ? prev.map((d) =>
+            d.id === saved.id || d.kodeWilayah === saved.kodeWilayah ? saved : d,
+          )
+        : [...prev, saved];
+      saveLocalDpr(next);
+      return next;
+    });
+  };
+
+  const handleDeleteDpr = (id: string) => {
+    setDprList((prev) => {
+      const next = prev.filter((d) => d.id !== id);
+      saveLocalDpr(next);
+      return next;
+    });
+  };
+
   const handleImportedKodeWilayah = (rows: KodeWilayahItem[]) => {
     setKodeWilayahList(rows);
     saveLocalKodeWilayah(rows);
@@ -304,12 +356,18 @@ export default function App() {
             kodeWilayahList={kodeWilayahList}
             dpwList={dpwList}
             dpdList={dpdList}
+            dpcList={dpcList}
+            dprList={dprList}
             syncing={syncing}
             onRefresh={syncFromSheet}
             onSaveDpw={handleSaveDpw}
             onDeleteDpw={handleDeleteDpw}
             onSaveDpd={handleSaveDpd}
             onDeleteDpd={handleDeleteDpd}
+            onSaveDpc={handleSaveDpc}
+            onDeleteDpc={handleDeleteDpc}
+            onSaveDpr={handleSaveDpr}
+            onDeleteDpr={handleDeleteDpr}
             onImportedKodeWilayah={handleImportedKodeWilayah}
           />
         )}

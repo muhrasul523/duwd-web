@@ -28,7 +28,9 @@ const SHEETS = {
 const WILAYAH_SHEETS = {
   KODE_WILAYAH: 'KODE_WILAYAH',
   DPW: 'DPW',
-  DPD: 'DPD'
+  DPD: 'DPD',
+  DPC: 'DPC',
+  DPR: 'DPR'
 };
 
 /**
@@ -168,26 +170,27 @@ function setupWilayahSpreadsheetManual() {
 }
 
 /**
- * Menyiapkan 3 tab sheet pada Spreadsheet #2 (KODE_WILAYAH, DPW, DPD).
+ * Menyiapkan tab sheet pada Spreadsheet #2 (KODE_WILAYAH, DPW, DPD, DPC, DPR).
+ * Catatan: jika tab KODE_WILAYAH sudah berisi data (mis. 83.762 baris), struktur kolomnya tidak diubah.
  */
 function setupWilayahDatabase_(wSs) {
+  // 1. Tab KODE_WILAYAH (jangan timpa jika sudah ada data)
+  let kwSheet = wSs.getSheetByName(WILAYAH_SHEETS.KODE_WILAYAH);
+  if (!kwSheet) {
+    kwSheet = wSs.insertSheet(WILAYAH_SHEETS.KODE_WILAYAH);
+  }
+  if (kwSheet.getLastRow() === 0) {
+    const kwHeaders = ['id', 'pulau', 'pulau_id', 'prov', 'prov_id', 'kab', 'kab_id', 'kec', 'kec_id', 'kel', 'kel_id'];
+    kwSheet.getRange(1, 1, 1, kwHeaders.length).setValues([kwHeaders]);
+    kwSheet.getRange(1, 1, 1, kwHeaders.length)
+      .setFontWeight('bold')
+      .setBackground('#07525E')
+      .setFontColor('#FFFFFF');
+    kwSheet.setFrozenRows(1);
+  }
+
+  // 2. Tab Kelembagaan: DPW, DPD, DPC, DPR
   const defs = [
-    {
-      name: WILAYAH_SHEETS.KODE_WILAYAH,
-      headers: [
-        'Kode_Wilayah',
-        'Tingkat',
-        'Pulau',
-        'Kode_Provinsi',
-        'Nama_Provinsi',
-        'Kode_KabKota',
-        'Nama_KabKota',
-        'Kode_Kecamatan',
-        'Nama_Kecamatan',
-        'Nama_KelDesa',
-        'Parent_Kode'
-      ]
-    },
     {
       name: WILAYAH_SHEETS.DPW,
       headers: [
@@ -225,6 +228,52 @@ function setupWilayahDatabase_(wSs) {
         'Tautan_Drive',
         'Diperbarui_Pada'
       ]
+    },
+    {
+      name: WILAYAH_SHEETS.DPC,
+      headers: [
+        'ID_DPC',
+        'Kode_Wilayah',
+        'Kode_KabKota',
+        'Kode_Provinsi',
+        'Pulau',
+        'Nama_Provinsi',
+        'Nama_KabKota',
+        'Nama_Kecamatan',
+        'Nama_DPC',
+        'Status_Terbentuk',
+        'Ketua_Nama',
+        'Ketua_WA',
+        'Sekretaris_Nama',
+        'Sekretaris_WA',
+        'Alamat_Kantor',
+        'Tautan_Drive',
+        'Diperbarui_Pada'
+      ]
+    },
+    {
+      name: WILAYAH_SHEETS.DPR,
+      headers: [
+        'ID_DPR',
+        'Kode_Wilayah',
+        'Kode_Kecamatan',
+        'Kode_KabKota',
+        'Kode_Provinsi',
+        'Pulau',
+        'Nama_Provinsi',
+        'Nama_KabKota',
+        'Nama_Kecamatan',
+        'Nama_KelDesa',
+        'Nama_DPR',
+        'Status_Terbentuk',
+        'Ketua_Nama',
+        'Ketua_WA',
+        'Sekretaris_Nama',
+        'Sekretaris_WA',
+        'Alamat_Kantor',
+        'Tautan_Drive',
+        'Diperbarui_Pada'
+      ]
     }
   ];
 
@@ -244,16 +293,6 @@ function setupWilayahDatabase_(wSs) {
       ensureHeaderColumns_(sheet, def.headers);
     }
   });
-
-  // Seed 38 Provinsi jika KODE_WILAYAH masih kosong
-  const kwSheet = wSs.getSheetByName(WILAYAH_SHEETS.KODE_WILAYAH);
-  if (kwSheet.getLastRow() <= 1) {
-    const starterProvinces = getStarterProvinceRows_();
-    kwSheet.getRange(2, 1, starterProvinces.length, 11).setValues(starterProvinces);
-    // Pastikan kolom Kode_Wilayah & Kode_Provinsi berformat teks agar nol di depan tidak hilang
-    kwSheet.getRange(2, 1, starterProvinces.length, 1).setNumberFormat('@');
-    kwSheet.getRange(2, 4, starterProvinces.length, 1).setNumberFormat('@');
-  }
 }
 
 function getWilayahSpreadsheetOrThrow_(optionalRawId) {
@@ -291,6 +330,8 @@ function doGet(e) {
       let wilayahError = '';
       let dpwCount = 0;
       let dpdCount = 0;
+      let dpcCount = 0;
+      let dprCount = 0;
       let wilayahRowsCount = 0;
 
       if (wilayahId) {
@@ -300,9 +341,13 @@ function doGet(e) {
           wilayahName = wSs.getName();
           const dpwSh = wSs.getSheetByName(WILAYAH_SHEETS.DPW);
           const dpdSh = wSs.getSheetByName(WILAYAH_SHEETS.DPD);
+          const dpcSh = wSs.getSheetByName(WILAYAH_SHEETS.DPC);
+          const dprSh = wSs.getSheetByName(WILAYAH_SHEETS.DPR);
           const kwSh = wSs.getSheetByName(WILAYAH_SHEETS.KODE_WILAYAH);
           dpwCount = dpwSh ? Math.max(0, dpwSh.getLastRow() - 1) : 0;
           dpdCount = dpdSh ? Math.max(0, dpdSh.getLastRow() - 1) : 0;
+          dpcCount = dpcSh ? Math.max(0, dpcSh.getLastRow() - 1) : 0;
+          dprCount = dprSh ? Math.max(0, dprSh.getLastRow() - 1) : 0;
           wilayahRowsCount = kwSh ? Math.max(0, kwSh.getLastRow() - 1) : 0;
         } catch (wErr) {
           wilayahError = wErr.message;
@@ -310,10 +355,10 @@ function doGet(e) {
       }
 
       const msg = wilayahConnected
-        ? 'Terhubung ke 2 Spreadsheet: "' + masterSs.getName() + '" & "' + wilayahName + '" (DPW: ' + dpwCount + ', DPD: ' + dpdCount + ', Wilayah: ' + wilayahRowsCount + ').'
+        ? 'Terhubung ke 2 Spreadsheet: "' + masterSs.getName() + '" & "' + wilayahName + '" (DPW: ' + dpwCount + ', DPD: ' + dpdCount + ', DPC: ' + dpcCount + ', DPR: ' + dprCount + ', Kode Wilayah: ' + wilayahRowsCount + ').'
         : wilayahId
           ? 'Spreadsheet Induk "' + masterSs.getName() + '" terhubung, tetapi Spreadsheet #2 gagal dibuka: ' + wilayahError
-          : 'Spreadsheet Induk "' + masterSs.getName() + '" terhubung. Spreadsheet #2 (Wilayah & DPW-DPD) belum ditautkan.';
+          : 'Spreadsheet Induk "' + masterSs.getName() + '" terhubung. Spreadsheet #2 (Wilayah & DPW-DPD-DPC-DPR) belum ditautkan.';
 
       return jsonOut_({
         ok: true,
@@ -337,21 +382,72 @@ function doGet(e) {
     if (action === 'getWilayahChildren') {
       const wSs = getWilayahSpreadsheetOrThrow_();
       const kwSheet = wSs.getSheetByName(WILAYAH_SHEETS.KODE_WILAYAH);
-      if (!kwSheet) {
+      if (!kwSheet || kwSheet.getLastRow() <= 1) {
         return jsonOut_({ ok: true, data: [] });
       }
       const parentKode = String(params.parentKode || '').trim();
       const kodeProvinsi = String(params.kodeProvinsi || '').trim();
       const tingkatFilter = String(params.tingkat || '').trim();
+
+      const headers = kwSheet.getRange(1, 1, 1, kwSheet.getLastColumn()).getValues()[0].map(function (h) {
+        return String(h).trim().toLowerCase();
+      });
+      const isFlatGabungan = headers.indexOf('kel_id') !== -1 || headers.indexOf('prov_id') !== -1;
+
       const allRows = readSheetObjects_(kwSheet);
       const result = [];
+      const seenKec = {};
+
       for (let i = 0; i < allRows.length; i++) {
-        const mapped = mapKodeWilayahRow_(allRows[i]);
-        if (tingkatFilter && mapped.tingkat !== tingkatFilter) continue;
-        if (parentKode && mapped.parentKode !== parentKode && !mapped.kodeWilayah.startsWith(parentKode + '.')) continue;
-        if (kodeProvinsi && mapped.kodeProvinsi !== kodeProvinsi) continue;
-        result.push(mapped);
-        if (result.length >= 1500) break;
+        const r = allRows[i];
+        if (isFlatGabungan) {
+          const provId = String(r.prov_id || '').trim();
+          const kabId = String(r.kab_id || '').trim();
+          const kecId = String(r.kec_id || '').trim();
+          const kelId = String(r.kel_id || r.id || '').trim();
+
+          if (kodeProvinsi && provId !== kodeProvinsi) continue;
+          if (parentKode && kecId !== parentKode && kabId !== parentKode && provId !== parentKode) continue;
+
+          if ((!tingkatFilter || tingkatFilter === 'Kecamatan') && kecId && !seenKec[kecId]) {
+            seenKec[kecId] = true;
+            result.push({
+              kodeWilayah: kecId,
+              tingkat: 'Kecamatan',
+              pulau: String(r.pulau || '').trim(),
+              kodeProvinsi: provId,
+              namaProvinsi: String(r.prov || '').trim(),
+              kodeKabKota: kabId,
+              namaKabKota: String(r.kab || '').trim(),
+              kodeKecamatan: kecId,
+              namaKecamatan: String(r.kec || '').trim(),
+              namaKelDesa: '',
+              parentKode: kabId
+            });
+          }
+          if (!tingkatFilter || tingkatFilter === 'KelDesa') {
+            result.push({
+              kodeWilayah: kelId,
+              tingkat: 'KelDesa',
+              pulau: String(r.pulau || '').trim(),
+              kodeProvinsi: provId,
+              namaProvinsi: String(r.prov || '').trim(),
+              kodeKabKota: kabId,
+              namaKabKota: String(r.kab || '').trim(),
+              kodeKecamatan: kecId,
+              namaKecamatan: String(r.kec || '').trim(),
+              namaKelDesa: String(r.kel || '').trim(),
+              parentKode: kecId
+            });
+          }
+        } else {
+          const mapped = mapKodeWilayahRow_(r);
+          if (tingkatFilter && mapped.tingkat !== tingkatFilter) continue;
+          if (parentKode && mapped.parentKode !== parentKode && !mapped.kodeWilayah.startsWith(parentKode + '.')) continue;
+          if (kodeProvinsi && mapped.kodeProvinsi !== kodeProvinsi) continue;
+          result.push(mapped);
+        }
+        if (result.length >= 4000) break;
       }
       result.sort(compareKodeWilayah_);
       return jsonOut_({ ok: true, data: result });
@@ -419,18 +515,20 @@ function doGet(e) {
       let kodeWilayah = [];
       let dpw = [];
       let dpd = [];
+      let dpc = [];
+      let dpr = [];
 
       if (wilayahId) {
         try {
           const wSs = SpreadsheetApp.openById(wilayahId);
           wilayahConnected = true;
 
+          // Lewati pembacaan full KODE_WILAYAH jika > 1500 baris (83rb+ baris dimuat langsung dari indeks statis frontend)
           const kwSheet = wSs.getSheetByName(WILAYAH_SHEETS.KODE_WILAYAH);
-          if (kwSheet) {
+          if (kwSheet && kwSheet.getLastRow() <= 1500) {
             const rawKw = readSheetObjects_(kwSheet);
             for (let i = 0; i < rawKw.length; i++) {
               const item = mapKodeWilayahRow_(rawKw[i]);
-              // Muat Pulau, Provinsi, dan KabKota saat getAllData agar cepat (~550 baris)
               if (item.tingkat === 'Pulau' || item.tingkat === 'Provinsi' || item.tingkat === 'KabKota') {
                 kodeWilayah.push(item);
               }
@@ -440,46 +538,22 @@ function doGet(e) {
 
           const dpwSheet = wSs.getSheetByName(WILAYAH_SHEETS.DPW);
           if (dpwSheet) {
-            dpw = readSheetObjects_(dpwSheet).map(function (r) {
-              return {
-                id: String(r.ID_DPW || ''),
-                kodeWilayah: String(r.Kode_Wilayah || ''),
-                pulau: String(r.Pulau || ''),
-                namaDpw: String(r.Nama_DPW || ''),
-                namaProvinsi: String(r.Nama_Provinsi || ''),
-                statusTerbentuk: String(r.Status_Terbentuk || 'Sudah Terbentuk'),
-                ketuaNama: String(r.Ketua_Nama || ''),
-                ketuaWa: normalizeWaNumber_(r.Ketua_WA || ''),
-                sekretarisNama: String(r.Sekretaris_Nama || ''),
-                sekretarisWa: normalizeWaNumber_(r.Sekretaris_WA || ''),
-                alamatKantor: String(r.Alamat_Kantor || ''),
-                tautanDrive: String(r.Tautan_Drive || ''),
-                diperbaruiPada: String(r.Diperbarui_Pada || '')
-              };
-            }).sort(compareKodeWilayah_);
+            dpw = readSheetObjects_(dpwSheet).map(mapDpwRow_).sort(compareKodeWilayah_);
           }
 
           const dpdSheet = wSs.getSheetByName(WILAYAH_SHEETS.DPD);
           if (dpdSheet) {
-            dpd = readSheetObjects_(dpdSheet).map(function (r) {
-              return {
-                id: String(r.ID_DPD || ''),
-                kodeWilayah: String(r.Kode_Wilayah || ''),
-                kodeProvinsi: String(r.Kode_Provinsi || ''),
-                pulau: String(r.Pulau || ''),
-                namaProvinsi: String(r.Nama_Provinsi || ''),
-                namaDpd: String(r.Nama_DPD || ''),
-                namaKabKota: String(r.Nama_KabKota || ''),
-                statusTerbentuk: String(r.Status_Terbentuk || 'Sudah Terbentuk'),
-                ketuaNama: String(r.Ketua_Nama || ''),
-                ketuaWa: normalizeWaNumber_(r.Ketua_WA || ''),
-                sekretarisNama: String(r.Sekretaris_Nama || ''),
-                sekretarisWa: normalizeWaNumber_(r.Sekretaris_WA || ''),
-                alamatKantor: String(r.Alamat_Kantor || ''),
-                tautanDrive: String(r.Tautan_Drive || ''),
-                diperbaruiPada: String(r.Diperbarui_Pada || '')
-              };
-            }).sort(compareKodeWilayah_);
+            dpd = readSheetObjects_(dpdSheet).map(mapDpdRow_).sort(compareKodeWilayah_);
+          }
+
+          const dpcSheet = wSs.getSheetByName(WILAYAH_SHEETS.DPC);
+          if (dpcSheet) {
+            dpc = readSheetObjects_(dpcSheet).map(mapDpcRow_).sort(compareKodeWilayah_);
+          }
+
+          const dprSheet = wSs.getSheetByName(WILAYAH_SHEETS.DPR);
+          if (dprSheet) {
+            dpr = readSheetObjects_(dprSheet).map(mapDprRow_).sort(compareKodeWilayah_);
           }
         } catch (ignore) {
           wilayahConnected = false;
@@ -496,6 +570,8 @@ function doGet(e) {
           kodeWilayah: kodeWilayah,
           dpw: dpw,
           dpd: dpd,
+          dpc: dpc,
+          dpr: dpr,
           wilayahConnected: wilayahConnected,
           settings: {
             namaAplikasi: settingsMap.NAMA_APLIKASI || 'DUWD DPP WI',
@@ -529,15 +605,22 @@ function doPost(e) {
   const pin = String(body.pin || '').trim();
   const payload = body.payload || {};
 
+  const ADMIN_ALLOWED_ACTIONS = {
+    saveDpw: true,
+    saveDpd: true,
+    saveDpc: true,
+    saveDpr: true
+  };
+
   try {
     const role = resolveRoleByPin_(pin);
     if (!role) {
       return jsonOut_({ ok: false, error: 'Akses ditolak. PIN tidak valid.' });
     }
-    if (role !== 'superadmin') {
+    if (role !== 'superadmin' && !(role === 'admin' && ADMIN_ALLOWED_ACTIONS[action])) {
       return jsonOut_({
         ok: false,
-        error: 'Saat ini hanya Super Admin yang memiliki akses untuk mengedit data pengurus, program kerja, unit, DPW/DPD, dan pengaturan.'
+        error: 'Akses terbatas: Admin hanya dapat mengedit nama dan WhatsApp Ketua/Sekretaris DPW/DPD/DPC/DPR.'
       });
     }
 
@@ -741,57 +824,56 @@ function doPost(e) {
       setupWilayahDatabase_(wSs);
 
       const kodeWilayah = String(payload.kodeWilayah || '').trim();
-      const namaDpw = String(payload.namaDpw || '').trim();
       const namaProvinsi = String(payload.namaProvinsi || '').trim();
-      if (!kodeWilayah || !namaDpw || !namaProvinsi) {
-        return jsonOut_({ ok: false, error: 'Kode wilayah, nama provinsi, dan nama DPW wajib diisi.' });
+      const namaDpw = String(payload.namaDpw || ('DPW Wahdah Islamiyah ' + namaProvinsi)).trim();
+      if (!kodeWilayah || !namaProvinsi) {
+        return jsonOut_({ ok: false, error: 'Kode wilayah dan nama provinsi wajib diisi.' });
       }
 
-      const isEdit = Boolean(payload.id);
-      const idDpw = isEdit ? String(payload.id).trim() : generateId_('DPW');
+      const existing = findRowInSs_(wSs, WILAYAH_SHEETS.DPW, payload.id ? 'ID_DPW' : 'Kode_Wilayah', payload.id || kodeWilayah)
+        || findRowInSs_(wSs, WILAYAH_SHEETS.DPW, 'Kode_Wilayah', kodeWilayah);
+      const idDpw = existing ? String(existing.ID_DPW) : (payload.id ? String(payload.id).trim() : generateId_('DPW'));
       const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
 
-      const rowObj = {
-        ID_DPW: idDpw,
-        Kode_Wilayah: kodeWilayah,
-        Pulau: String(payload.pulau || '').trim(),
-        Nama_DPW: namaDpw,
-        Nama_Provinsi: namaProvinsi,
-        Status_Terbentuk: String(payload.statusTerbentuk || 'Sudah Terbentuk').trim(),
-        Ketua_Nama: String(payload.ketuaNama || '').trim(),
-        Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
-        Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
-        Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
-        Alamat_Kantor: String(payload.alamatKantor || '').trim(),
-        Tautan_Drive: String(payload.tautanDrive || '').trim(),
-        Diperbarui_Pada: nowStr
-      };
+      const rowObj = role === 'admin'
+        ? {
+            ID_DPW: idDpw,
+            Kode_Wilayah: existing ? String(existing.Kode_Wilayah) : kodeWilayah,
+            Pulau: existing ? String(existing.Pulau) : String(payload.pulau || '').trim(),
+            Nama_DPW: existing ? String(existing.Nama_DPW) : namaDpw,
+            Nama_Provinsi: existing ? String(existing.Nama_Provinsi) : namaProvinsi,
+            Status_Terbentuk: existing ? String(existing.Status_Terbentuk || 'Belum Terbentuk') : 'Belum Terbentuk',
+            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
+            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
+            Alamat_Kantor: existing ? String(existing.Alamat_Kantor || '') : '',
+            Tautan_Drive: existing ? String(existing.Tautan_Drive || '') : '',
+            Diperbarui_Pada: nowStr
+          }
+        : {
+            ID_DPW: idDpw,
+            Kode_Wilayah: kodeWilayah,
+            Pulau: String(payload.pulau || '').trim(),
+            Nama_DPW: namaDpw,
+            Nama_Provinsi: namaProvinsi,
+            Status_Terbentuk: String(payload.statusTerbentuk || 'Sudah Terbentuk').trim(),
+            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
+            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
+            Alamat_Kantor: String(payload.alamatKantor || '').trim(),
+            Tautan_Drive: String(payload.tautanDrive || '').trim(),
+            Diperbarui_Pada: nowStr
+          };
 
-      const updated = isEdit ? updateRowByIdInSs_(wSs, WILAYAH_SHEETS.DPW, 'ID_DPW', idDpw, rowObj) : false;
+      const updated = existing ? updateRowByIdInSs_(wSs, WILAYAH_SHEETS.DPW, 'ID_DPW', idDpw, rowObj) : false;
       if (!updated) {
         appendRowInSs_(wSs, WILAYAH_SHEETS.DPW, rowObj);
       }
 
-      writeLog_('SUPERADMIN', isEdit ? 'updateDpw' : 'createDpw', kodeWilayah + ' — ' + namaDpw);
-
-      return jsonOut_({
-        ok: true,
-        data: {
-          id: idDpw,
-          kodeWilayah: rowObj.Kode_Wilayah,
-          pulau: rowObj.Pulau,
-          namaDpw: rowObj.Nama_DPW,
-          namaProvinsi: rowObj.Nama_Provinsi,
-          statusTerbentuk: rowObj.Status_Terbentuk,
-          ketuaNama: rowObj.Ketua_Nama,
-          ketuaWa: rowObj.Ketua_WA,
-          sekretarisNama: rowObj.Sekretaris_Nama,
-          sekretarisWa: rowObj.Sekretaris_WA,
-          alamatKantor: rowObj.Alamat_Kantor,
-          tautanDrive: rowObj.Tautan_Drive,
-          diperbaruiPada: rowObj.Diperbarui_Pada
-        }
-      });
+      writeLog_(role.toUpperCase(), existing ? 'updateDpw' : 'createDpw', kodeWilayah + ' — ' + rowObj.Nama_DPW);
+      return jsonOut_({ ok: true, data: mapDpwRow_(rowObj) });
     }
 
     if (action === 'deleteDpw') {
@@ -808,62 +890,61 @@ function doPost(e) {
       setupWilayahDatabase_(wSs);
 
       const kodeWilayah = String(payload.kodeWilayah || '').trim();
-      const namaDpd = String(payload.namaDpd || '').trim();
       const namaKabKota = String(payload.namaKabKota || '').trim();
-      if (!kodeWilayah || !namaDpd || !namaKabKota) {
-        return jsonOut_({ ok: false, error: 'Kode wilayah, nama Kab/Kota, dan nama DPD wajib diisi.' });
+      const namaDpd = String(payload.namaDpd || ('DPD Wahdah Islamiyah ' + namaKabKota)).trim();
+      if (!kodeWilayah || !namaKabKota) {
+        return jsonOut_({ ok: false, error: 'Kode wilayah dan nama Kab/Kota wajib diisi.' });
       }
 
-      const isEdit = Boolean(payload.id);
-      const idDpd = isEdit ? String(payload.id).trim() : generateId_('DPD');
+      const existing = findRowInSs_(wSs, WILAYAH_SHEETS.DPD, payload.id ? 'ID_DPD' : 'Kode_Wilayah', payload.id || kodeWilayah)
+        || findRowInSs_(wSs, WILAYAH_SHEETS.DPD, 'Kode_Wilayah', kodeWilayah);
+      const idDpd = existing ? String(existing.ID_DPD) : (payload.id ? String(payload.id).trim() : generateId_('DPD'));
       const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
       const kodeProv = String(payload.kodeProvinsi || kodeWilayah.split('.')[0] || '').trim();
 
-      const rowObj = {
-        ID_DPD: idDpd,
-        Kode_Wilayah: kodeWilayah,
-        Kode_Provinsi: kodeProv,
-        Pulau: String(payload.pulau || '').trim(),
-        Nama_Provinsi: String(payload.namaProvinsi || '').trim(),
-        Nama_DPD: namaDpd,
-        Nama_KabKota: namaKabKota,
-        Status_Terbentuk: String(payload.statusTerbentuk || 'Sudah Terbentuk').trim(),
-        Ketua_Nama: String(payload.ketuaNama || '').trim(),
-        Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
-        Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
-        Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
-        Alamat_Kantor: String(payload.alamatKantor || '').trim(),
-        Tautan_Drive: String(payload.tautanDrive || '').trim(),
-        Diperbarui_Pada: nowStr
-      };
+      const rowObj = role === 'admin'
+        ? {
+            ID_DPD: idDpd,
+            Kode_Wilayah: existing ? String(existing.Kode_Wilayah) : kodeWilayah,
+            Kode_Provinsi: existing ? String(existing.Kode_Provinsi) : kodeProv,
+            Pulau: existing ? String(existing.Pulau) : String(payload.pulau || '').trim(),
+            Nama_Provinsi: existing ? String(existing.Nama_Provinsi) : String(payload.namaProvinsi || '').trim(),
+            Nama_DPD: existing ? String(existing.Nama_DPD) : namaDpd,
+            Nama_KabKota: existing ? String(existing.Nama_KabKota) : namaKabKota,
+            Status_Terbentuk: existing ? String(existing.Status_Terbentuk || 'Belum Terbentuk') : 'Belum Terbentuk',
+            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
+            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
+            Alamat_Kantor: existing ? String(existing.Alamat_Kantor || '') : '',
+            Tautan_Drive: existing ? String(existing.Tautan_Drive || '') : '',
+            Diperbarui_Pada: nowStr
+          }
+        : {
+            ID_DPD: idDpd,
+            Kode_Wilayah: kodeWilayah,
+            Kode_Provinsi: kodeProv,
+            Pulau: String(payload.pulau || '').trim(),
+            Nama_Provinsi: String(payload.namaProvinsi || '').trim(),
+            Nama_DPD: namaDpd,
+            Nama_KabKota: namaKabKota,
+            Status_Terbentuk: String(payload.statusTerbentuk || 'Sudah Terbentuk').trim(),
+            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
+            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
+            Alamat_Kantor: String(payload.alamatKantor || '').trim(),
+            Tautan_Drive: String(payload.tautanDrive || '').trim(),
+            Diperbarui_Pada: nowStr
+          };
 
-      const updated = isEdit ? updateRowByIdInSs_(wSs, WILAYAH_SHEETS.DPD, 'ID_DPD', idDpd, rowObj) : false;
+      const updated = existing ? updateRowByIdInSs_(wSs, WILAYAH_SHEETS.DPD, 'ID_DPD', idDpd, rowObj) : false;
       if (!updated) {
         appendRowInSs_(wSs, WILAYAH_SHEETS.DPD, rowObj);
       }
 
-      writeLog_('SUPERADMIN', isEdit ? 'updateDpd' : 'createDpd', kodeWilayah + ' — ' + namaDpd);
-
-      return jsonOut_({
-        ok: true,
-        data: {
-          id: idDpd,
-          kodeWilayah: rowObj.Kode_Wilayah,
-          kodeProvinsi: rowObj.Kode_Provinsi,
-          pulau: rowObj.Pulau,
-          namaProvinsi: rowObj.Nama_Provinsi,
-          namaDpd: rowObj.Nama_DPD,
-          namaKabKota: rowObj.Nama_KabKota,
-          statusTerbentuk: rowObj.Status_Terbentuk,
-          ketuaNama: rowObj.Ketua_Nama,
-          ketuaWa: rowObj.Ketua_WA,
-          sekretarisNama: rowObj.Sekretaris_Nama,
-          sekretarisWa: rowObj.Sekretaris_WA,
-          alamatKantor: rowObj.Alamat_Kantor,
-          tautanDrive: rowObj.Tautan_Drive,
-          diperbaruiPada: rowObj.Diperbarui_Pada
-        }
-      });
+      writeLog_(role.toUpperCase(), existing ? 'updateDpd' : 'createDpd', kodeWilayah + ' — ' + rowObj.Nama_DPD);
+      return jsonOut_({ ok: true, data: mapDpdRow_(rowObj) });
     }
 
     if (action === 'deleteDpd') {
@@ -873,6 +954,165 @@ function doPost(e) {
       const deleted = deleteRowByIdInSs_(wSs, WILAYAH_SHEETS.DPD, 'ID_DPD', id);
       writeLog_('SUPERADMIN', 'deleteDpd', id + ' (deleted=' + deleted + ')');
       return jsonOut_({ ok: deleted, error: deleted ? undefined : 'Data DPD tidak ditemukan.' });
+    }
+
+    if (action === 'saveDpc') {
+      const wSs = getWilayahSpreadsheetOrThrow_();
+      setupWilayahDatabase_(wSs);
+
+      const kodeWilayah = String(payload.kodeWilayah || '').trim();
+      const namaKecamatan = String(payload.namaKecamatan || '').trim();
+      const namaDpc = String(payload.namaDpc || ('DPC Wahdah Islamiyah ' + namaKecamatan)).trim();
+      if (!kodeWilayah || !namaKecamatan) {
+        return jsonOut_({ ok: false, error: 'Kode wilayah dan nama Kecamatan wajib diisi.' });
+      }
+
+      const existing = findRowInSs_(wSs, WILAYAH_SHEETS.DPC, payload.id ? 'ID_DPC' : 'Kode_Wilayah', payload.id || kodeWilayah)
+        || findRowInSs_(wSs, WILAYAH_SHEETS.DPC, 'Kode_Wilayah', kodeWilayah);
+      const idDpc = existing ? String(existing.ID_DPC) : (payload.id ? String(payload.id).trim() : generateId_('DPC'));
+      const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
+      const segs = kodeWilayah.split('.');
+      const kodeKab = String(payload.kodeKabKota || segs.slice(0, 2).join('.') || '').trim();
+      const kodeProv = String(payload.kodeProvinsi || segs[0] || '').trim();
+
+      const rowObj = role === 'admin'
+        ? {
+            ID_DPC: idDpc,
+            Kode_Wilayah: existing ? String(existing.Kode_Wilayah) : kodeWilayah,
+            Kode_KabKota: existing ? String(existing.Kode_KabKota) : kodeKab,
+            Kode_Provinsi: existing ? String(existing.Kode_Provinsi) : kodeProv,
+            Pulau: existing ? String(existing.Pulau) : String(payload.pulau || '').trim(),
+            Nama_Provinsi: existing ? String(existing.Nama_Provinsi) : String(payload.namaProvinsi || '').trim(),
+            Nama_KabKota: existing ? String(existing.Nama_KabKota) : String(payload.namaKabKota || '').trim(),
+            Nama_Kecamatan: existing ? String(existing.Nama_Kecamatan) : namaKecamatan,
+            Nama_DPC: existing ? String(existing.Nama_DPC) : namaDpc,
+            Status_Terbentuk: existing ? String(existing.Status_Terbentuk || 'Belum Terbentuk') : 'Belum Terbentuk',
+            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
+            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
+            Alamat_Kantor: existing ? String(existing.Alamat_Kantor || '') : '',
+            Tautan_Drive: existing ? String(existing.Tautan_Drive || '') : '',
+            Diperbarui_Pada: nowStr
+          }
+        : {
+            ID_DPC: idDpc,
+            Kode_Wilayah: kodeWilayah,
+            Kode_KabKota: kodeKab,
+            Kode_Provinsi: kodeProv,
+            Pulau: String(payload.pulau || '').trim(),
+            Nama_Provinsi: String(payload.namaProvinsi || '').trim(),
+            Nama_KabKota: String(payload.namaKabKota || '').trim(),
+            Nama_Kecamatan: namaKecamatan,
+            Nama_DPC: namaDpc,
+            Status_Terbentuk: String(payload.statusTerbentuk || 'Sudah Terbentuk').trim(),
+            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
+            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
+            Alamat_Kantor: String(payload.alamatKantor || '').trim(),
+            Tautan_Drive: String(payload.tautanDrive || '').trim(),
+            Diperbarui_Pada: nowStr
+          };
+
+      const updated = existing ? updateRowByIdInSs_(wSs, WILAYAH_SHEETS.DPC, 'ID_DPC', idDpc, rowObj) : false;
+      if (!updated) {
+        appendRowInSs_(wSs, WILAYAH_SHEETS.DPC, rowObj);
+      }
+
+      writeLog_(role.toUpperCase(), existing ? 'updateDpc' : 'createDpc', kodeWilayah + ' — ' + rowObj.Nama_DPC);
+      return jsonOut_({ ok: true, data: mapDpcRow_(rowObj) });
+    }
+
+    if (action === 'deleteDpc') {
+      const id = String(payload.id || '').trim();
+      if (!id) return jsonOut_({ ok: false, error: 'ID DPC wajib diisi.' });
+      const wSs = getWilayahSpreadsheetOrThrow_();
+      const deleted = deleteRowByIdInSs_(wSs, WILAYAH_SHEETS.DPC, 'ID_DPC', id);
+      writeLog_('SUPERADMIN', 'deleteDpc', id + ' (deleted=' + deleted + ')');
+      return jsonOut_({ ok: deleted, error: deleted ? undefined : 'Data DPC tidak ditemukan.' });
+    }
+
+    if (action === 'saveDpr') {
+      const wSs = getWilayahSpreadsheetOrThrow_();
+      setupWilayahDatabase_(wSs);
+
+      const kodeWilayah = String(payload.kodeWilayah || '').trim();
+      const namaKelDesa = String(payload.namaKelDesa || '').trim();
+      const namaDpr = String(payload.namaDpr || ('DPR Wahdah Islamiyah ' + namaKelDesa)).trim();
+      if (!kodeWilayah || !namaKelDesa) {
+        return jsonOut_({ ok: false, error: 'Kode wilayah dan nama Kelurahan/Desa wajib diisi.' });
+      }
+
+      const existing = findRowInSs_(wSs, WILAYAH_SHEETS.DPR, payload.id ? 'ID_DPR' : 'Kode_Wilayah', payload.id || kodeWilayah)
+        || findRowInSs_(wSs, WILAYAH_SHEETS.DPR, 'Kode_Wilayah', kodeWilayah);
+      const idDpr = existing ? String(existing.ID_DPR) : (payload.id ? String(payload.id).trim() : generateId_('DPR'));
+      const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
+      const segs = kodeWilayah.split('.');
+      const kodeKec = String(payload.kodeKecamatan || segs.slice(0, 3).join('.') || '').trim();
+      const kodeKab = String(payload.kodeKabKota || segs.slice(0, 2).join('.') || '').trim();
+      const kodeProv = String(payload.kodeProvinsi || segs[0] || '').trim();
+
+      const rowObj = role === 'admin'
+        ? {
+            ID_DPR: idDpr,
+            Kode_Wilayah: existing ? String(existing.Kode_Wilayah) : kodeWilayah,
+            Kode_Kecamatan: existing ? String(existing.Kode_Kecamatan) : kodeKec,
+            Kode_KabKota: existing ? String(existing.Kode_KabKota) : kodeKab,
+            Kode_Provinsi: existing ? String(existing.Kode_Provinsi) : kodeProv,
+            Pulau: existing ? String(existing.Pulau) : String(payload.pulau || '').trim(),
+            Nama_Provinsi: existing ? String(existing.Nama_Provinsi) : String(payload.namaProvinsi || '').trim(),
+            Nama_KabKota: existing ? String(existing.Nama_KabKota) : String(payload.namaKabKota || '').trim(),
+            Nama_Kecamatan: existing ? String(existing.Nama_Kecamatan) : String(payload.namaKecamatan || '').trim(),
+            Nama_KelDesa: existing ? String(existing.Nama_KelDesa) : namaKelDesa,
+            Nama_DPR: existing ? String(existing.Nama_DPR) : namaDpr,
+            Status_Terbentuk: existing ? String(existing.Status_Terbentuk || 'Belum Terbentuk') : 'Belum Terbentuk',
+            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
+            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
+            Alamat_Kantor: existing ? String(existing.Alamat_Kantor || '') : '',
+            Tautan_Drive: existing ? String(existing.Tautan_Drive || '') : '',
+            Diperbarui_Pada: nowStr
+          }
+        : {
+            ID_DPR: idDpr,
+            Kode_Wilayah: kodeWilayah,
+            Kode_Kecamatan: kodeKec,
+            Kode_KabKota: kodeKab,
+            Kode_Provinsi: kodeProv,
+            Pulau: String(payload.pulau || '').trim(),
+            Nama_Provinsi: String(payload.namaProvinsi || '').trim(),
+            Nama_KabKota: String(payload.namaKabKota || '').trim(),
+            Nama_Kecamatan: String(payload.namaKecamatan || '').trim(),
+            Nama_KelDesa: namaKelDesa,
+            Nama_DPR: namaDpr,
+            Status_Terbentuk: String(payload.statusTerbentuk || 'Sudah Terbentuk').trim(),
+            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
+            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
+            Alamat_Kantor: String(payload.alamatKantor || '').trim(),
+            Tautan_Drive: String(payload.tautanDrive || '').trim(),
+            Diperbarui_Pada: nowStr
+          };
+
+      const updated = existing ? updateRowByIdInSs_(wSs, WILAYAH_SHEETS.DPR, 'ID_DPR', idDpr, rowObj) : false;
+      if (!updated) {
+        appendRowInSs_(wSs, WILAYAH_SHEETS.DPR, rowObj);
+      }
+
+      writeLog_(role.toUpperCase(), existing ? 'updateDpr' : 'createDpr', kodeWilayah + ' — ' + rowObj.Nama_DPR);
+      return jsonOut_({ ok: true, data: mapDprRow_(rowObj) });
+    }
+
+    if (action === 'deleteDpr') {
+      const id = String(payload.id || '').trim();
+      if (!id) return jsonOut_({ ok: false, error: 'ID DPR wajib diisi.' });
+      const wSs = getWilayahSpreadsheetOrThrow_();
+      const deleted = deleteRowByIdInSs_(wSs, WILAYAH_SHEETS.DPR, 'ID_DPR', id);
+      writeLog_('SUPERADMIN', 'deleteDpr', id + ' (deleted=' + deleted + ')');
+      return jsonOut_({ ok: deleted, error: deleted ? undefined : 'Data DPR tidak ditemukan.' });
     }
 
     if (action === 'importKodeWilayah') {
@@ -1153,6 +1393,104 @@ function updateRowByIdInSs_(ss, sheetName, idCol, idVal, rowObj) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function mapDpwRow_(r) {
+  return {
+    id: String(r.ID_DPW || ''),
+    kodeWilayah: String(r.Kode_Wilayah || ''),
+    pulau: String(r.Pulau || ''),
+    namaDpw: String(r.Nama_DPW || ''),
+    namaProvinsi: String(r.Nama_Provinsi || ''),
+    statusTerbentuk: String(r.Status_Terbentuk || 'Sudah Terbentuk'),
+    ketuaNama: String(r.Ketua_Nama || ''),
+    ketuaWa: normalizeWaNumber_(r.Ketua_WA || ''),
+    sekretarisNama: String(r.Sekretaris_Nama || ''),
+    sekretarisWa: normalizeWaNumber_(r.Sekretaris_WA || ''),
+    alamatKantor: String(r.Alamat_Kantor || ''),
+    tautanDrive: String(r.Tautan_Drive || ''),
+    diperbaruiPada: String(r.Diperbarui_Pada || '')
+  };
+}
+
+function mapDpdRow_(r) {
+  return {
+    id: String(r.ID_DPD || ''),
+    kodeWilayah: String(r.Kode_Wilayah || ''),
+    kodeProvinsi: String(r.Kode_Provinsi || ''),
+    pulau: String(r.Pulau || ''),
+    namaProvinsi: String(r.Nama_Provinsi || ''),
+    namaDpd: String(r.Nama_DPD || ''),
+    namaKabKota: String(r.Nama_KabKota || ''),
+    statusTerbentuk: String(r.Status_Terbentuk || 'Sudah Terbentuk'),
+    ketuaNama: String(r.Ketua_Nama || ''),
+    ketuaWa: normalizeWaNumber_(r.Ketua_WA || ''),
+    sekretarisNama: String(r.Sekretaris_Nama || ''),
+    sekretarisWa: normalizeWaNumber_(r.Sekretaris_WA || ''),
+    alamatKantor: String(r.Alamat_Kantor || ''),
+    tautanDrive: String(r.Tautan_Drive || ''),
+    diperbaruiPada: String(r.Diperbarui_Pada || '')
+  };
+}
+
+function mapDpcRow_(r) {
+  return {
+    id: String(r.ID_DPC || ''),
+    kodeWilayah: String(r.Kode_Wilayah || ''),
+    kodeKabKota: String(r.Kode_KabKota || ''),
+    kodeProvinsi: String(r.Kode_Provinsi || ''),
+    pulau: String(r.Pulau || ''),
+    namaProvinsi: String(r.Nama_Provinsi || ''),
+    namaKabKota: String(r.Nama_KabKota || ''),
+    namaKecamatan: String(r.Nama_Kecamatan || ''),
+    namaDpc: String(r.Nama_DPC || ''),
+    statusTerbentuk: String(r.Status_Terbentuk || 'Sudah Terbentuk'),
+    ketuaNama: String(r.Ketua_Nama || ''),
+    ketuaWa: normalizeWaNumber_(r.Ketua_WA || ''),
+    sekretarisNama: String(r.Sekretaris_Nama || ''),
+    sekretarisWa: normalizeWaNumber_(r.Sekretaris_WA || ''),
+    alamatKantor: String(r.Alamat_Kantor || ''),
+    tautanDrive: String(r.Tautan_Drive || ''),
+    diperbaruiPada: String(r.Diperbarui_Pada || '')
+  };
+}
+
+function mapDprRow_(r) {
+  return {
+    id: String(r.ID_DPR || ''),
+    kodeWilayah: String(r.Kode_Wilayah || ''),
+    kodeKecamatan: String(r.Kode_Kecamatan || ''),
+    kodeKabKota: String(r.Kode_KabKota || ''),
+    kodeProvinsi: String(r.Kode_Provinsi || ''),
+    pulau: String(r.Pulau || ''),
+    namaProvinsi: String(r.Nama_Provinsi || ''),
+    namaKabKota: String(r.Nama_KabKota || ''),
+    namaKecamatan: String(r.Nama_Kecamatan || ''),
+    namaKelDesa: String(r.Nama_KelDesa || ''),
+    namaDpr: String(r.Nama_DPR || ''),
+    statusTerbentuk: String(r.Status_Terbentuk || 'Sudah Terbentuk'),
+    ketuaNama: String(r.Ketua_Nama || ''),
+    ketuaWa: normalizeWaNumber_(r.Ketua_WA || ''),
+    sekretarisNama: String(r.Sekretaris_Nama || ''),
+    sekretarisWa: normalizeWaNumber_(r.Sekretaris_WA || ''),
+    alamatKantor: String(r.Alamat_Kantor || ''),
+    tautanDrive: String(r.Tautan_Drive || ''),
+    diperbaruiPada: String(r.Diperbarui_Pada || '')
+  };
+}
+
+function findRowInSs_(ss, sheetName, colName, targetVal) {
+  if (!targetVal) return null;
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet || sheet.getLastRow() <= 1) return null;
+  const rows = readSheetObjects_(sheet);
+  const needle = String(targetVal).trim();
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][colName] || '').trim() === needle) {
+      return rows[i];
+    }
+  }
+  return null;
 }
 
 function deleteRowByIdInSs_(ss, sheetName, idCol, idVal) {

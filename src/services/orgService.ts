@@ -2,7 +2,9 @@ import { STARTER_KODE_WILAYAH } from '../data/kodeWilayahSeed';
 import { RPKA_2027_KEGIATAN, RPKA_2027_PROKER } from '../data/rpka2027Seed';
 import type {
   AppSettings,
+  DpcItem,
   DpdItem,
+  DprItem,
   DpwItem,
   KegiatanRpkaItem,
   KodeWilayahItem,
@@ -23,6 +25,8 @@ const STORAGE_KEYS = {
   KODE_WILAYAH: 'duwd_kode_wilayah_cache_v1',
   DPW: 'duwd_dpw_cache_v1',
   DPD: 'duwd_dpd_cache_v1',
+  DPC: 'duwd_dpc_cache_v1',
+  DPR: 'duwd_dpr_cache_v1',
   SETTINGS: 'duwd_settings_cache_v2',
   PINS: 'duwd_local_pins_v2',
 };
@@ -228,6 +232,44 @@ export function saveLocalDpd(list: DpdItem[]): void {
   }
 }
 
+export function loadLocalDpc(): DpcItem[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.DPC);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as DpcItem[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalDpc(list: DpcItem[]): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.DPC, JSON.stringify(list));
+  } catch {
+    // Ignore
+  }
+}
+
+export function loadLocalDpr(): DprItem[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.DPR);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as DprItem[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalDpr(list: DprItem[]): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.DPR, JSON.stringify(list));
+  } catch {
+    // Ignore
+  }
+}
+
 function loadLocalPins(): { superadmin: string; admin: string } {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEYS.PINS);
@@ -367,6 +409,8 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
     kodeWilayah: loadLocalKodeWilayah(),
     dpw: loadLocalDpw(),
     dpd: loadLocalDpd(),
+    dpc: loadLocalDpc(),
+    dpr: loadLocalDpr(),
     wilayahConnected: false,
     settings: {
       namaAplikasi: localSettings.namaAplikasi,
@@ -389,6 +433,8 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
       res.data.kodeWilayah?.length > 0 ? res.data.kodeWilayah : STARTER_KODE_WILAYAH;
     const dpw = Array.isArray(res.data.dpw) ? res.data.dpw : [];
     const dpd = Array.isArray(res.data.dpd) ? res.data.dpd : [];
+    const dpc = Array.isArray(res.data.dpc) ? res.data.dpc : [];
+    const dpr = Array.isArray(res.data.dpr) ? res.data.dpr : [];
     const wilayahConnected = Boolean(res.data.wilayahConnected);
 
     saveLocalUnits(units);
@@ -398,6 +444,8 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
     saveLocalKodeWilayah(kodeWilayah);
     saveLocalDpw(dpw);
     saveLocalDpd(dpd);
+    saveLocalDpc(dpc);
+    saveLocalDpr(dpr);
 
     const nextSettings = {
       namaAplikasi: res.data.settings?.namaAplikasi || 'DUWD DPP WI',
@@ -417,6 +465,8 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
         kodeWilayah,
         dpw,
         dpd,
+        dpc,
+        dpr,
         wilayahConnected,
         settings: nextSettings,
       },
@@ -696,6 +746,106 @@ export async function deleteDpdRecord(
     const res = await gasPost(webAppUrl.trim(), 'deleteDpd', pin, { id });
     if (!res.ok) {
       return { ok: false, synced: false, error: res.error || 'Gagal menghapus DPD.' };
+    }
+    return { ok: true, synced: true };
+  }
+  return { ok: true, synced: false };
+}
+
+export async function saveDpcRecord(
+  input: Omit<DpcItem, 'id'> & { id?: string },
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; item?: DpcItem; synced: boolean; error?: string }> {
+  const payload = {
+    ...input,
+    ketuaWa: normalizeWhatsApp(input.ketuaWa),
+    sekretarisWa: normalizeWhatsApp(input.sekretarisWa),
+  };
+
+  if (webAppUrl.trim()) {
+    const res = await gasPost<DpcItem>(webAppUrl.trim(), 'saveDpc', pin, payload);
+    if (res.ok && res.data) {
+      return { ok: true, item: res.data, synced: true };
+    }
+    return {
+      ok: false,
+      synced: false,
+      error: res.error || 'Gagal menyimpan DPC ke Spreadsheet #2.',
+    };
+  }
+
+  const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  return {
+    ok: true,
+    synced: false,
+    item: {
+      ...payload,
+      id: input.id || `DPC-${Date.now().toString().slice(-6)}`,
+      diperbaruiPada: nowStr,
+    },
+  };
+}
+
+export async function deleteDpcRecord(
+  id: string,
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; synced: boolean; error?: string }> {
+  if (webAppUrl.trim()) {
+    const res = await gasPost(webAppUrl.trim(), 'deleteDpc', pin, { id });
+    if (!res.ok) {
+      return { ok: false, synced: false, error: res.error || 'Gagal menghapus DPC.' };
+    }
+    return { ok: true, synced: true };
+  }
+  return { ok: true, synced: false };
+}
+
+export async function saveDprRecord(
+  input: Omit<DprItem, 'id'> & { id?: string },
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; item?: DprItem; synced: boolean; error?: string }> {
+  const payload = {
+    ...input,
+    ketuaWa: normalizeWhatsApp(input.ketuaWa),
+    sekretarisWa: normalizeWhatsApp(input.sekretarisWa),
+  };
+
+  if (webAppUrl.trim()) {
+    const res = await gasPost<DprItem>(webAppUrl.trim(), 'saveDpr', pin, payload);
+    if (res.ok && res.data) {
+      return { ok: true, item: res.data, synced: true };
+    }
+    return {
+      ok: false,
+      synced: false,
+      error: res.error || 'Gagal menyimpan DPR ke Spreadsheet #2.',
+    };
+  }
+
+  const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  return {
+    ok: true,
+    synced: false,
+    item: {
+      ...payload,
+      id: input.id || `DPR-${Date.now().toString().slice(-6)}`,
+      diperbaruiPada: nowStr,
+    },
+  };
+}
+
+export async function deleteDprRecord(
+  id: string,
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; synced: boolean; error?: string }> {
+  if (webAppUrl.trim()) {
+    const res = await gasPost(webAppUrl.trim(), 'deleteDpr', pin, { id });
+    if (!res.ok) {
+      return { ok: false, synced: false, error: res.error || 'Gagal menghapus DPR.' };
     }
     return { ok: true, synced: true };
   }

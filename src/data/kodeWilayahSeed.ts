@@ -25,9 +25,9 @@ export const STARTER_KODE_WILAYAH: KodeWilayahItem[] = [
   { kodeWilayah: '35', tingkat: 'Provinsi', pulau: 'Jawa', kodeProvinsi: '35', namaProvinsi: 'Jawa Timur' },
   { kodeWilayah: '36', tingkat: 'Provinsi', pulau: 'Jawa', kodeProvinsi: '36', namaProvinsi: 'Banten' },
 
-  { kodeWilayah: '51', tingkat: 'Provinsi', pulau: 'Bali & Nusa Tenggara', kodeProvinsi: '51', namaProvinsi: 'Bali' },
-  { kodeWilayah: '52', tingkat: 'Provinsi', pulau: 'Bali & Nusa Tenggara', kodeProvinsi: '52', namaProvinsi: 'Nusa Tenggara Barat' },
-  { kodeWilayah: '53', tingkat: 'Provinsi', pulau: 'Bali & Nusa Tenggara', kodeProvinsi: '53', namaProvinsi: 'Nusa Tenggara Timur' },
+  { kodeWilayah: '51', tingkat: 'Provinsi', pulau: 'Bali-Nusa', kodeProvinsi: '51', namaProvinsi: 'Bali' },
+  { kodeWilayah: '52', tingkat: 'Provinsi', pulau: 'Bali-Nusa', kodeProvinsi: '52', namaProvinsi: 'Nusa Tenggara Barat' },
+  { kodeWilayah: '53', tingkat: 'Provinsi', pulau: 'Bali-Nusa', kodeProvinsi: '53', namaProvinsi: 'Nusa Tenggara Timur' },
 
   { kodeWilayah: '61', tingkat: 'Provinsi', pulau: 'Kalimantan', kodeProvinsi: '61', namaProvinsi: 'Kalimantan Barat' },
   { kodeWilayah: '62', tingkat: 'Provinsi', pulau: 'Kalimantan', kodeProvinsi: '62', namaProvinsi: 'Kalimantan Tengah' },

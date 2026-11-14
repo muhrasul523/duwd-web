@@ -64,6 +64,8 @@ export interface KodeWilayahItem {
 
 export type StatusTerbentuk = 'Sudah Terbentuk' | 'Persiapan' | 'Belum Terbentuk';
 
+export type JenisLembaga = 'DPW' | 'DPD' | 'DPC' | 'DPR';
+
 export interface DpwItem {
   id: string;
   kodeWilayah: string;
@@ -98,6 +100,73 @@ export interface DpdItem {
   diperbaruiPada?: string;
 }
 
+export interface DpcItem {
+  id: string;
+  kodeWilayah: string;
+  kodeKabKota: string;
+  kodeProvinsi: string;
+  pulau: string;
+  namaProvinsi: string;
+  namaKabKota: string;
+  namaKecamatan: string;
+  namaDpc: string;
+  statusTerbentuk: StatusTerbentuk;
+  ketuaNama: string;
+  ketuaWa: string;
+  sekretarisNama: string;
+  sekretarisWa: string;
+  alamatKantor?: string;
+  tautanDrive?: string;
+  diperbaruiPada?: string;
+}
+
+export interface DprItem {
+  id: string;
+  kodeWilayah: string;
+  kodeKecamatan: string;
+  kodeKabKota: string;
+  kodeProvinsi: string;
+  pulau: string;
+  namaProvinsi: string;
+  namaKabKota: string;
+  namaKecamatan: string;
+  namaKelDesa: string;
+  namaDpr: string;
+  statusTerbentuk: StatusTerbentuk;
+  ketuaNama: string;
+  ketuaWa: string;
+  sekretarisNama: string;
+  sekretarisWa: string;
+  alamatKantor?: string;
+  tautanDrive?: string;
+  diperbaruiPada?: string;
+}
+
+export interface KelembagaanUnifiedRow {
+  jenis: JenisLembaga;
+  id?: string;
+  kodeWilayah: string;
+  pulau: string;
+  kodeProvinsi: string;
+  namaProvinsi: string;
+  kodeKabKota?: string;
+  namaKabKota?: string;
+  kodeKecamatan?: string;
+  namaKecamatan?: string;
+  namaKelDesa?: string;
+  namaLembaga: string;
+  namaWilayah: string;
+  statusTerbentuk: StatusTerbentuk;
+  ketuaNama: string;
+  ketuaWa: string;
+  sekretarisNama: string;
+  sekretarisWa: string;
+  alamatKantor?: string;
+  tautanDrive?: string;
+  diperbaruiPada?: string;
+  hasSheetRecord: boolean;
+}
+
 export interface AppSettings {
   namaAplikasi: string;
   logoDataUrl: string;
@@ -114,6 +183,8 @@ export interface OrgDataset {
   kodeWilayah: KodeWilayahItem[];
   dpw: DpwItem[];
   dpd: DpdItem[];
+  dpc: DpcItem[];
+  dpr: DprItem[];
   wilayahConnected: boolean;
   settings: {
     namaAplikasi: string;

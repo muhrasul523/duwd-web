@@ -1,3 +1,5 @@
+import defaultLogoWi from '../assets/logo-wi.png';
+
 /**
  * Menormalkan nomor WhatsApp secara otomatis:
  * - Menghapus semua karakter selain angka (spasi, tanda baca, huruf)
@@ -90,7 +92,7 @@ export function applyBrowserFavicon(logoUrl: string): void {
     cleanUrl.startsWith('/') ||
     cleanUrl.startsWith('https://') ||
     cleanUrl.startsWith('http://');
-  const href = isValidLogo ? cleanUrl : '/favicon.png';
+  const href = isValidLogo ? cleanUrl : defaultLogoWi;
 
   let mimeType = 'image/png';
   if (href.startsWith('data:image/svg+xml') || href.endsWith('.svg')) {
@@ -101,19 +103,28 @@ export function applyBrowserFavicon(logoUrl: string): void {
     mimeType = 'image/webp';
   }
 
-  const iconLinks = document.querySelectorAll<HTMLLinkElement>("link[rel*='icon']");
-  if (iconLinks.length === 0) {
-    const link = document.createElement('link');
-    link.id = 'app-favicon';
-    link.rel = 'icon';
-    link.type = mimeType;
-    link.href = href;
-    document.head.appendChild(link);
-    return;
-  }
+  const existingIcons = document.querySelectorAll<HTMLLinkElement>(
+    "link[rel='icon'], link[rel='shortcut icon']",
+  );
+  existingIcons.forEach((node) => node.remove());
 
-  iconLinks.forEach((link) => {
-    link.type = mimeType;
-    link.href = href;
-  });
+  const iconLink = document.createElement('link');
+  iconLink.id = 'app-favicon';
+  iconLink.rel = 'icon';
+  iconLink.type = mimeType;
+  iconLink.href = href;
+  document.head.appendChild(iconLink);
+
+  const shortcutLink = document.createElement('link');
+  shortcutLink.rel = 'shortcut icon';
+  shortcutLink.type = mimeType;
+  shortcutLink.href = href;
+  document.head.appendChild(shortcutLink);
+
+  if (isValidLogo) {
+    const appleIcon = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
+    if (appleIcon) {
+      appleIcon.href = href;
+    }
+  }
 }

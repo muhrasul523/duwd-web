@@ -192,7 +192,9 @@ export function SuperAdminSettings({
         });
         setSettingsMsg({
           ok: true,
-          text: res.message || 'Spreadsheet #2 berhasil disiapkan (tab KODE_WILAYAH, DPW, DPD).',
+          text:
+            res.message ||
+            'Spreadsheet #2 berhasil disiapkan (tab KODE_WILAYAH, DPW, DPD, DPC, DPR).',
         });
         await onSyncFromSheet();
       } else {
@@ -362,7 +364,7 @@ export function SuperAdminSettings({
 
               <div>
                 <label className="mb-1 block text-xs font-semibold text-[#355158]">
-                  ID / Link Google Spreadsheet #2 (Kode Wilayah, DPW &amp; DPD)
+                  ID / Link Google Spreadsheet #2 (Kode Wilayah, DPW, DPD, DPC &amp; DPR)
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -376,7 +378,7 @@ export function SuperAdminSettings({
                     type="button"
                     onClick={handleSetupWilayahSheet}
                     disabled={settingUpWilayah}
-                    title="Buat tab KODE_WILAYAH, DPW, dan DPD otomatis di Spreadsheet #2"
+                    title="Buat tab KODE_WILAYAH, DPW, DPD, DPC, dan DPR otomatis di Spreadsheet #2"
                     className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-xl border border-[#D88B15]/35 bg-[#FFF9EE] px-3 py-2 text-xs font-semibold text-[#9A6008] hover:bg-[#FEF1D8] disabled:opacity-60"
                   >
                     <Database className="h-3.5 w-3.5" />
