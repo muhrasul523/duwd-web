@@ -151,10 +151,10 @@ export function SuperAdminSettings({
           <div className="space-y-5">
             <div>
               <h2 className="text-base font-bold text-[#07525E]">
-                Logo Wahdah Islamiyah &amp; Favicon
+                Logo Wahdah Islamiyah Global &amp; Favicon
               </h2>
               <p className="mt-1 text-xs text-[#526A70]">
-                Unggah logo resmi (PNG/JPG/SVG) untuk mengganti logo di header dan favicon tab browser secara langsung.
+                Logo ini digunakan secara global di seluruh halaman portal dan semua menu yang akan ditambahkan nanti (header, favicon browser, dan pengaturan induk).
               </p>
 
               <div className="mt-3 flex items-center gap-4">

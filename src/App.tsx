@@ -36,7 +36,7 @@ export default function App() {
   }, [logoDataUrl]);
 
   useEffect(() => {
-    document.title = `${namaAplikasi || 'DUWD DPP WI'} — Daftar Pengurus`;
+    document.title = namaAplikasi || 'DUWD DPP WI';
   }, [namaAplikasi]);
 
   const syncFromSheet = useCallback(async () => {
