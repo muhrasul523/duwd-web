@@ -72,11 +72,16 @@ export function PengurusDirectory({
   onSaveSuccess,
   onDeleteSuccess,
 }: PengurusDirectoryProps) {
-  const canEdit = role === 'admin' || role === 'superadmin';
+  const canEdit = role === 'superadmin';
   const activeUnits = useMemo(
     () => units.filter((u) => u.aktif).sort((a, b) => a.urutan - b.urutan),
     [units],
   );
+  const unitByIdMap = useMemo(() => {
+    const map = new Map<string, UnitItem>();
+    units.forEach((u) => map.set(u.id, u));
+    return map;
+  }, [units]);
 
   const [selectedUnitId, setSelectedUnitId] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,7 +123,8 @@ export function PengurusDirectory({
           return false;
         }
         if (q) {
-          const text = `${item.namaLengkap} ${item.namaPanggilan} ${item.namaUnit} ${item.amanah || ''} ${item.whatsapp}`.toLowerCase();
+          const unitObj = unitByIdMap.get(item.unitId);
+          const text = `${item.namaLengkap} ${item.namaPanggilan} ${unitObj?.kodeUnit || ''} ${item.namaUnit} ${item.amanah || ''} ${item.whatsapp}`.toLowerCase();
           if (!text.includes(q)) return false;
         }
         return true;
@@ -132,7 +138,7 @@ export function PengurusDirectory({
         if (amA !== amB) return amA - amB;
         return a.namaLengkap.localeCompare(b.namaLengkap, 'id');
       });
-  }, [pengurusList, units, selectedUnitId, searchQuery]);
+  }, [pengurusList, units, unitByIdMap, selectedUnitId, searchQuery]);
 
   const openCreateForm = () => {
     const defaultUnit = activeUnits[0];
@@ -365,6 +371,7 @@ export function PengurusDirectory({
               <button
                 key={u.id}
                 type="button"
+                title={u.namaUnit}
                 onClick={() => setSelectedUnitId(u.id)}
                 className={`cursor-pointer whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                   selectedUnitId === u.id
@@ -372,7 +379,7 @@ export function PengurusDirectory({
                     : 'text-[#526A70] hover:text-[#07525E]'
                 }`}
               >
-                {u.namaUnit}
+                {u.kodeUnit}
               </button>
             ))}
           </div>
@@ -393,7 +400,7 @@ export function PengurusDirectory({
               {pengurusList.length === 0
                 ? canEdit
                   ? 'Mulai susun struktur internal DUWD DPP Wahdah Islamiyah dengan menambahkan pengurus pertama.'
-                  : 'Daftar pengurus masih kosong. Masuk sebagai Admin atau Super Admin untuk mulai menginput data.'
+                  : 'Daftar pengurus masih kosong. Masuk sebagai Super Admin untuk mulai menginput data.'
                 : 'Tidak ada data pengurus yang sesuai dengan filter unit atau kata kunci pencarian.'}
             </p>
             {canEdit && pengurusList.length === 0 && (
@@ -433,8 +440,11 @@ export function PengurusDirectory({
                     <td className="px-4 py-4 text-[13px] text-[#355158]">
                       {item.namaPanggilan}
                     </td>
-                    <td className="px-4 py-4 text-[13px] font-medium text-[#07525E]">
-                      {item.namaUnit}
+                    <td
+                      title={unitByIdMap.get(item.unitId)?.namaUnit || item.namaUnit}
+                      className="px-4 py-4 text-[13px] font-semibold text-[#07525E]"
+                    >
+                      {unitByIdMap.get(item.unitId)?.kodeUnit || item.namaUnit}
                     </td>
                     <td className="px-4 py-4 text-[13px] font-semibold text-[#0C7A89]">
                       {item.amanah || '-'}
@@ -610,7 +620,7 @@ export function PengurusDirectory({
                   >
                     {activeUnits.map((u) => (
                       <option key={u.id} value={u.id}>
-                        {u.namaUnit} ({u.kodeUnit})
+                        {u.kodeUnit}
                       </option>
                     ))}
                   </select>

@@ -34,6 +34,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('DUWD DPP WI')
     .addItem('Setup Database / Buat Sheet Awal', 'setupDatabase')
+    .addItem('Sinkronkan Unit 0-5 & Proker 1-5', 'sinkronUnitDanProkerRPKA')
     .addToUi();
 }
 
@@ -102,13 +103,7 @@ function setupDatabase() {
   // Seed daftar unit awal jika sheet UNIT masih hanya berisi header
   const unitSheet = ss.getSheetByName(SHEETS.UNIT);
   if (unitSheet.getLastRow() <= 1) {
-    const starterUnits = [
-      ['UNIT-01', 'PI', 'Pengurus Inti (PI)', 1, 'Ya'],
-      ['UNIT-02', 'WILAYAH', 'Bidang Pembinaan Wilayah', 2, 'Ya'],
-      ['UNIT-03', 'DAERAH', 'Bidang Konsolidasi Daerah', 3, 'Ya'],
-      ['UNIT-04', 'KADER', 'Bidang Kaderisasi & Levelisasi', 4, 'Ya'],
-      ['UNIT-05', 'ADMIN-IT', 'Bidang Administrasi & Digitalisasi', 5, 'Ya']
-    ];
+    const starterUnits = getStarterUnitRows_();
     unitSheet.getRange(2, 1, starterUnits.length, 5).setValues(starterUnits);
   }
 
@@ -119,12 +114,10 @@ function setupDatabase() {
     prokerSheet.getRange(2, 1, starterProker.length, 4).setValues(starterProker);
   }
 
-  // Seed 37 Kegiatan RPKA 2027 jika kosong
+  // Format kolom angka Pendapatan & Belanja pada KEGIATAN_RPKA jika sudah ada datanya
   const kegSheet = ss.getSheetByName(SHEETS.KEGIATAN_RPKA);
-  if (kegSheet.getLastRow() <= 1) {
-    const starterKegiatan = getStarterKegiatanRows_();
-    kegSheet.getRange(2, 1, starterKegiatan.length, 14).setValues(starterKegiatan);
-    kegSheet.getRange(2, 10, starterKegiatan.length, 2).setNumberFormat('#,##0');
+  if (kegSheet.getLastRow() > 1) {
+    kegSheet.getRange(2, 10, kegSheet.getLastRow() - 1, 2).setNumberFormat('#,##0');
   }
 
   // Seed pengaturan awal jika sheet PENGATURAN masih kosong
@@ -252,12 +245,8 @@ function doGet(e) {
 /**
  * HTTP POST Handler:
  * Payload JSON: { action, pin, payload }
- * Actions:
- * - savePengurus (Admin & Super Admin)
- * - deletePengurus (Admin & Super Admin)
- * - saveUnit (Super Admin only)
- * - deleteUnit (Super Admin only)
- * - updateSettings (Super Admin only)
+ * Saat ini seluruh aksi perubahan data (Pengurus, Kegiatan/Proker, Unit, Pengaturan)
+ * dikunci khusus untuk role Super Admin.
  */
 function doPost(e) {
   let body = {};
@@ -274,7 +263,13 @@ function doPost(e) {
   try {
     const role = resolveRoleByPin_(pin);
     if (!role) {
-      return jsonOut_({ ok: false, error: 'Akses ditolak. PIN Admin atau Super Admin tidak valid.' });
+      return jsonOut_({ ok: false, error: 'Akses ditolak. PIN tidak valid.' });
+    }
+    if (role !== 'superadmin') {
+      return jsonOut_({
+        ok: false,
+        error: 'Saat ini hanya Super Admin yang memiliki akses untuk mengedit data pengurus, program kerja, unit, dan pengaturan.'
+      });
     }
 
     if (action === 'savePengurus') {
@@ -396,11 +391,6 @@ function doPost(e) {
       const deleted = deleteRowById_(SHEETS.KEGIATAN_RPKA, 'Kode_Kegiatan', kode);
       writeLog_(role.toUpperCase(), 'deleteKegiatan', kode + ' (deleted=' + deleted + ')');
       return jsonOut_({ ok: deleted, error: deleted ? undefined : 'Kegiatan tidak ditemukan.' });
-    }
-
-    // Semua action berikut khusus SUPER ADMIN
-    if (role !== 'superadmin') {
-      return jsonOut_({ ok: false, error: 'Fitur ini hanya dapat diubah oleh Super Admin.' });
     }
 
     if (action === 'saveUnit') {
@@ -696,54 +686,51 @@ function jsonOut_(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-function getStarterProkerRows_() {
+function getStarterUnitRows_() {
   return [
-    ['10001', 'PENDIRIAN DAN PEMBINAAN DPW DPD', '2027', 'Bidang Pembinaan Wilayah'],
-    ['10002', 'PENINGKATAN KUALITAS KELEMBAGAAN DPW DPD', '2027', 'Bidang Konsolidasi Daerah'],
-    ['10003', 'PENINGKATAN KUALITAS PENGURUS DPW DAN DPD', '2027', 'Bidang Kaderisasi & Levelisasi'],
-    ['10004', 'MONITORING DAN EVALUASI KINERJA DPW DPD', '2027', 'Bidang Pembinaan Wilayah'],
-    ['10005', 'PENINGKATAN KINERJA, MUTU, DAN INOVASI INTERNAL', '2027', 'Bidang Administrasi & Digitalisasi']
+    ['UNIT-00', 'PI', 'Pengurus Inti', 0, 'Ya'],
+    ['UNIT-01', 'EKSPANSI', 'PENDIRIAN DAN PEMBINAAN DPW DPD', 1, 'Ya'],
+    ['UNIT-02', 'KELEMBAGAAN', 'PENINGKATAN KUALITAS KELEMBAGAAN DPW DPD', 2, 'Ya'],
+    ['UNIT-03', 'KEPENGURUSAN', 'PENINGKATAN KUALITAS PENGURUS DPW DAN DPD', 3, 'Ya'],
+    ['UNIT-04', 'MONEV', 'MONITORING DAN EVALUASI KINERJA DPW DPD', 4, 'Ya'],
+    ['UNIT-05', 'INOVASI', 'PENINGKATAN KINERJA, MUTU, DAN INOVASI INTERNAL', 5, 'Ya']
   ];
 }
 
-function getStarterKegiatanRows_() {
+function getStarterProkerRows_() {
   return [
-    ['10001.00001', '10001', 'PENDIRIAN DAN PEMBINAAN DPW DPD', 'Akselerasi Pembentukan DPD', 'Memaksimalkan kesiapan real semua unsur di kabupaten/kota yang menjadi target pembentukan DPD', 'Calon DPD', '1 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 128975000, '', 'Rencana', ''],
-    ['10001.00002', '10001', 'PENDIRIAN DAN PEMBINAAN DPW DPD', 'Orientasi Dai Utusan', 'Memberikan wawasan dan ilmu kepada calon dai yang menunjang kinerja dai di tempat tugas', 'Calon Dai utusan', '1 kali', 'Makassar', '2026-08-15 - 2026-08-15', 20000000, 10325000, '', 'Rencana', ''],
-    ['10001.00003', '10001', 'PENDIRIAN DAN PEMBINAAN DPW DPD', 'Penempatan dan pemberangkatan Dai Utusan', 'Menjaga keberlangsungan dakwah di daerah', 'Dai Utusan', '1 kali', 'Online', '2027-09-01 - 2027-10-31', 1000000000, 898575000, '', 'Rencana', ''],
-    ['10001.00004', '10001', 'PENDIRIAN DAN PEMBINAAN DPW DPD', 'Pengontrolan dan Evaluasi Dai Utusan', 'Menjaga dai agar tetap semangat menjalankan amanah di tempat tugas serta sebagai wadah problem solving dai utusan', 'Dai utusan', '1 kali', 'Online', '2027-01-01 - 2027-11-30', 109000000, 6002400000, '', 'Rencana', ''],
-    ['10001.00005', '10001', 'PENDIRIAN DAN PEMBINAAN DPW DPD', 'Liqa Maftuh Dai Utusan', 'Mendengarkan aspirasi dari DPD/DPW, memberikan penguatan dan arahan untuk menjaga soliditas serta pengembangan kapasitas DPD/DPW', 'Dai utusan', '2 kali', 'Online', '2027-02-01 - 2027-02-01, 2027-10-01 - 2027-10-01', 0, 2800000, '', 'Rencana', ''],
-    ['10001.00006', '10001', 'PENDIRIAN DAN PEMBINAAN DPW DPD', 'Khidmah DPW DPD', 'Memberikan pelayanan kepada DPW/DPD sesuai dengan kebutuhan', 'DPW/DPD', '12 kali', 'Makassar', '2027-01-01 - 2027-11-30', 0, 14000000, '', 'Rencana', ''],
-    ['10001.00007', '10001', 'PENDIRIAN DAN PEMBINAAN DPW DPD', 'Kunjungan Unsur PH DPP', 'Memberikan penguatan, motivasi dan arahan untuk menjaga soliditas dalam pengembangan kapasitas DPW/DPD', 'DPW/DPD', '1 kali', 'Menyesuaikan', '2027-01-01 - 2027-11-30', 0, 134407000, '', 'Rencana', ''],
-    ['10001.00008', '10001', 'PENDIRIAN DAN PEMBINAAN DPW DPD', 'Koordinasi Pendampingan 4M (MUSWIL, MUKERWIL, MUSDA dan MUKERDA)', 'Memberikan arahan dan penguatan demi kesuksesan pelaksanaan kegiatan 4M', 'DPW/DPD', '1 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 350000, '', 'Rencana', ''],
-    ['10001.00009', '10001', 'PENDIRIAN DAN PEMBINAAN DPW DPD', 'Monev Musyrif DPW', 'Menjaga kestabilan semangat musyrif dan asisten musyrif', 'Musyrif DPW', '12 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 14400000, '', 'Rencana', ''],
-    ['10001.00010', '10001', 'PENDIRIAN DAN PEMBINAAN DPW DPD', 'Monev DUDC DPW', 'Mengontrol dan mengevaluasi kinerja DPW/DPD dalam pembentukan cabang', 'DUDC DPW', '12 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 6600000, '', 'Rencana', ''],
-    ['10001.00011', '10001', 'PENDIRIAN DAN PEMBINAAN DPW DPD', 'Monev Persaudaraan DPW DPD', 'Mengontrol dan mengevaluasi keberlangsungan persaudaraan DPW/DPD', 'DPW/DPD', '12 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 6000000, '', 'Rencana', ''],
-    ['10001.00012', '10001', 'PENDIRIAN DAN PEMBINAAN DPW DPD', 'Koordinasi Sharing Inspirasi Lintas DPW DPD', 'Menumbuhkan semangat kolaborasi dan sinergitas dalam melakukan akselerasi pencapaian visi bersama', 'DPW/DPD', '12 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 800000, '', 'Rencana', ''],
-    ['10001.00013', '10001', 'PENDIRIAN DAN PEMBINAAN DPW DPD', 'Monev Persaudaraan Dai Utusan', 'Menjaga dai agar tetap semangat menjalankan amanah di tempat tugas, serta sebagai wadah untuk menguatkan dan menjaga ukhuwah di antara dai', 'Dai utusan', '12 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 2400000, '', 'Rencana', ''],
-    ['10002.00001', '10002', 'PENINGKATAN KUALITAS KELEMBAGAAN DPW DPD', 'Kelas Akselerasi DPW DPD', 'Menambah wawasan dan sebagai wadah berbagi inspirasi dan motivasi sesama DPW dan DPD', 'DPW DPD', '2 kali', 'Online', '2027-04-01 - 2027-04-30, 2027-09-01 - 2027-09-30', 0, 8250000, '', 'Rencana', ''],
-    ['10002.00002', '10002', 'PENINGKATAN KUALITAS KELEMBAGAAN DPW DPD', 'Tata Kelola Kelembagaan dan Persaudaraan Award DPW DPD', 'Meningkatkan motivasi dan mutu tata kelola kelembagaan DPW dan DPD dan menguatkan ukhuwah antar DPW dan DPD', 'DPW dan DPD', '1 kali', 'Menyesuaikan Mukernas', '2027-11-01 - 2027-11-01', 30000000, 30625000, '', 'Rencana', ''],
-    ['10002.00003', '10002', 'PENINGKATAN KUALITAS KELEMBAGAAN DPW DPD', 'Pekan Pendalaman Dokumen Organisasi', 'Mendorong peningkatan kapasitas dan Kinerja Organisasi melalui pendalaman dokumen Organisasi', 'DPW dan DPD', '1 kali', 'Online', '2027-09-15 - 2027-09-15', 0, 6375000, '', 'Rencana', ''],
-    ['10002.00004', '10002', 'PENINGKATAN KUALITAS KELEMBAGAAN DPW DPD', 'Levelisasi DPW DPD', 'Untuk mengetahui kondisi atau level setiap DPW dan DPD serta memberikan perlakuan sesuai dengan levelnya masing-masing', 'DPW dan DPD', '1 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 1750000, '', 'Rencana', ''],
-    ['10003.00001', '10003', 'PENINGKATAN KUALITAS PENGURUS DPW DAN DPD', 'TOT Upgrading Pengurus DPW dan DPD', 'Melahirkan trainer dan meningkatkan kualitas pengurus DPW dan DPD', 'Utusan DPW yang belum memiliki trainer dan pengurus DPW/DPD', '1 kali', 'Online', '2027-03-21 - 2027-03-21', 8500000, 10130000, '', 'Rencana', ''],
-    ['10003.00002', '10003', 'PENINGKATAN KUALITAS PENGURUS DPW DAN DPD', 'Kajian Wawasan Tematik Pengurus DPW dan DPD', 'Meningkatkan kualitas pengurus dari segi wawasan untuk menunjang kinerja/pelaksanaan amanah pengurus', 'DPW dan DPD', '2 kali', 'Online', '2027-04-01 - 2027-04-01, 2027-06-01 - 2027-06-01', 0, 2100000, '', 'Rencana', ''],
-    ['10003.00003', '10003', 'PENINGKATAN KUALITAS PENGURUS DPW DAN DPD', 'Majelis Kepemimpinan', 'Meningkatkan kehadiran pimpinan atau rasa kebersamaan antara ketua dan pengurus DPW/DPD dengan pimpinan DPP', 'Ketua DPW dan DPD serta 3-5 orang PH yang direkomendasikan', '1 kali', 'Online', '2027-05-14 - 2027-05-14', 0, 1250000, '', 'Rencana', ''],
-    ['10003.00004', '10003', 'PENINGKATAN KUALITAS PENGURUS DPW DAN DPD', 'Sekolah Kepemimpinan', 'Meningkatkan kemampuan kepemimpinan para pengurus inti dan ketua departemen setiap DPW', 'DPW DPD', '2 kali', 'Online', '2027-07-09 - 2027-07-09, 2027-10-15 - 2027-10-15', 17500000, 9350000, '', 'Rencana', ''],
-    ['10004.00001', '10004', 'MONITORING DAN EVALUASI KINERJA DPW DPD', 'Rapat Khusus DUWD DPP dengan DPW', 'Memberikan arahan untuk mewujudkan target target strategis DPW dan Visi 2030 WI', 'DPW', '2 kali', 'Online', '2027-01-03 - 2027-01-03, 2027-08-29 - 2027-08-29', 0, 1050000, '', 'Rencana', ''],
-    ['10004.00002', '10004', 'MONITORING DAN EVALUASI KINERJA DPW DPD', 'Monev Level DPW DPD', 'Mengontrol pengawalan DPW dan DPD untuk peningkatan level', 'DPW dan DPD', '12 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 400000, '', 'Rencana', ''],
-    ['10004.00003', '10004', 'MONITORING DAN EVALUASI KINERJA DPW DPD', 'Monev Pelaksanaan Pekan Pendalaman Dokumen Organisasi', 'Mengontrol pelaksanaan Pekan Evaluasi Pendalaman Dokumen Organisasi', 'DPW dan DPD', '1 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 13200000, '', 'Rencana', ''],
-    ['10004.00004', '10004', 'MONITORING DAN EVALUASI KINERJA DPW DPD', 'Monev Pelaksanaan Tata Kelola Kelembagaan Award di DPW', 'Mengontrol pelaksanaan tata kelola kelembagaan award di tingkat wilayah', 'DPW DPD', '1 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 13200000, '', 'Rencana', ''],
-    ['10004.00005', '10004', 'MONITORING DAN EVALUASI KINERJA DPW DPD', 'Monev Pelaksanaan Upgrading Pengurus DPW DPD', 'Meningkatkan kualitas pengurus DPW dan DPD', 'DPW/DPD', '1 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 13200000, '', 'Rencana', ''],
-    ['10004.00006', '10004', 'MONITORING DAN EVALUASI KINERJA DPW DPD', 'Monev Pelaksanaan Pengajian Pengurus DPW DPD', 'Meningkatkan kualitas pengurus dari sisi ruhiyah untuk menunjang kinerja/pelaksanaan amanah pengurus', 'DPW/DPD', '1 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 13200000, '', 'Rencana', ''],
-    ['10004.00007', '10004', 'MONITORING DAN EVALUASI KINERJA DPW DPD', 'Monev Pengurusan SKKO DPW DPD', 'Meningkatkan kepercayaan masyarakat dan pemerintah terhadap DPD dan DPW', 'DPD dan DPW', '1 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 13200000, '', 'Rencana', ''],
-    ['10004.00008', '10004', 'MONITORING DAN EVALUASI KINERJA DPW DPD', 'Monev Pendampingan Pengadaan Kantor oleh DPW DPD', 'Mengontrol pelaksanaan pengadaan kantor DPW dan DPD', 'DPW dan DPD', '1 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 13200000, '', 'Rencana', ''],
-    ['10004.00009', '10004', 'MONITORING DAN EVALUASI KINERJA DPW DPD', 'Monev Pengadaan Staf Administrasi Sekretariat di DPW DPD', 'Meningkatkan tata kelola kelembagaan DPD dan DPW', 'DPW dan DPD', '1 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 24000000, '', 'Rencana', ''],
-    ['10004.00010', '10004', 'MONITORING DAN EVALUASI KINERJA DPW DPD', 'Monev Penerapan Standar Tata Kelola Kelembagaan di DPW DPD', 'Memberikan acuan kerja yang dapat menunjang tata kelola kelembagaan yang efektif dan efisien', 'DPW dan DPD', '1 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 13200000, '', 'Rencana', ''],
-    ['10004.00011', '10004', 'MONITORING DAN EVALUASI KINERJA DPW DPD', 'Monev Kepanitiaan Amaliah Ramadan di DPW DPD', 'Memastikan program Amaliah Ramadan terlaksana secara optimal dan meningkatkan kualitas tata kelola kepanitiaan', 'DPD dan DPW', '1 kali', 'Online', '2027-01-01 - 2027-03-15', 0, 2200000, '', 'Rencana', ''],
-    ['10004.00012', '10004', 'MONITORING DAN EVALUASI KINERJA DPW DPD', 'Monev Kepanitiaan Zulhijah di DPW DPD', 'Memastikan program Amaliah Ramadan terlaksana secara optimal dan meningkatkan kualitas tata kelola kepanitiaan (catatan: konteks operasional adalah kepanitiaan Zulhijah/Qurban)', 'DPD dan DPW', '1 kali', 'Online', '2027-04-01 - 2027-05-31', 0, 2200000, '', 'Rencana', ''],
-    ['10005.00001', '10005', 'PENINGKATAN KINERJA, MUTU, DAN INOVASI INTERNAL', 'Kajian kelembagaan pengurus DUWD', 'Meningkatkan pemahaman pengurus DUWD terhadap AD ART, Renstra, Manajemen Lembaga, dan apa yang terkait dengan itu', 'Pengurus DUWD', '2 kali', 'Online', '2027-04-17 - 2027-04-17, 2027-10-09 - 2027-10-09', 0, 1100000, '', 'Rencana', ''],
-    ['10005.00002', '10005', 'PENINGKATAN KINERJA, MUTU, DAN INOVASI INTERNAL', 'Pengembangan system database online lingkup kerja DUWD', 'Untuk memudahkan dalam pendataan, pengolahan perkembagan, dan penggunaan data DPW dan DPD khususnya dalam hal pencapaian Visi 2030', 'Data lingkup kerja DUWD', '1 kali', 'Online', '2027-01-01 - 2027-11-30', 0, 18125000, '', 'Rencana', ''],
-    ['10005.00003', '10005', 'PENINGKATAN KINERJA, MUTU, DAN INOVASI INTERNAL', 'Pembuatan panduan kelembagaan DPW/DPD pada lingkup kerja DUWD', 'Untuk menyeragamkan panduan kelembagaan yang bisa digunakan secara seragam untuk DPW/DPD', 'Data lingkup kerja DUWD', '1 kali', 'Makassar', '2027-01-01 - 2027-11-30', 0, 3200000, '', 'Rencana', ''],
-    ['10005.00004', '10005', 'PENINGKATAN KINERJA, MUTU, DAN INOVASI INTERNAL', 'Musyawarah Departemen', 'Mengevaluasi dan menyelaraskan program kerja departemen serta merumuskan langkah strategis yang terukur untuk meningkatkan efektivitas pelaksanaan program DUWD', 'Pengurus DUWD', '40 kali', 'Hybrid', '2027-01-01 - 2027-11-30', 0, 3120000, '', 'Rencana', '']
+    ['10001', 'PENDIRIAN DAN PEMBINAAN DPW DPD', '2027', 'EKSPANSI'],
+    ['10002', 'PENINGKATAN KUALITAS KELEMBAGAAN DPW DPD', '2027', 'KELEMBAGAAN'],
+    ['10003', 'PENINGKATAN KUALITAS PENGURUS DPW DAN DPD', '2027', 'KEPENGURUSAN'],
+    ['10004', 'MONITORING DAN EVALUASI KINERJA DPW DPD', '2027', 'MONEV'],
+    ['10005', 'PENINGKATAN KINERJA, MUTU, DAN INOVASI INTERNAL', '2027', 'INOVASI']
   ];
 }
+
+/**
+ * Jalankan fungsi ini 1x jika sheet UNIT & PROGRAM_KERJA sudah terisi data lama
+ * dan ingin disesuaikan ke struktur Unit 0 (PI) + Unit 1-5 (Proker 10001-10005).
+ */
+function sinkronUnitDanProkerRPKA() {
+  const ss = getSpreadsheet_();
+  const unitSheet = ss.getSheetByName(SHEETS.UNIT);
+  if (unitSheet) {
+    const unitRows = getStarterUnitRows_();
+    if (unitSheet.getLastRow() > 1) {
+      unitSheet.getRange(2, 1, unitSheet.getLastRow() - 1, 5).clearContent();
+    }
+    unitSheet.getRange(2, 1, unitRows.length, 5).setValues(unitRows);
+  }
+
+  const prokerSheet = ss.getSheetByName(SHEETS.PROGRAM_KERJA);
+  if (prokerSheet) {
+    const prokerRows = getStarterProkerRows_();
+    if (prokerSheet.getLastRow() > 1) {
+      prokerSheet.getRange(2, 1, prokerSheet.getLastRow() - 1, 4).clearContent();
+    }
+    prokerSheet.getRange(2, 1, prokerRows.length, 4).setValues(prokerRows);
+  }
+
+  writeLog_('SUPERADMIN', 'sinkronUnitDanProkerRPKA', 'Sheet UNIT (0-5) dan PROGRAM_KERJA (10001-10005) disinkronkan.');
+}
+

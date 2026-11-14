@@ -52,7 +52,7 @@ export function TopBar({
           className="flex items-center gap-3 whitespace-nowrap shrink-0 text-[#07525E] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0C7A89]"
         >
           <img
-            src={logoUrl || '/logo-wi.svg'}
+            src={logoUrl || '/logo-wi.png'}
             alt="Logo Wahdah Islamiyah"
             referrerPolicy="no-referrer"
             className="h-9 w-9 shrink-0 rounded-xl object-contain bg-white/80 p-0.5 border border-[#07525E]/10"
@@ -92,7 +92,7 @@ export function TopBar({
               className="hidden cursor-pointer items-center gap-1.5 whitespace-nowrap shrink-0 rounded-xl bg-gradient-to-r from-[#0C7A89] to-[#07525E] px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition-transform duration-150 hover:-translate-y-0.5 sm:inline-flex"
             >
               <LogIn className="h-3.5 w-3.5" />
-              <span>Masuk Admin</span>
+              <span>Masuk Pengelola</span>
             </button>
           ) : (
             <button

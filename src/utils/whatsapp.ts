@@ -71,7 +71,18 @@ export function processLogoFileToDataUrl(file: File, maxDim = 256): Promise<stri
  * Memperbarui favicon browser secara dinamis setiap kali logo diganti.
  */
 export function applyBrowserFavicon(logoUrl: string): void {
-  const href = logoUrl.trim() || '/logo-wi.svg';
+  const cleanUrl = logoUrl.trim();
+  const href = cleanUrl || '/favicon.png';
+
+  let mimeType = 'image/png';
+  if (href.startsWith('data:image/svg+xml') || href.endsWith('.svg')) {
+    mimeType = 'image/svg+xml';
+  } else if (href.startsWith('data:image/jpeg') || href.endsWith('.jpg') || href.endsWith('.jpeg')) {
+    mimeType = 'image/jpeg';
+  } else if (href.startsWith('data:image/webp') || href.endsWith('.webp')) {
+    mimeType = 'image/webp';
+  }
+
   let link = document.getElementById('app-favicon') as HTMLLinkElement | null;
   if (!link) {
     link = document.createElement('link');
@@ -79,5 +90,6 @@ export function applyBrowserFavicon(logoUrl: string): void {
     link.rel = 'icon';
     document.head.appendChild(link);
   }
+  link.type = mimeType;
   link.href = href;
 }

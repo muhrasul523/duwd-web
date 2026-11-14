@@ -81,7 +81,7 @@ export function ProkerRpkaView({
   onSaveKegiatan,
   onDeleteKegiatan,
 }: ProkerRpkaViewProps) {
-  const canEdit = role === 'admin' || role === 'superadmin';
+  const canEdit = role === 'superadmin';
 
   const [selectedProkerKode, setSelectedProkerKode] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<'ALL' | KegiatanStatus>('ALL');
@@ -123,6 +123,18 @@ export function ProkerRpkaView({
     prokerList.forEach((p) => map.set(p.kodeProker, p));
     return map;
   }, [prokerList]);
+
+  const unitCodeByProker = useMemo(() => {
+    const map = new Map<string, string>();
+    prokerList.forEach((p) => {
+      const idx = Number(p.kodeProker.slice(-1));
+      const matchedUnit = Number.isFinite(idx)
+        ? units.find((u) => u.urutan === idx)
+        : undefined;
+      map.set(p.kodeProker, matchedUnit?.kodeUnit || p.unitPj || p.kodeProker);
+    });
+    return map;
+  }, [prokerList, units]);
 
   const filteredKegiatan = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -487,12 +499,13 @@ export function ProkerRpkaView({
           {prokerList.map((proker) => {
             const count = prokerCounts.get(proker.kodeProker) || 0;
             const active = selectedProkerKode === proker.kodeProker;
+            const shortUnit = unitCodeByProker.get(proker.kodeProker) || proker.unitPj || proker.kodeProker;
             return (
               <button
                 key={proker.kodeProker}
                 type="button"
                 onClick={() => setSelectedProkerKode(proker.kodeProker)}
-                title={proker.namaProker}
+                title={`${proker.kodeProker} — ${proker.namaProker}`}
                 className={`cursor-pointer rounded-xl px-3.5 py-2 text-left text-xs font-semibold transition-colors ${
                   active
                     ? 'bg-[#0C7A89] text-white'
@@ -500,11 +513,7 @@ export function ProkerRpkaView({
                 }`}
               >
                 <span className="font-mono">{proker.kodeProker}</span> &middot;{' '}
-                <span>
-                  {proker.namaProker.length > 34
-                    ? `${proker.namaProker.slice(0, 34)}…`
-                    : proker.namaProker}
-                </span>{' '}
+                <span>{shortUnit}</span>{' '}
                 <span className={active ? 'text-white/80' : 'text-[#6B8187]'}>
                   ({count})
                 </span>
@@ -517,7 +526,7 @@ export function ProkerRpkaView({
         {selectedProkerKode !== 'ALL' && prokerMap.get(selectedProkerKode) && (
           <div className="rounded-xl border border-[#0C7A89]/15 bg-[#F4FAFB] px-3.5 py-2.5 text-xs text-[#355158]">
             <span className="font-mono font-bold text-[#07525E]">
-              Program {selectedProkerKode}:
+              Program {selectedProkerKode} ({unitCodeByProker.get(selectedProkerKode)}):
             </span>{' '}
             <span className="font-semibold text-[#07525E]">
               {prokerMap.get(selectedProkerKode)?.namaProker}
@@ -598,9 +607,12 @@ export function ProkerRpkaView({
                     </td>
 
                     <td className="px-4 py-3.5">
-                      <div className="text-[11px] font-medium text-[#526A70]">
+                      <div
+                        title={item.namaProker}
+                        className="text-[11px] font-semibold text-[#0C7A89]"
+                      >
                         <span className="font-mono">{item.kodeProker}</span> &middot;{' '}
-                        {item.namaProker}
+                        {unitCodeByProker.get(item.kodeProker) || item.namaProker}
                       </div>
                       <div className="mt-1 text-[13px] font-bold leading-snug text-[#0F2429]">
                         {item.namaKegiatan}
@@ -1017,11 +1029,13 @@ export function ProkerRpkaView({
                     className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
                   >
                     <option value="">-- Pilih Unit --</option>
-                    {activeUnits.map((u) => (
-                      <option key={u.id} value={u.namaUnit}>
-                        {u.namaUnit}
-                      </option>
-                    ))}
+                    {activeUnits
+                      .filter((u) => u.urutan > 0)
+                      .map((u) => (
+                        <option key={u.id} value={u.kodeUnit}>
+                          {u.kodeUnit}
+                        </option>
+                      ))}
                   </select>
                 </div>
 

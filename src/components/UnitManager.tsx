@@ -107,7 +107,7 @@ export function UnitManager({
             Kelola Daftar Unit Internal DUWD
           </h1>
           <p className="mt-1 text-xs text-[#526A70]">
-            Daftar unit di sini otomatis menjadi pilihan pada formulir pendataan pengurus dan filter direktori.
+            Unit 0 (<span className="font-mono font-semibold">PI</span>) adalah Pengurus Inti tanpa Program Kerja. Unit 1–5 terhubung langsung ke Program Kerja <span className="font-mono font-semibold">10001–10005</span>, dan aplikasi menampilkan <span className="font-semibold">Kode Unit (1 kata)</span> agar ringkas.
           </p>
         </div>
 
@@ -218,28 +218,28 @@ export function UnitManager({
 
               <div>
                 <label className="mb-1 block text-xs font-semibold text-[#355158]">
-                  Kode Unit
+                  Kode Unit (1 Kata — Ditampilkan di Aplikasi)
                 </label>
                 <input
                   type="text"
                   required
                   value={kodeUnit}
                   onChange={(e) => setKodeUnit(e.target.value)}
-                  placeholder="Contoh: WILAYAH"
+                  placeholder="Contoh: EKSPANSI"
                   className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 font-mono text-sm uppercase text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
                 />
               </div>
 
               <div>
                 <label className="mb-1 block text-xs font-semibold text-[#355158]">
-                  Nama Unit
+                  Nama Unit / Nama Program Kerja
                 </label>
                 <input
                   type="text"
                   required
                   value={namaUnit}
                   onChange={(e) => setNamaUnit(e.target.value)}
-                  placeholder="Contoh: Bidang Pembinaan Wilayah"
+                  placeholder="Contoh: PENDIRIAN DAN PEMBINAAN DPW DPD"
                   className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
                 />
               </div>
@@ -247,11 +247,11 @@ export function UnitManager({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-[#355158]">
-                    Urutan Tampil
+                    Urutan Tampil (0 = PI, 1–5 = Proker)
                   </label>
                   <input
                     type="number"
-                    min={1}
+                    min={0}
                     value={urutan}
                     onChange={(e) => setUrutan(Number(e.target.value))}
                     className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm tabular-nums text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"

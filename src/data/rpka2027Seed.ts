@@ -5,31 +5,31 @@ export const RPKA_2027_PROKER: ProgramKerjaItem[] = [
     kodeProker: '10001',
     namaProker: 'PENDIRIAN DAN PEMBINAAN DPW DPD',
     tahun: '2027',
-    unitPj: 'Bidang Pembinaan Wilayah',
+    unitPj: 'EKSPANSI',
   },
   {
     kodeProker: '10002',
     namaProker: 'PENINGKATAN KUALITAS KELEMBAGAAN DPW DPD',
     tahun: '2027',
-    unitPj: 'Bidang Konsolidasi Daerah',
+    unitPj: 'KELEMBAGAAN',
   },
   {
     kodeProker: '10003',
     namaProker: 'PENINGKATAN KUALITAS PENGURUS DPW DAN DPD',
     tahun: '2027',
-    unitPj: 'Bidang Kaderisasi & Levelisasi',
+    unitPj: 'KEPENGURUSAN',
   },
   {
     kodeProker: '10004',
     namaProker: 'MONITORING DAN EVALUASI KINERJA DPW DPD',
     tahun: '2027',
-    unitPj: 'Bidang Pembinaan Wilayah',
+    unitPj: 'MONEV',
   },
   {
     kodeProker: '10005',
     namaProker: 'PENINGKATAN KINERJA, MUTU, DAN INOVASI INTERNAL',
     tahun: '2027',
-    unitPj: 'Bidang Administrasi & Digitalisasi',
+    unitPj: 'INOVASI',
   },
 ];
 

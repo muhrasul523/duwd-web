@@ -12,20 +12,21 @@ import { normalizeWhatsApp } from '../utils/whatsapp';
 
 const STORAGE_KEYS = {
   GAS_URL: 'duwd_gas_webapp_url_v2',
-  UNITS: 'duwd_units_cache_v2',
+  UNITS: 'duwd_units_cache_v3',
   PENGURUS: 'duwd_pengurus_cache_v2',
-  PROKER: 'duwd_proker_cache_v2',
+  PROKER: 'duwd_proker_cache_v3',
   KEGIATAN: 'duwd_kegiatan_cache_v2',
   SETTINGS: 'duwd_settings_cache_v2',
   PINS: 'duwd_local_pins_v2',
 };
 
 export const STARTER_UNITS: UnitItem[] = [
-  { id: 'UNIT-01', kodeUnit: 'PI', namaUnit: 'Pengurus Inti (PI)', urutan: 1, aktif: true },
-  { id: 'UNIT-02', kodeUnit: 'WILAYAH', namaUnit: 'Bidang Pembinaan Wilayah', urutan: 2, aktif: true },
-  { id: 'UNIT-03', kodeUnit: 'DAERAH', namaUnit: 'Bidang Konsolidasi Daerah', urutan: 3, aktif: true },
-  { id: 'UNIT-04', kodeUnit: 'KADER', namaUnit: 'Bidang Kaderisasi & Levelisasi', urutan: 4, aktif: true },
-  { id: 'UNIT-05', kodeUnit: 'ADMIN-IT', namaUnit: 'Bidang Administrasi & Digitalisasi', urutan: 5, aktif: true },
+  { id: 'UNIT-00', kodeUnit: 'PI', namaUnit: 'Pengurus Inti', urutan: 0, aktif: true },
+  { id: 'UNIT-01', kodeUnit: 'EKSPANSI', namaUnit: 'PENDIRIAN DAN PEMBINAAN DPW DPD', urutan: 1, aktif: true },
+  { id: 'UNIT-02', kodeUnit: 'KELEMBAGAAN', namaUnit: 'PENINGKATAN KUALITAS KELEMBAGAAN DPW DPD', urutan: 2, aktif: true },
+  { id: 'UNIT-03', kodeUnit: 'KEPENGURUSAN', namaUnit: 'PENINGKATAN KUALITAS PENGURUS DPW DAN DPD', urutan: 3, aktif: true },
+  { id: 'UNIT-04', kodeUnit: 'MONEV', namaUnit: 'MONITORING DAN EVALUASI KINERJA DPW DPD', urutan: 4, aktif: true },
+  { id: 'UNIT-05', kodeUnit: 'INOVASI', namaUnit: 'PENINGKATAN KINERJA, MUTU, DAN INOVASI INTERNAL', urutan: 5, aktif: true },
 ];
 
 const DEFAULT_PINS = {

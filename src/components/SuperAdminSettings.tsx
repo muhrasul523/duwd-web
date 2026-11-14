@@ -171,7 +171,7 @@ export function SuperAdminSettings({
 
               <div className="mt-3 flex items-center gap-4">
                 <img
-                  src={logoDataUrl || '/logo-wi.svg'}
+                  src={logoDataUrl || '/logo-wi.png'}
                   alt="Preview Logo Wahdah Islamiyah"
                   className="h-16 w-16 rounded-2xl border border-[#07525E]/15 bg-white object-contain p-1.5"
                 />
@@ -211,11 +211,8 @@ export function SuperAdminSettings({
 
               {/* Note khusus WhatsApp Link Preview */}
               <div className="mt-3 rounded-xl border border-[#0C7A89]/15 bg-[#F4FAFB] p-3 text-[11px] leading-relaxed text-[#355158]">
-                <span className="font-bold text-[#07525E]">Catatan Preview Link WhatsApp:</span>{' '}
-                WhatsApp hanya membaca gambar statis dari server. Pastikan Anda juga menyimpan file logo bernama{' '}
-                <span className="font-mono font-semibold text-[#07525E]">logo-wi.png</span> di folder{' '}
-                <span className="font-mono font-semibold text-[#07525E]">/public/logo-wi.png</span> pada repositori GitHub sebelum deploy ke{' '}
-                <span className="font-mono">duwd.web.id</span>.
+                <span className="font-bold text-[#07525E]">Catatan Favicon &amp; Preview Link WhatsApp:</span>{' '}
+                Favicon tab browser (<span className="font-mono font-semibold text-[#07525E]">/favicon.png</span>) dan preview link WhatsApp (<span className="font-mono font-semibold text-[#07525E]">/og-preview.jpg</span>, 600&times;600 px) sudah disiapkan dari logo Wahdah Islamiyah di folder <span className="font-mono font-semibold text-[#07525E]">/public/</span> untuk domain <span className="font-mono">duwd.web.id</span>.
                 {logoDataUrl && logoDataUrl.startsWith('data:image/png') && (
                   <div className="mt-2">
                     <a
