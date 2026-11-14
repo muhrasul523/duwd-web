@@ -1,30 +1,27 @@
-# Backend Google Apps Script — DUWD DPP WI
+# Backend Google Apps Script — DUWD DPP WI (Arsitektur 2 Spreadsheet)
 
-File `/backend-gas/Code.gs` dirancang untuk dipasang langsung di dalam **Google Spreadsheet yang sudah Anda buat** (Container-bound Script).
+File `/backend-gas/Code.gs` menggunakan **arsitektur Hybrid Multi-Spreadsheet** dengan 1 URL Web App (`/exec`) yang sama:
 
-## Langkah Pemasangan
-1. Buka Google Spreadsheet Anda.
-2. Klik menu **Extensions (Ekstensi)** > **Apps Script**.
-3. Hapus isi bawaan `Code.gs`, lalu salin-tempel seluruh isi file `/backend-gas/Code.gs`.
-4. Simpan (**Ctrl + S**).
-5. Di toolbar atas editor Apps Script, pilih fungsi **`setupDatabase`** lalu klik **Run** (cukup 1 kali — aman dijalankan ulang saat ada pembaruan modul).
-   - Skrip otomatis membuat / memperbarui 6 tab sheet:
-     - `UNIT` (Unit 0 `PI` tanpa Proker, dan Unit 1–5 yang terhubung ke Proker `10001`–`10005`)
-     - `PENGURUS` (Nama Lengkap, Nama Panggilan, WhatsApp `628...`, Unit, Amanah)
-     - `PROGRAM_KERJA` (5 Program Kerja Induk DUWD 2027 beserta kode)
-     - `KEGIATAN_RPKA` (37 Kegiatan RPKA 2027 lengkap dengan Tujuan, Sasaran, Indikator, Tempat, Waktu, Pendapatan, Belanja, Unit PJ, Status, Tautan Drive)
-     - `PENGATURAN` (PIN Super Admin, PIN Admin, Nama Aplikasi, Logo, Link Drive RPKA)
-     - `SYSTEM_LOGS` (Catatan aktivitas otomatis)
-   - Jika sheet `UNIT` dan `PROGRAM_KERJA` sudah terisi data lama dan ingin disesuaikan ke pemetaan Unit 0–5 (`PI`, `EKSPANSI`, `KELEMBAGAAN`, `KEPENGURUSAN`, `MONEV`, `INOVASI`), jalankan fungsi **`sinkronUnitDanProkerRPKA`** 1 kali dari menu **DUWD DPP WI** di Google Sheet.
-6. Klik **Deploy** > **New deployment** > pilih jenis **Web app**:
-   - **Execute as:** `Me`
-   - **Who has access:** `Anyone`
-7. Salin **Web app URL** (berakhiran `/exec`), lalu tempelkan di menu **Super Admin > Pengaturan & GAS** pada aplikasi web.
+1. **Spreadsheet #1 (Induk — tempat `Code.gs` dipasang):**
+   - `UNIT` (Unit 0 `PI` tanpa Proker, Unit 1–5 terhubung ke Proker `10001`–`10005`)
+   - `PENGURUS` (Nama Lengkap, Nama Panggilan, WhatsApp `628...`, Unit, Amanah)
+   - `PROGRAM_KERJA` (5 Program Kerja Induk DUWD 2027)
+   - `KEGIATAN_RPKA` (37 Kegiatan RPKA 2027)
+   - `PENGATURAN` (PIN Super Admin, PIN Admin, Nama Aplikasi, Logo, Link Drive RPKA, ID Spreadsheet #2)
+   - `SYSTEM_LOGS` (Catatan aktivitas otomatis)
 
-## Hak Akses Saat Ini
-- **Publik & Admin:** Akses lihat direktori Pengurus dan Program Kerja 2027.
-- **Super Admin:** Akses penuh untuk tambah/edit/hapus Pengurus, Kegiatan/Proker, Unit, serta Pengaturan & GAS.
+2. **Spreadsheet #2 (Wilayah & DPW-DPD — dibuka otomatis via `SpreadsheetApp.openById`):**
+   - `KODE_WILAYAH` (Kode Wilayah Pulau, Provinsi, Kabupaten/Kota, Kecamatan, Kelurahan/Desa)
+   - `DPW` (Data DPW per Kode Provinsi, Status Terbentuk, Ketua & WA, Sekretaris & WA, Alamat, Link Drive)
+   - `DPD` (Data DPD per Kode Kab/Kota, Status Terbentuk, Ketua & WA, Sekretaris & WA, Alamat, Link Drive)
 
-## PIN Bawaan (Dapat Diubah Kapan Saja)
-- **Super Admin PIN:** `duwd-super-2026`
-- **Admin PIN:** `duwd-admin-2026`
+## Langkah Pemasangan Awal & Pembaruan
+1. Buka Google Spreadsheet Induk (#1) > **Extensions** > **Apps Script**.
+2. Tempel seluruh isi `/backend-gas/Code.gs` lalu simpan (**Ctrl + S**).
+3. Jalankan fungsi **`setupDatabase`** (1 kali).
+4. **Deployment:**
+   - Pemasangan pertama: **Deploy > New deployment > Web app** (`Execute as: Me`, `Who has access: Anyone`).
+   - Setiap ada perubahan kode `Code.gs`: **Deploy > Manage deployments > ikon Pensil (Edit) > Version: New version > Deploy** (URL `/exec` tetap sama).
+5. **Menghubungkan Spreadsheet #2 (Wilayah & DPW-DPD):**
+   - Buat 1 Google Spreadsheet baru di Google Drive (dengan akun Google yang sama).
+   - Salin URL atau ID Spreadsheet #2 tersebut, tempelkan di menu aplikasi web **Pengaturan & GAS > ID / Link Google Spreadsheet #2**, lalu klik **Siapkan Tab** dan **Simpan Pengaturan**.

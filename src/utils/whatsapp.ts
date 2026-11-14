@@ -1,11 +1,11 @@
 /**
  * Menormalkan nomor WhatsApp secara otomatis:
- * - "0812-3456-7890" -> "6281234567890"
- * - "+62 812 3456"   -> "628123456"
- * - "8123456789"     -> "628123456789"
+ * - Menghapus semua karakter selain angka (spasi, tanda baca, huruf)
+ * - "081234567890" -> "6281234567890"
+ * - "81234567890"  -> "6281234567890"
  */
 export function normalizeWhatsApp(raw: string): string {
-  let digits = raw.replace(/[^\d]/g, '');
+  let digits = raw.replace(/\D/g, '');
   if (!digits) return '';
   if (digits.startsWith('08')) {
     digits = `62${digits.slice(1)}`;
@@ -13,6 +13,19 @@ export function normalizeWhatsApp(raw: string): string {
     digits = `62${digits.slice(1)}`;
   } else if (digits.startsWith('8')) {
     digits = `62${digits}`;
+  }
+  return digits;
+}
+
+/**
+ * Filter real-time saat mengetik / menempel di kolom input WhatsApp:
+ * Hanya angka yang lolos; bila diawali "08" langsung menjadi "628".
+ */
+export function sanitizeWhatsAppTyping(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('08')) {
+    return `628${digits.slice(2)}`;
   }
   return digits;
 }
@@ -68,11 +81,16 @@ export function processLogoFileToDataUrl(file: File, maxDim = 256): Promise<stri
 }
 
 /**
- * Memperbarui favicon browser secara dinamis setiap kali logo diganti.
+ * Memperbarui semua tag favicon browser secara dinamis setiap kali logo diganti.
  */
 export function applyBrowserFavicon(logoUrl: string): void {
   const cleanUrl = logoUrl.trim();
-  const href = cleanUrl || '/favicon.png';
+  const isValidLogo =
+    cleanUrl.startsWith('data:image/') ||
+    cleanUrl.startsWith('/') ||
+    cleanUrl.startsWith('https://') ||
+    cleanUrl.startsWith('http://');
+  const href = isValidLogo ? cleanUrl : '/favicon.png';
 
   let mimeType = 'image/png';
   if (href.startsWith('data:image/svg+xml') || href.endsWith('.svg')) {
@@ -83,13 +101,19 @@ export function applyBrowserFavicon(logoUrl: string): void {
     mimeType = 'image/webp';
   }
 
-  let link = document.getElementById('app-favicon') as HTMLLinkElement | null;
-  if (!link) {
-    link = document.createElement('link');
+  const iconLinks = document.querySelectorAll<HTMLLinkElement>("link[rel*='icon']");
+  if (iconLinks.length === 0) {
+    const link = document.createElement('link');
     link.id = 'app-favicon';
     link.rel = 'icon';
+    link.type = mimeType;
+    link.href = href;
     document.head.appendChild(link);
+    return;
   }
-  link.type = mimeType;
-  link.href = href;
+
+  iconLinks.forEach((link) => {
+    link.type = mimeType;
+    link.href = href;
+  });
 }

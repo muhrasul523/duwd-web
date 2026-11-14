@@ -1,4 +1,6 @@
+import { AlertTriangle, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { DpwDpdView } from './components/DpwDpdView';
 import { LoginModal } from './components/LoginModal';
 import { PengurusDirectory } from './components/PengurusDirectory';
 import { ProkerRpkaView } from './components/ProkerRpkaView';
@@ -7,17 +9,26 @@ import { TopBar, type ActiveView } from './components/TopBar';
 import { UnitManager } from './components/UnitManager';
 import {
   fetchAllOrgData,
+  loadLocalDpd,
+  loadLocalDpw,
   loadLocalKegiatan,
+  loadLocalKodeWilayah,
   loadLocalPengurus,
   loadLocalProker,
   loadLocalSettings,
   loadLocalUnits,
+  saveLocalDpd,
+  saveLocalDpw,
   saveLocalKegiatan,
+  saveLocalKodeWilayah,
   saveLocalPengurus,
   saveLocalUnits,
 } from './services/orgService';
 import type {
+  DpdItem,
+  DpwItem,
   KegiatanRpkaItem,
+  KodeWilayahItem,
   PengurusItem,
   ProgramKerjaItem,
   UnitItem,
@@ -36,12 +47,22 @@ export default function App() {
   const [namaAplikasi, setNamaAplikasi] = useState(initialSettings.namaAplikasi);
   const [logoDataUrl, setLogoDataUrl] = useState(initialSettings.logoDataUrl);
   const [rpkaDriveUrl, setRpkaDriveUrl] = useState(initialSettings.rpkaDriveUrl);
+  const [wilayahSpreadsheetId, setWilayahSpreadsheetId] = useState(
+    initialSettings.wilayahSpreadsheetId,
+  );
   const [webAppUrl, setWebAppUrl] = useState(initialSettings.gasWebAppUrl);
+  const [wilayahConnected, setWilayahConnected] = useState(false);
+  const [syncError, setSyncError] = useState('');
 
   const [units, setUnits] = useState<UnitItem[]>(() => loadLocalUnits());
   const [pengurusList, setPengurusList] = useState<PengurusItem[]>(() => loadLocalPengurus());
   const [prokerList, setProkerList] = useState<ProgramKerjaItem[]>(() => loadLocalProker());
   const [kegiatanList, setKegiatanList] = useState<KegiatanRpkaItem[]>(() => loadLocalKegiatan());
+  const [kodeWilayahList, setKodeWilayahList] = useState<KodeWilayahItem[]>(() =>
+    loadLocalKodeWilayah(),
+  );
+  const [dpwList, setDpwList] = useState<DpwItem[]>(() => loadLocalDpw());
+  const [dpdList, setDpdList] = useState<DpdItem[]>(() => loadLocalDpd());
   const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
@@ -55,13 +76,19 @@ export default function App() {
   const syncFromSheet = useCallback(async () => {
     if (!webAppUrl.trim()) return;
     setSyncing(true);
+    setSyncError('');
     try {
-      const { dataset, synced } = await fetchAllOrgData(webAppUrl);
+      const { dataset, synced, error } = await fetchAllOrgData(webAppUrl);
       if (synced) {
         setUnits(dataset.units);
         setPengurusList(dataset.pengurus);
         setProkerList(dataset.proker);
         setKegiatanList(dataset.kegiatan);
+        setKodeWilayahList(dataset.kodeWilayah);
+        setDpwList(dataset.dpw);
+        setDpdList(dataset.dpd);
+        setWilayahConnected(dataset.wilayahConnected);
+
         if (dataset.settings.namaAplikasi) {
           setNamaAplikasi(dataset.settings.namaAplikasi);
         }
@@ -71,6 +98,11 @@ export default function App() {
         if (dataset.settings.rpkaDriveUrl !== undefined) {
           setRpkaDriveUrl(dataset.settings.rpkaDriveUrl);
         }
+        if (dataset.settings.wilayahSpreadsheetId !== undefined) {
+          setWilayahSpreadsheetId(dataset.settings.wilayahSpreadsheetId);
+        }
+      } else if (error) {
+        setSyncError(error);
       }
     } finally {
       setSyncing(false);
@@ -159,6 +191,49 @@ export default function App() {
     });
   };
 
+  const handleSaveDpw = (saved: DpwItem) => {
+    setDpwList((prev) => {
+      const exists = prev.some((d) => d.id === saved.id);
+      const next = exists
+        ? prev.map((d) => (d.id === saved.id ? saved : d))
+        : [...prev, saved];
+      saveLocalDpw(next);
+      return next;
+    });
+  };
+
+  const handleDeleteDpw = (id: string) => {
+    setDpwList((prev) => {
+      const next = prev.filter((d) => d.id !== id);
+      saveLocalDpw(next);
+      return next;
+    });
+  };
+
+  const handleSaveDpd = (saved: DpdItem) => {
+    setDpdList((prev) => {
+      const exists = prev.some((d) => d.id === saved.id);
+      const next = exists
+        ? prev.map((d) => (d.id === saved.id ? saved : d))
+        : [...prev, saved];
+      saveLocalDpd(next);
+      return next;
+    });
+  };
+
+  const handleDeleteDpd = (id: string) => {
+    setDpdList((prev) => {
+      const next = prev.filter((d) => d.id !== id);
+      saveLocalDpd(next);
+      return next;
+    });
+  };
+
+  const handleImportedKodeWilayah = (rows: KodeWilayahItem[]) => {
+    setKodeWilayahList(rows);
+    saveLocalKodeWilayah(rows);
+  };
+
   return (
     <div id="top" className="min-h-screen duwd-ambient-bg flex flex-col text-[#0F2429]">
       <TopBar
@@ -170,6 +245,24 @@ export default function App() {
         onOpenLogin={() => setLoginOpen(true)}
         onLogout={handleLogout}
       />
+
+      {syncError && (
+        <div className="mx-auto mt-4 w-full max-w-[1160px] px-4 sm:px-6">
+          <div className="flex items-start justify-between gap-3 rounded-xl border border-amber-500/35 bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-900">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+              <span>Sinkronisasi Spreadsheet gagal: {syncError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSyncError('')}
+              className="cursor-pointer text-amber-700"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1">
         {activeView === 'direktori' && (
@@ -202,6 +295,25 @@ export default function App() {
           />
         )}
 
+        {activeView === 'dpw_dpd' && (
+          <DpwDpdView
+            role={role}
+            activePin={activePin}
+            webAppUrl={webAppUrl}
+            wilayahConnected={wilayahConnected}
+            kodeWilayahList={kodeWilayahList}
+            dpwList={dpwList}
+            dpdList={dpdList}
+            syncing={syncing}
+            onRefresh={syncFromSheet}
+            onSaveDpw={handleSaveDpw}
+            onDeleteDpw={handleDeleteDpw}
+            onSaveDpd={handleSaveDpd}
+            onDeleteDpd={handleDeleteDpd}
+            onImportedKodeWilayah={handleImportedKodeWilayah}
+          />
+        )}
+
         {activeView === 'unit' && role === 'superadmin' && (
           <UnitManager
             activePin={activePin}
@@ -218,11 +330,13 @@ export default function App() {
             namaAplikasi={namaAplikasi}
             logoDataUrl={logoDataUrl}
             rpkaDriveUrl={rpkaDriveUrl}
+            wilayahSpreadsheetId={wilayahSpreadsheetId}
             webAppUrl={webAppUrl}
             onUpdateSettingsState={(next) => {
               setNamaAplikasi(next.namaAplikasi);
               setLogoDataUrl(next.logoDataUrl);
               setRpkaDriveUrl(next.rpkaDriveUrl);
+              setWilayahSpreadsheetId(next.wilayahSpreadsheetId);
               setWebAppUrl(next.webAppUrl);
             }}
             onSyncFromSheet={syncFromSheet}

@@ -20,6 +20,7 @@ import {
   isValidWhatsApp,
   normalizeWhatsApp,
 } from '../utils/whatsapp';
+import { WhatsAppInput } from './WhatsAppInput';
 
 interface PengurusDirectoryProps {
   role: UserRole;
@@ -186,15 +187,6 @@ export function PengurusDirectory({
     if (amanahSelect !== 'LAINNYA' && !nextPresets.includes(amanahSelect)) {
       setAmanahSelect(nextPresets[0]);
     }
-  };
-
-  const handleWaInputChange = (val: string) => {
-    // Jika user mengetik atau paste diawali 08, langsung tampilkan normalisasi 628 secara halus
-    if (val.startsWith('08')) {
-      setWaRaw(`628${val.slice(2)}`);
-      return;
-    }
-    setWaRaw(val);
   };
 
   const handleSubmitForm = async (e: React.FormEvent) => {
@@ -585,16 +577,13 @@ export function PengurusDirectory({
                   htmlFor="p-whatsapp"
                   className="mb-1 block text-xs font-semibold text-[#355158]"
                 >
-                  Nomor WhatsApp (Otomatis 08 &rarr; 628)
+                  Nomor WhatsApp (Hanya Angka, Otomatis 08 &rarr; 628)
                 </label>
-                <input
+                <WhatsAppInput
                   id="p-whatsapp"
-                  type="tel"
                   required
                   value={waRaw}
-                  onChange={(e) => handleWaInputChange(e.target.value)}
-                  placeholder="081234567890"
-                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 font-mono text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                  onChange={setWaRaw}
                 />
                 {normalizedWaPreview && (
                   <p className="mt-1 font-mono text-[11px] text-[#0C7A89]">

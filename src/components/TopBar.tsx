@@ -1,8 +1,9 @@
 import { LogIn, LogOut, Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import defaultLogoWi from '../assets/logo-wi.png';
 import type { UserRole } from '../types/org';
 
-export type ActiveView = 'direktori' | 'proker' | 'unit' | 'pengaturan';
+export type ActiveView = 'direktori' | 'proker' | 'dpw_dpd' | 'unit' | 'pengaturan';
 
 interface TopBarProps {
   namaAplikasi: string;
@@ -28,6 +29,7 @@ export function TopBar({
   const navItems: { id: ActiveView; label: string; visible: boolean }[] = [
     { id: 'direktori', label: 'Daftar Pengurus', visible: true },
     { id: 'proker', label: 'Program Kerja 2027', visible: true },
+    { id: 'dpw_dpd', label: 'DPW & DPD', visible: true },
     { id: 'unit', label: 'Kelola Unit', visible: role === 'superadmin' },
     { id: 'pengaturan', label: 'Pengaturan & GAS', visible: role === 'superadmin' },
   ];
@@ -52,10 +54,15 @@ export function TopBar({
           className="flex items-center gap-3 whitespace-nowrap shrink-0 text-[#07525E] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0C7A89]"
         >
           <img
-            src={logoUrl || '/logo-wi.png'}
+            src={logoUrl || defaultLogoWi}
             alt="Logo Wahdah Islamiyah"
             referrerPolicy="no-referrer"
-            className="h-9 w-9 shrink-0 rounded-xl object-contain bg-white/80 p-0.5 border border-[#07525E]/10"
+            onError={(e) => {
+              if (e.currentTarget.src !== defaultLogoWi) {
+                e.currentTarget.src = defaultLogoWi;
+              }
+            }}
+            className="h-9 w-9 shrink-0 rounded-xl object-contain bg-white/90 p-0.5 border border-[#07525E]/10"
           />
           <span className="text-[15px] font-bold tracking-tight sm:text-base">
             {namaAplikasi || 'DUWD DPP WI'}

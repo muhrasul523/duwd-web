@@ -1,7 +1,11 @@
+import { STARTER_KODE_WILAYAH } from '../data/kodeWilayahSeed';
 import { RPKA_2027_KEGIATAN, RPKA_2027_PROKER } from '../data/rpka2027Seed';
 import type {
   AppSettings,
+  DpdItem,
+  DpwItem,
   KegiatanRpkaItem,
+  KodeWilayahItem,
   OrgDataset,
   PengurusItem,
   ProgramKerjaItem,
@@ -16,6 +20,9 @@ const STORAGE_KEYS = {
   PENGURUS: 'duwd_pengurus_cache_v2',
   PROKER: 'duwd_proker_cache_v3',
   KEGIATAN: 'duwd_kegiatan_cache_v2',
+  KODE_WILAYAH: 'duwd_kode_wilayah_cache_v1',
+  DPW: 'duwd_dpw_cache_v1',
+  DPD: 'duwd_dpd_cache_v1',
   SETTINGS: 'duwd_settings_cache_v2',
   PINS: 'duwd_local_pins_v2',
 };
@@ -34,6 +41,13 @@ const DEFAULT_PINS = {
   admin: 'duwd-admin-2026',
 };
 
+export function extractSpreadsheetId(raw: string): string {
+  const val = raw.trim();
+  if (!val) return '';
+  const match = val.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return match?.[1] ? match[1] : val;
+}
+
 export function loadLocalSettings(): AppSettings {
   try {
     const gasUrl =
@@ -46,6 +60,7 @@ export function loadLocalSettings(): AppSettings {
       namaAplikasi: parsed.namaAplikasi || 'DUWD DPP WI',
       logoDataUrl: parsed.logoDataUrl || '',
       rpkaDriveUrl: parsed.rpkaDriveUrl || '',
+      wilayahSpreadsheetId: parsed.wilayahSpreadsheetId || '',
       gasWebAppUrl: gasUrl,
     };
   } catch {
@@ -53,6 +68,7 @@ export function loadLocalSettings(): AppSettings {
       namaAplikasi: 'DUWD DPP WI',
       logoDataUrl: '',
       rpkaDriveUrl: '',
+      wilayahSpreadsheetId: '',
       gasWebAppUrl: '',
     };
   }
@@ -70,6 +86,7 @@ export function saveLocalSettingsCache(settings: {
   namaAplikasi: string;
   logoDataUrl: string;
   rpkaDriveUrl: string;
+  wilayahSpreadsheetId: string;
 }): void {
   try {
     window.localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
@@ -154,6 +171,63 @@ export function saveLocalKegiatan(list: KegiatanRpkaItem[]): void {
   }
 }
 
+export function loadLocalKodeWilayah(): KodeWilayahItem[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.KODE_WILAYAH);
+    if (!raw) return STARTER_KODE_WILAYAH;
+    const parsed = JSON.parse(raw) as KodeWilayahItem[];
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : STARTER_KODE_WILAYAH;
+  } catch {
+    return STARTER_KODE_WILAYAH;
+  }
+}
+
+export function saveLocalKodeWilayah(list: KodeWilayahItem[]): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.KODE_WILAYAH, JSON.stringify(list));
+  } catch {
+    // Ignore
+  }
+}
+
+export function loadLocalDpw(): DpwItem[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.DPW);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as DpwItem[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalDpw(list: DpwItem[]): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.DPW, JSON.stringify(list));
+  } catch {
+    // Ignore
+  }
+}
+
+export function loadLocalDpd(): DpdItem[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.DPD);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as DpdItem[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalDpd(list: DpdItem[]): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.DPD, JSON.stringify(list));
+  } catch {
+    // Ignore
+  }
+}
+
 function loadLocalPins(): { superadmin: string; admin: string } {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEYS.PINS);
@@ -181,22 +255,55 @@ function saveLocalPins(pins: { superadmin?: string; admin?: string }): void {
   }
 }
 
+interface GasJsonResponse<T> {
+  ok: boolean;
+  data?: T;
+  role?: UserRole;
+  error?: string;
+  message?: string;
+  masterName?: string;
+  wilayahConnected?: boolean;
+  wilayahName?: string;
+  wilayahError?: string;
+  count?: number;
+}
+
+async function parseGasResponse<T>(res: Response): Promise<GasJsonResponse<T>> {
+  const rawText = await res.text();
+  try {
+    return JSON.parse(rawText) as GasJsonResponse<T>;
+  } catch {
+    if (rawText.includes('accounts.google.com') || rawText.includes('<!DOCTYPE html')) {
+      return {
+        ok: false,
+        error:
+          'Google Apps Script tidak mengembalikan JSON. Pastikan Deployment Web App diatur "Who has access: Anyone" dan menggunakan URL /exec terbaru.',
+      };
+    }
+    return {
+      ok: false,
+      error: `Respons tidak valid dari Apps Script (HTTP ${res.status}).`,
+    };
+  }
+}
+
 async function gasGet<T>(
   webAppUrl: string,
   params: Record<string, string>,
-): Promise<{ ok: boolean; data?: T; role?: UserRole; error?: string; message?: string }> {
-  const url = new URL(webAppUrl);
-  Object.entries(params).forEach(([k, v]) => {
-    url.searchParams.set(k, v);
-  });
-  const res = await fetch(url.toString(), { method: 'GET' });
-  return (await res.json()) as {
-    ok: boolean;
-    data?: T;
-    role?: UserRole;
-    error?: string;
-    message?: string;
-  };
+): Promise<GasJsonResponse<T>> {
+  try {
+    const url = new URL(webAppUrl);
+    Object.entries(params).forEach(([k, v]) => {
+      url.searchParams.set(k, v);
+    });
+    const res = await fetch(url.toString(), { method: 'GET' });
+    return await parseGasResponse<T>(res);
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : 'Gagal menghubungi Google Apps Script.',
+    };
+  }
 }
 
 async function gasPost<T>(
@@ -204,34 +311,46 @@ async function gasPost<T>(
   action: string,
   pin: string,
   payload: Record<string, unknown>,
-): Promise<{ ok: boolean; data?: T; error?: string; message?: string }> {
-  const res = await fetch(webAppUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action, pin, payload }),
-  });
-  return (await res.json()) as { ok: boolean; data?: T; error?: string; message?: string };
+): Promise<GasJsonResponse<T>> {
+  try {
+    const res = await fetch(webAppUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, pin, payload }),
+    });
+    return await parseGasResponse<T>(res);
+  } catch (err) {
+    return {
+      ok: false,
+      error:
+        err instanceof Error
+          ? `Gagal mengirim ke Google Apps Script: ${err.message}`
+          : 'Gagal mengirim data ke Google Apps Script.',
+    };
+  }
 }
 
-export async function testGasConnection(
-  webAppUrl: string,
-): Promise<{ ok: boolean; message: string }> {
+export async function testGasConnection(webAppUrl: string): Promise<{
+  ok: boolean;
+  message: string;
+  masterName?: string;
+  wilayahConnected?: boolean;
+  wilayahName?: string;
+  wilayahError?: string;
+}> {
   const cleanUrl = webAppUrl.trim();
   if (!cleanUrl) {
     return { ok: false, message: 'URL Web App Google Apps Script masih kosong.' };
   }
-  try {
-    const res = await gasGet(cleanUrl, { action: 'ping' });
-    return {
-      ok: Boolean(res.ok),
-      message: res.message || res.error || 'Respons tidak dikenali dari Apps Script.',
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      message: err instanceof Error ? err.message : 'Gagal menghubungi Google Apps Script.',
-    };
-  }
+  const res = await gasGet(cleanUrl, { action: 'ping' });
+  return {
+    ok: Boolean(res.ok),
+    message: res.message || res.error || 'Respons tidak dikenali dari Apps Script.',
+    masterName: res.masterName,
+    wilayahConnected: res.wilayahConnected,
+    wilayahName: res.wilayahName,
+    wilayahError: res.wilayahError,
+  };
 }
 
 export async function fetchAllOrgData(webAppUrl: string): Promise<{
@@ -245,10 +364,15 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
     pengurus: loadLocalPengurus(),
     proker: loadLocalProker(),
     kegiatan: loadLocalKegiatan(),
+    kodeWilayah: loadLocalKodeWilayah(),
+    dpw: loadLocalDpw(),
+    dpd: loadLocalDpd(),
+    wilayahConnected: false,
     settings: {
       namaAplikasi: localSettings.namaAplikasi,
       logoDataUrl: localSettings.logoDataUrl,
       rpkaDriveUrl: localSettings.rpkaDriveUrl,
+      wilayahSpreadsheetId: localSettings.wilayahSpreadsheetId,
     },
   };
 
@@ -256,44 +380,70 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
     return { dataset: fallback, synced: false };
   }
 
-  try {
-    const res = await gasGet<OrgDataset>(webAppUrl.trim(), { action: 'getAllData' });
-    if (res.ok && res.data) {
-      const units = res.data.units?.length > 0 ? res.data.units : STARTER_UNITS;
-      const proker = res.data.proker?.length > 0 ? res.data.proker : RPKA_2027_PROKER;
-      const kegiatan = res.data.kegiatan?.length > 0 ? res.data.kegiatan : RPKA_2027_KEGIATAN;
-      saveLocalUnits(units);
-      saveLocalPengurus(res.data.pengurus || []);
-      saveLocalProker(proker);
-      saveLocalKegiatan(kegiatan);
-      saveLocalSettingsCache({
-        namaAplikasi: res.data.settings?.namaAplikasi || 'DUWD DPP WI',
-        logoDataUrl: res.data.settings?.logoDataUrl || localSettings.logoDataUrl,
-        rpkaDriveUrl: res.data.settings?.rpkaDriveUrl || localSettings.rpkaDriveUrl,
-      });
-      return {
-        dataset: {
-          units,
-          pengurus: res.data.pengurus || [],
-          proker,
-          kegiatan,
-          settings: {
-            namaAplikasi: res.data.settings?.namaAplikasi || 'DUWD DPP WI',
-            logoDataUrl: res.data.settings?.logoDataUrl || localSettings.logoDataUrl,
-            rpkaDriveUrl: res.data.settings?.rpkaDriveUrl || localSettings.rpkaDriveUrl,
-          },
-        },
-        synced: true,
-      };
-    }
-    return { dataset: fallback, synced: false, error: res.error };
-  } catch (err) {
+  const res = await gasGet<OrgDataset>(webAppUrl.trim(), { action: 'getAllData' });
+  if (res.ok && res.data) {
+    const units = res.data.units?.length > 0 ? res.data.units : STARTER_UNITS;
+    const proker = res.data.proker?.length > 0 ? res.data.proker : RPKA_2027_PROKER;
+    const kegiatan = res.data.kegiatan?.length > 0 ? res.data.kegiatan : RPKA_2027_KEGIATAN;
+    const kodeWilayah =
+      res.data.kodeWilayah?.length > 0 ? res.data.kodeWilayah : STARTER_KODE_WILAYAH;
+    const dpw = Array.isArray(res.data.dpw) ? res.data.dpw : [];
+    const dpd = Array.isArray(res.data.dpd) ? res.data.dpd : [];
+    const wilayahConnected = Boolean(res.data.wilayahConnected);
+
+    saveLocalUnits(units);
+    saveLocalPengurus(res.data.pengurus || []);
+    saveLocalProker(proker);
+    saveLocalKegiatan(kegiatan);
+    saveLocalKodeWilayah(kodeWilayah);
+    saveLocalDpw(dpw);
+    saveLocalDpd(dpd);
+
+    const nextSettings = {
+      namaAplikasi: res.data.settings?.namaAplikasi || 'DUWD DPP WI',
+      logoDataUrl: res.data.settings?.logoDataUrl || localSettings.logoDataUrl,
+      rpkaDriveUrl: res.data.settings?.rpkaDriveUrl ?? localSettings.rpkaDriveUrl,
+      wilayahSpreadsheetId:
+        res.data.settings?.wilayahSpreadsheetId ?? localSettings.wilayahSpreadsheetId,
+    };
+    saveLocalSettingsCache(nextSettings);
+
     return {
-      dataset: fallback,
-      synced: false,
-      error: err instanceof Error ? err.message : 'Gagal sinkronisasi data dari Spreadsheet.',
+      dataset: {
+        units,
+        pengurus: res.data.pengurus || [],
+        proker,
+        kegiatan,
+        kodeWilayah,
+        dpw,
+        dpd,
+        wilayahConnected,
+        settings: nextSettings,
+      },
+      synced: true,
     };
   }
+
+  return { dataset: fallback, synced: false, error: res.error };
+}
+
+export async function fetchWilayahChildren(
+  webAppUrl: string,
+  params: { parentKode?: string; kodeProvinsi?: string; tingkat?: string },
+): Promise<{ ok: boolean; data: KodeWilayahItem[]; error?: string }> {
+  if (!webAppUrl.trim()) {
+    return { ok: false, data: [], error: 'Web App GAS belum terhubung.' };
+  }
+  const query: Record<string, string> = { action: 'getWilayahChildren' };
+  if (params.parentKode) query.parentKode = params.parentKode;
+  if (params.kodeProvinsi) query.kodeProvinsi = params.kodeProvinsi;
+  if (params.tingkat) query.tingkat = params.tingkat;
+
+  const res = await gasGet<KodeWilayahItem[]>(webAppUrl.trim(), query);
+  if (res.ok && Array.isArray(res.data)) {
+    return { ok: true, data: res.data };
+  }
+  return { ok: false, data: [], error: res.error || 'Gagal mengambil detail wilayah.' };
 }
 
 export async function authenticatePin(
@@ -304,14 +454,12 @@ export async function authenticatePin(
   if (!cleanPin) return { ok: false, error: 'Masukkan PIN akses terlebih dahulu.' };
 
   if (webAppUrl.trim()) {
-    try {
-      const res = await gasGet(webAppUrl.trim(), { action: 'verifyPin', pin: cleanPin });
-      if (res.ok && res.role) {
-        return { ok: true, role: res.role };
-      }
+    const res = await gasGet(webAppUrl.trim(), { action: 'verifyPin', pin: cleanPin });
+    if (res.ok && res.role) {
+      return { ok: true, role: res.role };
+    }
+    if (res.error && !res.error.includes('Gagal menghubungi')) {
       return { ok: false, error: res.error || 'PIN akses tidak sesuai.' };
-    } catch {
-      // Fallback to local verification if GAS unreachable
     }
   }
 
@@ -370,7 +518,10 @@ export async function deletePengurusRecord(
 ): Promise<{ ok: boolean; synced: boolean; error?: string }> {
   if (webAppUrl.trim()) {
     const res = await gasPost(webAppUrl.trim(), 'deletePengurus', pin, { id });
-    return { ok: res.ok, synced: true, error: res.error };
+    if (!res.ok) {
+      return { ok: false, synced: false, error: res.error || 'Gagal menghapus dari Spreadsheet.' };
+    }
+    return { ok: true, synced: true };
   }
   return { ok: true, synced: false };
 }
@@ -399,7 +550,10 @@ export async function deleteKegiatanRecord(
 ): Promise<{ ok: boolean; synced: boolean; error?: string }> {
   if (webAppUrl.trim()) {
     const res = await gasPost(webAppUrl.trim(), 'deleteKegiatan', pin, { kodeKegiatan });
-    return { ok: res.ok, synced: true, error: res.error };
+    if (!res.ok) {
+      return { ok: false, synced: false, error: res.error || 'Gagal menghapus kegiatan.' };
+    }
+    return { ok: true, synced: true };
   }
   return { ok: true, synced: false };
 }
@@ -427,7 +581,7 @@ export async function saveUnitRecord(
     id: input.id || `UNIT-${Date.now().toString().slice(-4)}`,
     kodeUnit: input.kodeUnit.trim().toUpperCase(),
     namaUnit: input.namaUnit.trim(),
-    urutan: Number(input.urutan) || 99,
+    urutan: Number(input.urutan) ?? 99,
     aktif: input.aktif,
   };
   return { ok: true, item, synced: false };
@@ -440,9 +594,157 @@ export async function deleteUnitRecord(
 ): Promise<{ ok: boolean; synced: boolean; error?: string }> {
   if (webAppUrl.trim()) {
     const res = await gasPost(webAppUrl.trim(), 'deleteUnit', pin, { id });
-    return { ok: res.ok, synced: true, error: res.error };
+    if (!res.ok) {
+      return { ok: false, synced: false, error: res.error || 'Gagal menghapus Unit.' };
+    }
+    return { ok: true, synced: true };
   }
   return { ok: true, synced: false };
+}
+
+export async function saveDpwRecord(
+  input: Omit<DpwItem, 'id'> & { id?: string },
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; item?: DpwItem; synced: boolean; error?: string }> {
+  const payload = {
+    ...input,
+    ketuaWa: normalizeWhatsApp(input.ketuaWa),
+    sekretarisWa: normalizeWhatsApp(input.sekretarisWa),
+  };
+
+  if (webAppUrl.trim()) {
+    const res = await gasPost<DpwItem>(webAppUrl.trim(), 'saveDpw', pin, payload);
+    if (res.ok && res.data) {
+      return { ok: true, item: res.data, synced: true };
+    }
+    return {
+      ok: false,
+      synced: false,
+      error: res.error || 'Gagal menyimpan DPW ke Spreadsheet #2.',
+    };
+  }
+
+  const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  return {
+    ok: true,
+    synced: false,
+    item: {
+      ...payload,
+      id: input.id || `DPW-${Date.now().toString().slice(-6)}`,
+      diperbaruiPada: nowStr,
+    },
+  };
+}
+
+export async function deleteDpwRecord(
+  id: string,
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; synced: boolean; error?: string }> {
+  if (webAppUrl.trim()) {
+    const res = await gasPost(webAppUrl.trim(), 'deleteDpw', pin, { id });
+    if (!res.ok) {
+      return { ok: false, synced: false, error: res.error || 'Gagal menghapus DPW.' };
+    }
+    return { ok: true, synced: true };
+  }
+  return { ok: true, synced: false };
+}
+
+export async function saveDpdRecord(
+  input: Omit<DpdItem, 'id'> & { id?: string },
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; item?: DpdItem; synced: boolean; error?: string }> {
+  const payload = {
+    ...input,
+    ketuaWa: normalizeWhatsApp(input.ketuaWa),
+    sekretarisWa: normalizeWhatsApp(input.sekretarisWa),
+  };
+
+  if (webAppUrl.trim()) {
+    const res = await gasPost<DpdItem>(webAppUrl.trim(), 'saveDpd', pin, payload);
+    if (res.ok && res.data) {
+      return { ok: true, item: res.data, synced: true };
+    }
+    return {
+      ok: false,
+      synced: false,
+      error: res.error || 'Gagal menyimpan DPD ke Spreadsheet #2.',
+    };
+  }
+
+  const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  return {
+    ok: true,
+    synced: false,
+    item: {
+      ...payload,
+      id: input.id || `DPD-${Date.now().toString().slice(-6)}`,
+      diperbaruiPada: nowStr,
+    },
+  };
+}
+
+export async function deleteDpdRecord(
+  id: string,
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; synced: boolean; error?: string }> {
+  if (webAppUrl.trim()) {
+    const res = await gasPost(webAppUrl.trim(), 'deleteDpd', pin, { id });
+    if (!res.ok) {
+      return { ok: false, synced: false, error: res.error || 'Gagal menghapus DPD.' };
+    }
+    return { ok: true, synced: true };
+  }
+  return { ok: true, synced: false };
+}
+
+export async function importKodeWilayahBatch(
+  rows: KodeWilayahItem[],
+  replaceAll: boolean,
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; count?: number; synced: boolean; error?: string }> {
+  if (!webAppUrl.trim()) {
+    saveLocalKodeWilayah(rows);
+    return { ok: true, count: rows.length, synced: false };
+  }
+  const res = await gasPost(webAppUrl.trim(), 'importKodeWilayah', pin, {
+    rows,
+    replaceAll,
+  });
+  if (!res.ok) {
+    return {
+      ok: false,
+      synced: false,
+      error: res.error || 'Gagal mengimpor kode wilayah ke Spreadsheet #2.',
+    };
+  }
+  return { ok: true, count: res.count || rows.length, synced: true };
+}
+
+export async function setupWilayahSpreadsheetRemote(
+  wilayahSpreadsheetId: string,
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; message?: string; error?: string }> {
+  if (!webAppUrl.trim()) {
+    return { ok: false, error: 'URL Web App Google Apps Script (/exec) belum diisi.' };
+  }
+  const cleanId = extractSpreadsheetId(wilayahSpreadsheetId);
+  const res = await gasPost<{ wilayahSpreadsheetId: string; wilayahName: string }>(
+    webAppUrl.trim(),
+    'setupWilayahSpreadsheet',
+    pin,
+    { wilayahSpreadsheetId: cleanId },
+  );
+  if (!res.ok) {
+    return { ok: false, error: res.error || 'Gagal menyiapkan Spreadsheet #2.' };
+  }
+  return { ok: true, message: res.message };
 }
 
 export async function saveAppSettings(
@@ -450,17 +752,36 @@ export async function saveAppSettings(
     namaAplikasi: string;
     logoDataUrl: string;
     rpkaDriveUrl: string;
+    wilayahSpreadsheetId: string;
     adminPin?: string;
     superAdminPin?: string;
   },
   pin: string,
   webAppUrl: string,
 ): Promise<{ ok: boolean; synced: boolean; error?: string }> {
+  const cleanWilayahId = extractSpreadsheetId(input.wilayahSpreadsheetId);
+
+  if (webAppUrl.trim()) {
+    const res = await gasPost(webAppUrl.trim(), 'updateSettings', pin, {
+      ...input,
+      wilayahSpreadsheetId: cleanWilayahId,
+    });
+    if (!res.ok) {
+      return {
+        ok: false,
+        synced: false,
+        error: res.error || 'Gagal menyimpan pengaturan ke Spreadsheet.',
+      };
+    }
+  }
+
   saveLocalSettingsCache({
     namaAplikasi: input.namaAplikasi.trim() || 'DUWD DPP WI',
     logoDataUrl: input.logoDataUrl,
     rpkaDriveUrl: input.rpkaDriveUrl.trim(),
+    wilayahSpreadsheetId: cleanWilayahId,
   });
+
   if (input.adminPin || input.superAdminPin) {
     saveLocalPins({
       admin: input.adminPin,
@@ -468,9 +789,5 @@ export async function saveAppSettings(
     });
   }
 
-  if (webAppUrl.trim()) {
-    const res = await gasPost(webAppUrl.trim(), 'updateSettings', pin, { ...input });
-    return { ok: res.ok, synced: true, error: res.error };
-  }
-  return { ok: true, synced: false };
+  return { ok: true, synced: Boolean(webAppUrl.trim()) };
 }

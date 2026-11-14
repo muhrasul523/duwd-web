@@ -315,6 +315,10 @@ export function ProkerRpkaView({
           : `Kegiatan ${kode} dihapus dari daftar.`,
       );
       window.setTimeout(() => setNotice(''), 3500);
+    } else {
+      setConfirmDeleteKode(null);
+      setNotice(res.error || `Gagal menghapus kegiatan ${kode}.`);
+      window.setTimeout(() => setNotice(''), 5000);
     }
   };
 

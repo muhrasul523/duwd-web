@@ -46,10 +46,63 @@ export interface KegiatanRpkaItem {
   tautanDrive?: string;
 }
 
+export type TingkatWilayah = 'Pulau' | 'Provinsi' | 'KabKota' | 'Kecamatan' | 'KelDesa';
+
+export interface KodeWilayahItem {
+  kodeWilayah: string;
+  tingkat: TingkatWilayah;
+  pulau: string;
+  kodeProvinsi: string;
+  namaProvinsi: string;
+  kodeKabKota?: string;
+  namaKabKota?: string;
+  kodeKecamatan?: string;
+  namaKecamatan?: string;
+  namaKelDesa?: string;
+  parentKode?: string;
+}
+
+export type StatusTerbentuk = 'Sudah Terbentuk' | 'Persiapan' | 'Belum Terbentuk';
+
+export interface DpwItem {
+  id: string;
+  kodeWilayah: string;
+  pulau: string;
+  namaDpw: string;
+  namaProvinsi: string;
+  statusTerbentuk: StatusTerbentuk;
+  ketuaNama: string;
+  ketuaWa: string;
+  sekretarisNama: string;
+  sekretarisWa: string;
+  alamatKantor?: string;
+  tautanDrive?: string;
+  diperbaruiPada?: string;
+}
+
+export interface DpdItem {
+  id: string;
+  kodeWilayah: string;
+  kodeProvinsi: string;
+  pulau: string;
+  namaProvinsi: string;
+  namaDpd: string;
+  namaKabKota: string;
+  statusTerbentuk: StatusTerbentuk;
+  ketuaNama: string;
+  ketuaWa: string;
+  sekretarisNama: string;
+  sekretarisWa: string;
+  alamatKantor?: string;
+  tautanDrive?: string;
+  diperbaruiPada?: string;
+}
+
 export interface AppSettings {
   namaAplikasi: string;
   logoDataUrl: string;
   rpkaDriveUrl: string;
+  wilayahSpreadsheetId: string;
   gasWebAppUrl: string;
 }
 
@@ -58,9 +111,14 @@ export interface OrgDataset {
   pengurus: PengurusItem[];
   proker: ProgramKerjaItem[];
   kegiatan: KegiatanRpkaItem[];
+  kodeWilayah: KodeWilayahItem[];
+  dpw: DpwItem[];
+  dpd: DpdItem[];
+  wilayahConnected: boolean;
   settings: {
     namaAplikasi: string;
     logoDataUrl: string;
     rpkaDriveUrl: string;
+    wilayahSpreadsheetId: string;
   };
 }
