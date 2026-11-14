@@ -1,18 +1,28 @@
 import { useCallback, useEffect, useState } from 'react';
 import { LoginModal } from './components/LoginModal';
 import { PengurusDirectory } from './components/PengurusDirectory';
+import { ProkerRpkaView } from './components/ProkerRpkaView';
 import { SuperAdminSettings } from './components/SuperAdminSettings';
 import { TopBar, type ActiveView } from './components/TopBar';
 import { UnitManager } from './components/UnitManager';
 import {
   fetchAllOrgData,
+  loadLocalKegiatan,
   loadLocalPengurus,
+  loadLocalProker,
   loadLocalSettings,
   loadLocalUnits,
+  saveLocalKegiatan,
   saveLocalPengurus,
   saveLocalUnits,
 } from './services/orgService';
-import type { PengurusItem, UnitItem, UserRole } from './types/org';
+import type {
+  KegiatanRpkaItem,
+  PengurusItem,
+  ProgramKerjaItem,
+  UnitItem,
+  UserRole,
+} from './types/org';
 import { applyBrowserFavicon } from './utils/whatsapp';
 
 export default function App() {
@@ -25,10 +35,13 @@ export default function App() {
 
   const [namaAplikasi, setNamaAplikasi] = useState(initialSettings.namaAplikasi);
   const [logoDataUrl, setLogoDataUrl] = useState(initialSettings.logoDataUrl);
+  const [rpkaDriveUrl, setRpkaDriveUrl] = useState(initialSettings.rpkaDriveUrl);
   const [webAppUrl, setWebAppUrl] = useState(initialSettings.gasWebAppUrl);
 
   const [units, setUnits] = useState<UnitItem[]>(() => loadLocalUnits());
   const [pengurusList, setPengurusList] = useState<PengurusItem[]>(() => loadLocalPengurus());
+  const [prokerList, setProkerList] = useState<ProgramKerjaItem[]>(() => loadLocalProker());
+  const [kegiatanList, setKegiatanList] = useState<KegiatanRpkaItem[]>(() => loadLocalKegiatan());
   const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
@@ -47,11 +60,16 @@ export default function App() {
       if (synced) {
         setUnits(dataset.units);
         setPengurusList(dataset.pengurus);
+        setProkerList(dataset.proker);
+        setKegiatanList(dataset.kegiatan);
         if (dataset.settings.namaAplikasi) {
           setNamaAplikasi(dataset.settings.namaAplikasi);
         }
         if (dataset.settings.logoDataUrl) {
           setLogoDataUrl(dataset.settings.logoDataUrl);
+        }
+        if (dataset.settings.rpkaDriveUrl !== undefined) {
+          setRpkaDriveUrl(dataset.settings.rpkaDriveUrl);
         }
       }
     } finally {
@@ -67,13 +85,14 @@ export default function App() {
     setRole(nextRole);
     setActivePin(pin);
     setLoginOpen(false);
-    setActiveView('direktori');
   };
 
   const handleLogout = () => {
     setRole('publik');
     setActivePin('');
-    setActiveView('direktori');
+    if (activeView === 'unit' || activeView === 'pengaturan') {
+      setActiveView('direktori');
+    }
   };
 
   const handleSavePengurus = (saved: PengurusItem) => {
@@ -95,6 +114,25 @@ export default function App() {
     });
   };
 
+  const handleSaveKegiatan = (saved: KegiatanRpkaItem) => {
+    setKegiatanList((prev) => {
+      const exists = prev.some((k) => k.kodeKegiatan === saved.kodeKegiatan);
+      const next = exists
+        ? prev.map((k) => (k.kodeKegiatan === saved.kodeKegiatan ? saved : k))
+        : [...prev, saved];
+      saveLocalKegiatan(next);
+      return next;
+    });
+  };
+
+  const handleDeleteKegiatan = (kodeKegiatan: string) => {
+    setKegiatanList((prev) => {
+      const next = prev.filter((k) => k.kodeKegiatan !== kodeKegiatan);
+      saveLocalKegiatan(next);
+      return next;
+    });
+  };
+
   const handleSaveUnit = (savedUnit: UnitItem) => {
     setUnits((prev) => {
       const exists = prev.some((u) => u.id === savedUnit.id);
@@ -104,7 +142,6 @@ export default function App() {
       saveLocalUnits(next);
       return next;
     });
-    // Perbarui nama unit pada daftar pengurus yang menggunakan unit ini
     setPengurusList((prev) => {
       const next = prev.map((p) =>
         p.unitId === savedUnit.id ? { ...p, namaUnit: savedUnit.namaUnit } : p,
@@ -149,6 +186,22 @@ export default function App() {
           />
         )}
 
+        {activeView === 'proker' && (
+          <ProkerRpkaView
+            role={role}
+            activePin={activePin}
+            webAppUrl={webAppUrl}
+            prokerList={prokerList}
+            kegiatanList={kegiatanList}
+            units={units}
+            rpkaDriveUrl={rpkaDriveUrl}
+            syncing={syncing}
+            onRefresh={syncFromSheet}
+            onSaveKegiatan={handleSaveKegiatan}
+            onDeleteKegiatan={handleDeleteKegiatan}
+          />
+        )}
+
         {activeView === 'unit' && role === 'superadmin' && (
           <UnitManager
             activePin={activePin}
@@ -164,10 +217,12 @@ export default function App() {
             activePin={activePin}
             namaAplikasi={namaAplikasi}
             logoDataUrl={logoDataUrl}
+            rpkaDriveUrl={rpkaDriveUrl}
             webAppUrl={webAppUrl}
             onUpdateSettingsState={(next) => {
               setNamaAplikasi(next.namaAplikasi);
               setLogoDataUrl(next.logoDataUrl);
+              setRpkaDriveUrl(next.rpkaDriveUrl);
               setWebAppUrl(next.webAppUrl);
             }}
             onSyncFromSheet={syncFromSheet}
@@ -178,7 +233,7 @@ export default function App() {
       <footer className="border-t border-[#07525E]/10 bg-white/60 px-4 py-5 backdrop-blur-md sm:px-6">
         <div className="mx-auto flex max-w-[1160px] flex-col justify-between gap-2 text-xs text-[#526A70] sm:flex-row sm:items-center">
           <div>
-            &copy; 2026 Departemen Urusan Wilayah dan Daerah · DPP Wahdah Islamiyah
+            &copy; 2026 Departemen Urusan Wilayah dan Daerah &middot; DPP Wahdah Islamiyah
           </div>
           <div>duwd.web.id</div>
         </div>

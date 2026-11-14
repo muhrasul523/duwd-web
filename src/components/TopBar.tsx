@@ -2,7 +2,7 @@ import { LogIn, LogOut, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import type { UserRole } from '../types/org';
 
-export type ActiveView = 'direktori' | 'unit' | 'pengaturan';
+export type ActiveView = 'direktori' | 'proker' | 'unit' | 'pengaturan';
 
 interface TopBarProps {
   namaAplikasi: string;
@@ -27,6 +27,7 @@ export function TopBar({
 
   const navItems: { id: ActiveView; label: string; visible: boolean }[] = [
     { id: 'direktori', label: 'Daftar Pengurus', visible: true },
+    { id: 'proker', label: 'Program Kerja 2027', visible: true },
     { id: 'unit', label: 'Kelola Unit', visible: role === 'superadmin' },
     { id: 'pengaturan', label: 'Pengaturan & GAS', visible: role === 'superadmin' },
   ];

@@ -1,21 +1,31 @@
-import type { AppSettings, OrgDataset, PengurusItem, UnitItem, UserRole } from '../types/org';
+import { RPKA_2027_KEGIATAN, RPKA_2027_PROKER } from '../data/rpka2027Seed';
+import type {
+  AppSettings,
+  KegiatanRpkaItem,
+  OrgDataset,
+  PengurusItem,
+  ProgramKerjaItem,
+  UnitItem,
+  UserRole,
+} from '../types/org';
 import { normalizeWhatsApp } from '../utils/whatsapp';
 
 const STORAGE_KEYS = {
   GAS_URL: 'duwd_gas_webapp_url_v2',
   UNITS: 'duwd_units_cache_v2',
   PENGURUS: 'duwd_pengurus_cache_v2',
+  PROKER: 'duwd_proker_cache_v2',
+  KEGIATAN: 'duwd_kegiatan_cache_v2',
   SETTINGS: 'duwd_settings_cache_v2',
   PINS: 'duwd_local_pins_v2',
 };
 
 export const STARTER_UNITS: UnitItem[] = [
-  { id: 'UNIT-01', kodeUnit: 'KETUA', namaUnit: 'Ketua Departemen', urutan: 1, aktif: true },
-  { id: 'UNIT-02', kodeUnit: 'SEKRETARIS', namaUnit: 'Sekretaris Departemen', urutan: 2, aktif: true },
-  { id: 'UNIT-03', kodeUnit: 'BENDAHARA', namaUnit: 'Bendahara', urutan: 3, aktif: true },
-  { id: 'UNIT-04', kodeUnit: 'WILAYAH', namaUnit: 'Bidang Pembinaan Wilayah', urutan: 4, aktif: true },
-  { id: 'UNIT-05', kodeUnit: 'DAERAH', namaUnit: 'Bidang Konsolidasi Daerah', urutan: 5, aktif: true },
-  { id: 'UNIT-06', kodeUnit: 'ADMIN-IT', namaUnit: 'Bidang Administrasi & Digitalisasi', urutan: 6, aktif: true },
+  { id: 'UNIT-01', kodeUnit: 'PI', namaUnit: 'Pengurus Inti (PI)', urutan: 1, aktif: true },
+  { id: 'UNIT-02', kodeUnit: 'WILAYAH', namaUnit: 'Bidang Pembinaan Wilayah', urutan: 2, aktif: true },
+  { id: 'UNIT-03', kodeUnit: 'DAERAH', namaUnit: 'Bidang Konsolidasi Daerah', urutan: 3, aktif: true },
+  { id: 'UNIT-04', kodeUnit: 'KADER', namaUnit: 'Bidang Kaderisasi & Levelisasi', urutan: 4, aktif: true },
+  { id: 'UNIT-05', kodeUnit: 'ADMIN-IT', namaUnit: 'Bidang Administrasi & Digitalisasi', urutan: 5, aktif: true },
 ];
 
 const DEFAULT_PINS = {
@@ -34,12 +44,14 @@ export function loadLocalSettings(): AppSettings {
     return {
       namaAplikasi: parsed.namaAplikasi || 'DUWD DPP WI',
       logoDataUrl: parsed.logoDataUrl || '',
+      rpkaDriveUrl: parsed.rpkaDriveUrl || '',
       gasWebAppUrl: gasUrl,
     };
   } catch {
     return {
       namaAplikasi: 'DUWD DPP WI',
       logoDataUrl: '',
+      rpkaDriveUrl: '',
       gasWebAppUrl: '',
     };
   }
@@ -53,7 +65,11 @@ export function saveGasWebAppUrl(url: string): void {
   }
 }
 
-export function saveLocalSettingsCache(settings: { namaAplikasi: string; logoDataUrl: string }): void {
+export function saveLocalSettingsCache(settings: {
+  namaAplikasi: string;
+  logoDataUrl: string;
+  rpkaDriveUrl: string;
+}): void {
   try {
     window.localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   } catch {
@@ -99,6 +115,44 @@ export function saveLocalPengurus(list: PengurusItem[]): void {
   }
 }
 
+export function loadLocalProker(): ProgramKerjaItem[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.PROKER);
+    if (!raw) return RPKA_2027_PROKER;
+    const parsed = JSON.parse(raw) as ProgramKerjaItem[];
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : RPKA_2027_PROKER;
+  } catch {
+    return RPKA_2027_PROKER;
+  }
+}
+
+export function saveLocalProker(list: ProgramKerjaItem[]): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.PROKER, JSON.stringify(list));
+  } catch {
+    // Ignore
+  }
+}
+
+export function loadLocalKegiatan(): KegiatanRpkaItem[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.KEGIATAN);
+    if (!raw) return RPKA_2027_KEGIATAN;
+    const parsed = JSON.parse(raw) as KegiatanRpkaItem[];
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : RPKA_2027_KEGIATAN;
+  } catch {
+    return RPKA_2027_KEGIATAN;
+  }
+}
+
+export function saveLocalKegiatan(list: KegiatanRpkaItem[]): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.KEGIATAN, JSON.stringify(list));
+  } catch {
+    // Ignore
+  }
+}
+
 function loadLocalPins(): { superadmin: string; admin: string } {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEYS.PINS);
@@ -126,13 +180,22 @@ function saveLocalPins(pins: { superadmin?: string; admin?: string }): void {
   }
 }
 
-async function gasGet<T>(webAppUrl: string, params: Record<string, string>): Promise<{ ok: boolean; data?: T; role?: UserRole; error?: string; message?: string }> {
+async function gasGet<T>(
+  webAppUrl: string,
+  params: Record<string, string>,
+): Promise<{ ok: boolean; data?: T; role?: UserRole; error?: string; message?: string }> {
   const url = new URL(webAppUrl);
   Object.entries(params).forEach(([k, v]) => {
     url.searchParams.set(k, v);
   });
   const res = await fetch(url.toString(), { method: 'GET' });
-  return (await res.json()) as { ok: boolean; data?: T; role?: UserRole; error?: string; message?: string };
+  return (await res.json()) as {
+    ok: boolean;
+    data?: T;
+    role?: UserRole;
+    error?: string;
+    message?: string;
+  };
 }
 
 async function gasPost<T>(
@@ -149,7 +212,9 @@ async function gasPost<T>(
   return (await res.json()) as { ok: boolean; data?: T; error?: string; message?: string };
 }
 
-export async function testGasConnection(webAppUrl: string): Promise<{ ok: boolean; message: string }> {
+export async function testGasConnection(
+  webAppUrl: string,
+): Promise<{ ok: boolean; message: string }> {
   const cleanUrl = webAppUrl.trim();
   if (!cleanUrl) {
     return { ok: false, message: 'URL Web App Google Apps Script masih kosong.' };
@@ -177,9 +242,12 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
   const fallback: OrgDataset = {
     units: loadLocalUnits(),
     pengurus: loadLocalPengurus(),
+    proker: loadLocalProker(),
+    kegiatan: loadLocalKegiatan(),
     settings: {
       namaAplikasi: localSettings.namaAplikasi,
       logoDataUrl: localSettings.logoDataUrl,
+      rpkaDriveUrl: localSettings.rpkaDriveUrl,
     },
   };
 
@@ -190,20 +258,28 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
   try {
     const res = await gasGet<OrgDataset>(webAppUrl.trim(), { action: 'getAllData' });
     if (res.ok && res.data) {
-      const units = res.data.units.length > 0 ? res.data.units : STARTER_UNITS;
+      const units = res.data.units?.length > 0 ? res.data.units : STARTER_UNITS;
+      const proker = res.data.proker?.length > 0 ? res.data.proker : RPKA_2027_PROKER;
+      const kegiatan = res.data.kegiatan?.length > 0 ? res.data.kegiatan : RPKA_2027_KEGIATAN;
       saveLocalUnits(units);
-      saveLocalPengurus(res.data.pengurus);
+      saveLocalPengurus(res.data.pengurus || []);
+      saveLocalProker(proker);
+      saveLocalKegiatan(kegiatan);
       saveLocalSettingsCache({
         namaAplikasi: res.data.settings?.namaAplikasi || 'DUWD DPP WI',
         logoDataUrl: res.data.settings?.logoDataUrl || localSettings.logoDataUrl,
+        rpkaDriveUrl: res.data.settings?.rpkaDriveUrl || localSettings.rpkaDriveUrl,
       });
       return {
         dataset: {
           units,
-          pengurus: res.data.pengurus,
+          pengurus: res.data.pengurus || [],
+          proker,
+          kegiatan,
           settings: {
             namaAplikasi: res.data.settings?.namaAplikasi || 'DUWD DPP WI',
             logoDataUrl: res.data.settings?.logoDataUrl || localSettings.logoDataUrl,
+            rpkaDriveUrl: res.data.settings?.rpkaDriveUrl || localSettings.rpkaDriveUrl,
           },
         },
         synced: true,
@@ -232,7 +308,7 @@ export async function authenticatePin(
       if (res.ok && res.role) {
         return { ok: true, role: res.role };
       }
-      return { ok: false, error: res.error || 'PIN tidak valid di Google Sheets.' };
+      return { ok: false, error: res.error || 'PIN akses tidak sesuai.' };
     } catch {
       // Fallback to local verification if GAS unreachable
     }
@@ -252,6 +328,7 @@ export async function savePengurusRecord(
     whatsapp: string;
     unitId: string;
     namaUnit: string;
+    amanah: string;
     dibuatPada?: string;
   },
   pin: string,
@@ -278,6 +355,7 @@ export async function savePengurusRecord(
     whatsapp: normalizedWa,
     unitId: input.unitId,
     namaUnit: input.namaUnit,
+    amanah: input.amanah.trim(),
     dibuatPada: input.dibuatPada || nowStr,
     diperbaruiPada: nowStr,
   };
@@ -291,6 +369,35 @@ export async function deletePengurusRecord(
 ): Promise<{ ok: boolean; synced: boolean; error?: string }> {
   if (webAppUrl.trim()) {
     const res = await gasPost(webAppUrl.trim(), 'deletePengurus', pin, { id });
+    return { ok: res.ok, synced: true, error: res.error };
+  }
+  return { ok: true, synced: false };
+}
+
+export async function saveKegiatanRecord(
+  input: KegiatanRpkaItem,
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; item?: KegiatanRpkaItem; synced: boolean; error?: string }> {
+  if (webAppUrl.trim()) {
+    const res = await gasPost<KegiatanRpkaItem>(webAppUrl.trim(), 'saveKegiatan', pin, {
+      ...input,
+    });
+    if (res.ok && res.data) {
+      return { ok: true, item: res.data, synced: true };
+    }
+    return { ok: false, synced: false, error: res.error || 'Gagal menyimpan kegiatan.' };
+  }
+  return { ok: true, item: input, synced: false };
+}
+
+export async function deleteKegiatanRecord(
+  kodeKegiatan: string,
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; synced: boolean; error?: string }> {
+  if (webAppUrl.trim()) {
+    const res = await gasPost(webAppUrl.trim(), 'deleteKegiatan', pin, { kodeKegiatan });
     return { ok: res.ok, synced: true, error: res.error };
   }
   return { ok: true, synced: false };
@@ -341,6 +448,7 @@ export async function saveAppSettings(
   input: {
     namaAplikasi: string;
     logoDataUrl: string;
+    rpkaDriveUrl: string;
     adminPin?: string;
     superAdminPin?: string;
   },
@@ -350,6 +458,7 @@ export async function saveAppSettings(
   saveLocalSettingsCache({
     namaAplikasi: input.namaAplikasi.trim() || 'DUWD DPP WI',
     logoDataUrl: input.logoDataUrl,
+    rpkaDriveUrl: input.rpkaDriveUrl.trim(),
   });
   if (input.adminPin || input.superAdminPin) {
     saveLocalPins({

@@ -7,11 +7,13 @@ File `/backend-gas/Code.gs` dirancang untuk dipasang langsung di dalam **Google 
 2. Klik menu **Extensions (Ekstensi)** > **Apps Script**.
 3. Hapus isi bawaan `Code.gs`, lalu salin-tempel seluruh isi file `/backend-gas/Code.gs`.
 4. Simpan (**Ctrl + S**).
-5. Di toolbar atas editor Apps Script, pilih fungsi **`setupDatabase`** lalu klik **Run** (cukup 1 kali).
-   - Skrip otomatis membuat 4 tab sheet:
+5. Di toolbar atas editor Apps Script, pilih fungsi **`setupDatabase`** lalu klik **Run** (cukup 1 kali — aman dijalankan ulang saat ada pembaruan modul).
+   - Skrip otomatis membuat / memperbarui 6 tab sheet:
      - `UNIT` (Daftar unit/bidang internal DUWD)
-     - `PENGURUS` (Nama Lengkap, Nama Panggilan, WhatsApp `628...`, Unit)
-     - `PENGATURAN` (PIN Super Admin, PIN Admin, Nama Aplikasi, Logo)
+     - `PENGURUS` (Nama Lengkap, Nama Panggilan, WhatsApp `628...`, Unit, Amanah)
+     - `PROGRAM_KERJA` (5 Program Kerja Induk DUWD 2027 beserta kode)
+     - `KEGIATAN_RPKA` (37 Kegiatan RPKA 2027 lengkap dengan Tujuan, Sasaran, Indikator, Tempat, Waktu, Pendapatan, Belanja, Unit PJ, Status, Tautan Drive)
+     - `PENGATURAN` (PIN Super Admin, PIN Admin, Nama Aplikasi, Logo, Link Drive RPKA)
      - `SYSTEM_LOGS` (Catatan aktivitas otomatis)
 6. Klik **Deploy** > **New deployment** > pilih jenis **Web app**:
    - **Execute as:** `Me`

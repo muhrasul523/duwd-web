@@ -100,17 +100,6 @@ export function LoginModal({ webAppUrl, onClose, onSuccess }: LoginModalProps) {
             </div>
           )}
 
-          <div className="rounded-xl bg-[#F6FAFB] p-3 text-[11px] leading-relaxed text-[#526A70]">
-            <div>
-              <span className="font-semibold text-[#07525E]">PIN Bawaan Super Admin:</span>{' '}
-              <span className="font-mono">duwd-super-2026</span>
-            </div>
-            <div>
-              <span className="font-semibold text-[#07525E]">PIN Bawaan Admin:</span>{' '}
-              <span className="font-mono">duwd-admin-2026</span>
-            </div>
-          </div>
-
           <div className="flex items-center justify-end gap-2 pt-1">
             <button
               type="button"

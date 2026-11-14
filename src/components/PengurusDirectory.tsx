@@ -33,6 +33,34 @@ interface PengurusDirectoryProps {
   onDeleteSuccess: (id: string) => void;
 }
 
+const PI_AMANAH_PRESETS = [
+  'Ketua',
+  'Wakil Ketua',
+  'Sekretaris',
+  'Wakil Sekretaris',
+  'Bendahara',
+  'Wakil Bendahara',
+];
+
+const UNIT_AMANAH_PRESETS = ['Ketua', 'Sekretaris', 'Anggota'];
+
+const AMANAH_ORDER: Record<string, number> = {
+  ketua: 1,
+  'wakil ketua': 2,
+  sekretaris: 3,
+  'wakil sekretaris': 4,
+  bendahara: 5,
+  'wakil bendahara': 6,
+  anggota: 7,
+};
+
+function isPiUnit(unit?: UnitItem): boolean {
+  if (!unit) return false;
+  const code = unit.kodeUnit.trim().toUpperCase();
+  const name = unit.namaUnit.trim().toLowerCase();
+  return code === 'PI' || name.includes('pengurus inti');
+}
+
 export function PengurusDirectory({
   role,
   activePin,
@@ -60,6 +88,8 @@ export function PengurusDirectory({
   const [namaPanggilan, setNamaPanggilan] = useState('');
   const [waRaw, setWaRaw] = useState('');
   const [unitId, setUnitId] = useState('');
+  const [amanahSelect, setAmanahSelect] = useState('Ketua');
+  const [amanahCustom, setAmanahCustom] = useState('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
@@ -67,38 +97,89 @@ export function PengurusDirectory({
 
   const normalizedWaPreview = useMemo(() => normalizeWhatsApp(waRaw), [waRaw]);
 
+  const selectedUnitObj = useMemo(
+    () => units.find((u) => u.id === unitId),
+    [units, unitId],
+  );
+
+  const amanahPresets = useMemo(
+    () => (isPiUnit(selectedUnitObj) ? PI_AMANAH_PRESETS : UNIT_AMANAH_PRESETS),
+    [selectedUnitObj],
+  );
+
   const filteredPengurus = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return pengurusList.filter((item) => {
-      if (selectedUnitId !== 'ALL' && item.unitId !== selectedUnitId) {
-        return false;
-      }
-      if (q) {
-        const text = `${item.namaLengkap} ${item.namaPanggilan} ${item.namaUnit} ${item.whatsapp}`.toLowerCase();
-        if (!text.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [pengurusList, selectedUnitId, searchQuery]);
+    const unitOrderMap = new Map<string, number>();
+    units.forEach((u) => unitOrderMap.set(u.id, u.urutan));
+
+    return pengurusList
+      .filter((item) => {
+        if (selectedUnitId !== 'ALL' && item.unitId !== selectedUnitId) {
+          return false;
+        }
+        if (q) {
+          const text = `${item.namaLengkap} ${item.namaPanggilan} ${item.namaUnit} ${item.amanah || ''} ${item.whatsapp}`.toLowerCase();
+          if (!text.includes(q)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const uA = unitOrderMap.get(a.unitId) ?? 999;
+        const uB = unitOrderMap.get(b.unitId) ?? 999;
+        if (uA !== uB) return uA - uB;
+        const amA = AMANAH_ORDER[(a.amanah || '').trim().toLowerCase()] ?? 99;
+        const amB = AMANAH_ORDER[(b.amanah || '').trim().toLowerCase()] ?? 99;
+        if (amA !== amB) return amA - amB;
+        return a.namaLengkap.localeCompare(b.namaLengkap, 'id');
+      });
+  }, [pengurusList, units, selectedUnitId, searchQuery]);
 
   const openCreateForm = () => {
+    const defaultUnit = activeUnits[0];
+    const presets = isPiUnit(defaultUnit) ? PI_AMANAH_PRESETS : UNIT_AMANAH_PRESETS;
     setEditingItem(null);
     setNamaLengkap('');
     setNamaPanggilan('');
     setWaRaw('');
-    setUnitId(activeUnits[0]?.id || '');
+    setUnitId(defaultUnit?.id || '');
+    setAmanahSelect(presets[0]);
+    setAmanahCustom('');
     setFormError('');
     setFormOpen(true);
   };
 
   const openEditForm = (item: PengurusItem) => {
+    const targetUnit = units.find((u) => u.id === item.unitId) || activeUnits[0];
+    const presets = isPiUnit(targetUnit) ? PI_AMANAH_PRESETS : UNIT_AMANAH_PRESETS;
+    const currentAmanah = (item.amanah || '').trim();
+    const isPreset = presets.includes(currentAmanah);
+
     setEditingItem(item);
     setNamaLengkap(item.namaLengkap);
     setNamaPanggilan(item.namaPanggilan);
     setWaRaw(item.whatsapp);
-    setUnitId(item.unitId || activeUnits[0]?.id || '');
+    setUnitId(targetUnit?.id || '');
+    if (isPreset) {
+      setAmanahSelect(currentAmanah);
+      setAmanahCustom('');
+    } else if (currentAmanah) {
+      setAmanahSelect('LAINNYA');
+      setAmanahCustom(currentAmanah);
+    } else {
+      setAmanahSelect(presets[0]);
+      setAmanahCustom('');
+    }
     setFormError('');
     setFormOpen(true);
+  };
+
+  const handleUnitChangeInForm = (nextUnitId: string) => {
+    setUnitId(nextUnitId);
+    const nextUnit = units.find((u) => u.id === nextUnitId);
+    const nextPresets = isPiUnit(nextUnit) ? PI_AMANAH_PRESETS : UNIT_AMANAH_PRESETS;
+    if (amanahSelect !== 'LAINNYA' && !nextPresets.includes(amanahSelect)) {
+      setAmanahSelect(nextPresets[0]);
+    }
   };
 
   const handleWaInputChange = (val: string) => {
@@ -132,6 +213,12 @@ export function PengurusDirectory({
       setFormError('Pilih unit kepengurusan terlebih dahulu.');
       return;
     }
+    const finalAmanah =
+      amanahSelect === 'LAINNYA' ? amanahCustom.trim() : amanahSelect.trim();
+    if (!finalAmanah) {
+      setFormError('Pilih atau tuliskan amanah kepengurusan.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -143,6 +230,7 @@ export function PengurusDirectory({
           whatsapp: finalWa,
           unitId: chosenUnit.id,
           namaUnit: chosenUnit.namaUnit,
+          amanah: finalAmanah,
           dibuatPada: editingItem?.dibuatPada,
         },
         activePin,
@@ -256,7 +344,7 @@ export function PengurusDirectory({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari nama, panggilan, WA, atau unit..."
+              placeholder="Cari nama, panggilan, unit, amanah, WA..."
               className="w-full rounded-xl border border-[#07525E]/15 bg-white/90 py-2 pr-3.5 pl-10 text-sm text-[#0F2429] placeholder:text-[#738A90] focus:border-[#0C7A89] focus:outline-none"
             />
           </div>
@@ -328,6 +416,7 @@ export function PengurusDirectory({
                   <th className="px-4 py-3.5">Nama Lengkap</th>
                   <th className="px-4 py-3.5">Nama Panggilan</th>
                   <th className="px-4 py-3.5">Unit</th>
+                  <th className="px-4 py-3.5">Amanah</th>
                   <th className="px-4 py-3.5">WhatsApp</th>
                   {canEdit && <th className="px-6 py-3.5 text-right">Kelola</th>}
                 </tr>
@@ -346,6 +435,9 @@ export function PengurusDirectory({
                     </td>
                     <td className="px-4 py-4 text-[13px] font-medium text-[#07525E]">
                       {item.namaUnit}
+                    </td>
+                    <td className="px-4 py-4 text-[13px] font-semibold text-[#0C7A89]">
+                      {item.amanah || '-'}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <a
@@ -501,27 +593,72 @@ export function PengurusDirectory({
                 )}
               </div>
 
-              <div>
-                <label
-                  htmlFor="p-unit"
-                  className="mb-1 block text-xs font-semibold text-[#355158]"
-                >
-                  Pilih Unit
-                </label>
-                <select
-                  id="p-unit"
-                  required
-                  value={unitId}
-                  onChange={(e) => setUnitId(e.target.value)}
-                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
-                >
-                  {activeUnits.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.namaUnit} ({u.kodeUnit})
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="p-unit"
+                    className="mb-1 block text-xs font-semibold text-[#355158]"
+                  >
+                    Pilih Unit
+                  </label>
+                  <select
+                    id="p-unit"
+                    required
+                    value={unitId}
+                    onChange={(e) => handleUnitChangeInForm(e.target.value)}
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                  >
+                    {activeUnits.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.namaUnit} ({u.kodeUnit})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="p-amanah"
+                    className="mb-1 block text-xs font-semibold text-[#355158]"
+                  >
+                    Pilih Amanah
+                  </label>
+                  <select
+                    id="p-amanah"
+                    required
+                    value={amanahSelect}
+                    onChange={(e) => setAmanahSelect(e.target.value)}
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                  >
+                    {amanahPresets.map((preset) => (
+                      <option key={preset} value={preset}>
+                        {preset}
+                      </option>
+                    ))}
+                    <option value="LAINNYA">Lainnya (Isi Manual)</option>
+                  </select>
+                </div>
               </div>
+
+              {amanahSelect === 'LAINNYA' && (
+                <div>
+                  <label
+                    htmlFor="p-amanah-custom"
+                    className="mb-1 block text-xs font-semibold text-[#355158]"
+                  >
+                    Tulis Nama Amanah
+                  </label>
+                  <input
+                    id="p-amanah-custom"
+                    type="text"
+                    required
+                    value={amanahCustom}
+                    onChange={(e) => setAmanahCustom(e.target.value)}
+                    placeholder="Contoh: Koordinator Wilayah Timur"
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                  />
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-2 border-t border-[#07525E]/10 pt-4">
                 <button

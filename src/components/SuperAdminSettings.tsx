@@ -22,10 +22,12 @@ interface SuperAdminSettingsProps {
   activePin: string;
   namaAplikasi: string;
   logoDataUrl: string;
+  rpkaDriveUrl: string;
   webAppUrl: string;
   onUpdateSettingsState: (next: {
     namaAplikasi: string;
     logoDataUrl: string;
+    rpkaDriveUrl: string;
     webAppUrl: string;
   }) => void;
   onSyncFromSheet: () => Promise<void>;
@@ -35,12 +37,14 @@ export function SuperAdminSettings({
   activePin,
   namaAplikasi: initialName,
   logoDataUrl: initialLogo,
+  rpkaDriveUrl: initialRpkaDriveUrl,
   webAppUrl: initialGasUrl,
   onUpdateSettingsState,
   onSyncFromSheet,
 }: SuperAdminSettingsProps) {
   const [namaAplikasi, setNamaAplikasi] = useState(initialName);
   const [logoDataUrl, setLogoDataUrl] = useState(initialLogo);
+  const [rpkaDriveUrl, setRpkaDriveUrl] = useState(initialRpkaDriveUrl);
   const [webAppUrl, setWebAppUrl] = useState(initialGasUrl);
   const [adminPin, setAdminPin] = useState('');
   const [superAdminPin, setSuperAdminPin] = useState('');
@@ -63,6 +67,7 @@ export function SuperAdminSettings({
       onUpdateSettingsState({
         namaAplikasi,
         logoDataUrl: dataUrl,
+        rpkaDriveUrl,
         webAppUrl,
       });
       setSettingsMsg('Logo diperbarui di aplikasi & favicon browser. Klik "Simpan Pengaturan" untuk menyimpan ke Spreadsheet.');
@@ -81,6 +86,7 @@ export function SuperAdminSettings({
         {
           namaAplikasi,
           logoDataUrl,
+          rpkaDriveUrl,
           adminPin: adminPin.trim() || undefined,
           superAdminPin: superAdminPin.trim() || undefined,
         },
@@ -91,13 +97,14 @@ export function SuperAdminSettings({
       onUpdateSettingsState({
         namaAplikasi: namaAplikasi.trim() || 'DUWD DPP WI',
         logoDataUrl,
+        rpkaDriveUrl: rpkaDriveUrl.trim(),
         webAppUrl: webAppUrl.trim(),
       });
       setAdminPin('');
       setSuperAdminPin('');
       setSettingsMsg(
         res.synced
-          ? 'Pengaturan, logo, dan PIN tersimpan ke sheet PENGATURAN.'
+          ? 'Pengaturan, logo, link Drive RPKA, dan PIN tersimpan ke sheet PENGATURAN.'
           : 'Pengaturan disimpan di browser lokal.',
       );
     } finally {
@@ -107,7 +114,12 @@ export function SuperAdminSettings({
 
   const handleTestAndSyncGas = async () => {
     saveGasWebAppUrl(webAppUrl);
-    onUpdateSettingsState({ namaAplikasi, logoDataUrl, webAppUrl: webAppUrl.trim() });
+    onUpdateSettingsState({
+      namaAplikasi,
+      logoDataUrl,
+      rpkaDriveUrl,
+      webAppUrl: webAppUrl.trim(),
+    });
 
     setTestingGas(true);
     const res = await testGasConnection(webAppUrl);
@@ -181,7 +193,12 @@ export function SuperAdminSettings({
                       type="button"
                       onClick={() => {
                         setLogoDataUrl('');
-                        onUpdateSettingsState({ namaAplikasi, logoDataUrl: '', webAppUrl });
+                        onUpdateSettingsState({
+                          namaAplikasi,
+                          logoDataUrl: '',
+                          rpkaDriveUrl,
+                          webAppUrl,
+                        });
                       }}
                       className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-[#07525E]/15 px-3 py-2 text-xs font-medium text-[#526A70] hover:bg-white"
                     >
@@ -224,6 +241,19 @@ export function SuperAdminSettings({
                   value={namaAplikasi}
                   onChange={(e) => setNamaAplikasi(e.target.value)}
                   className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                  Tautan Google Drive PDF RPKA 2027 (Opsional)
+                </label>
+                <input
+                  type="url"
+                  value={rpkaDriveUrl}
+                  onChange={(e) => setRpkaDriveUrl(e.target.value)}
+                  placeholder="https://drive.google.com/file/d/.../view"
+                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
                 />
               </div>
 
