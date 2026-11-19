@@ -1,7 +1,9 @@
 import { AlertTriangle, X } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { DpwDpdView } from './components/DpwDpdView';
+import { KalenderKegiatanView } from './components/KalenderKegiatanView';
 import { LoginModal } from './components/LoginModal';
+import { MusyawarahView } from './components/MusyawarahView';
 import { PengurusDirectory } from './components/PengurusDirectory';
 import { ProkerRpkaView } from './components/ProkerRpkaView';
 import { SuperAdminSettings } from './components/SuperAdminSettings';
@@ -15,7 +17,9 @@ import {
   loadLocalDpw,
   loadLocalKegiatan,
   loadLocalKodeWilayah,
+  loadLocalMusyawarah,
   loadLocalPengurus,
+  loadLocalPresensi,
   loadLocalProker,
   loadLocalSettings,
   loadLocalUnits,
@@ -25,7 +29,9 @@ import {
   saveLocalDpw,
   saveLocalKegiatan,
   saveLocalKodeWilayah,
+  saveLocalMusyawarah,
   saveLocalPengurus,
+  saveLocalPresensi,
   saveLocalUnits,
 } from './services/orgService';
 import type {
@@ -35,12 +41,50 @@ import type {
   DpwItem,
   KegiatanRpkaItem,
   KodeWilayahItem,
+  MusyawarahItem,
   PengurusItem,
+  PresensiItem,
   ProgramKerjaItem,
+  ThemePreference,
   UnitItem,
   UserRole,
+  ViewportMode,
 } from './types/org';
 import { applyBrowserFavicon } from './utils/whatsapp';
+
+const THEME_STORAGE_KEY = 'duwd_theme_pref_v1';
+const VIEWPORT_STORAGE_KEY = 'duwd_viewport_mode_v1';
+const WIDTH_PCT_STORAGE_KEY = 'duwd_screen_width_pct_v1';
+
+function loadInitialTheme(): ThemePreference {
+  try {
+    const raw = localStorage.getItem(THEME_STORAGE_KEY);
+    if (raw === 'light' || raw === 'dark' || raw === 'system') return raw;
+  } catch {
+    // ignore
+  }
+  return 'system';
+}
+
+function loadInitialViewport(): ViewportMode {
+  try {
+    const raw = localStorage.getItem(VIEWPORT_STORAGE_KEY);
+    if (raw === 'desktop' || raw === 'tablet' || raw === 'mobile') return raw;
+  } catch {
+    // ignore
+  }
+  return 'desktop';
+}
+
+function loadInitialScreenWidthPct(): number {
+  try {
+    const raw = Number(localStorage.getItem(WIDTH_PCT_STORAGE_KEY));
+    if (Number.isFinite(raw) && raw >= 60 && raw <= 100) return Math.round(raw);
+  } catch {
+    // ignore
+  }
+  return 95;
+}
 
 export default function App() {
   const initialSettings = loadLocalSettings();
@@ -49,6 +93,11 @@ export default function App() {
   const [activePin, setActivePin] = useState('');
   const [activeView, setActiveView] = useState<ActiveView>('direktori');
   const [loginOpen, setLoginOpen] = useState(false);
+
+  // Theme (default: system) & Viewport preview (default: desktop 95% layar)
+  const [themePref, setThemePref] = useState<ThemePreference>(loadInitialTheme);
+  const [viewportMode, setViewportMode] = useState<ViewportMode>(loadInitialViewport);
+  const [screenWidthPct, setScreenWidthPct] = useState<number>(loadInitialScreenWidthPct);
 
   const [namaAplikasi, setNamaAplikasi] = useState(initialSettings.namaAplikasi);
   const [logoDataUrl, setLogoDataUrl] = useState(initialSettings.logoDataUrl);
@@ -64,6 +113,10 @@ export default function App() {
   const [pengurusList, setPengurusList] = useState<PengurusItem[]>(() => loadLocalPengurus());
   const [prokerList, setProkerList] = useState<ProgramKerjaItem[]>(() => loadLocalProker());
   const [kegiatanList, setKegiatanList] = useState<KegiatanRpkaItem[]>(() => loadLocalKegiatan());
+  const [musyawarahList, setMusyawarahList] = useState<MusyawarahItem[]>(() =>
+    loadLocalMusyawarah(),
+  );
+  const [presensiList, setPresensiList] = useState<PresensiItem[]>(() => loadLocalPresensi());
   const [kodeWilayahList, setKodeWilayahList] = useState<KodeWilayahItem[]>(() =>
     loadLocalKodeWilayah(),
   );
@@ -72,6 +125,48 @@ export default function App() {
   const [dpcList, setDpcList] = useState<DpcItem[]>(() => loadLocalDpc());
   const [dprList, setDprList] = useState<DprItem[]>(() => loadLocalDpr());
   const [syncing, setSyncing] = useState(false);
+
+  // Apply Dark / Light / System preference to <html>
+  useEffect(() => {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, themePref);
+    } catch {
+      // ignore
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const applyTheme = () => {
+      const shouldBeDark =
+        themePref === 'dark' || (themePref === 'system' && mediaQuery.matches);
+      document.documentElement.classList.toggle('dark', shouldBeDark);
+      document.documentElement.style.colorScheme = shouldBeDark ? 'dark' : 'light';
+    };
+
+    applyTheme();
+
+    if (themePref === 'system') {
+      mediaQuery.addEventListener('change', applyTheme);
+      return () => mediaQuery.removeEventListener('change', applyTheme);
+    }
+    return undefined;
+  }, [themePref]);
+
+  // Persist viewport mode & desktop screen width percentage
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEWPORT_STORAGE_KEY, viewportMode);
+    } catch {
+      // ignore
+    }
+  }, [viewportMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(WIDTH_PCT_STORAGE_KEY, String(screenWidthPct));
+    } catch {
+      // ignore
+    }
+  }, [screenWidthPct]);
 
   useEffect(() => {
     applyBrowserFavicon(logoDataUrl);
@@ -92,6 +187,8 @@ export default function App() {
         setPengurusList(dataset.pengurus);
         setProkerList(dataset.proker);
         setKegiatanList(dataset.kegiatan);
+        setMusyawarahList(dataset.musyawarah);
+        setPresensiList(dataset.presensi);
         setKodeWilayahList(dataset.kodeWilayah);
         setDpwList(dataset.dpw);
         setDpdList(dataset.dpd);
@@ -171,6 +268,39 @@ export default function App() {
     setKegiatanList((prev) => {
       const next = prev.filter((k) => k.kodeKegiatan !== kodeKegiatan);
       saveLocalKegiatan(next);
+      return next;
+    });
+  };
+
+  const handleSaveMusyawarah = (saved: MusyawarahItem) => {
+    setMusyawarahList((prev) => {
+      const exists = prev.some((m) => m.id === saved.id);
+      const next = exists
+        ? prev.map((m) => (m.id === saved.id ? saved : m))
+        : [...prev, saved];
+      saveLocalMusyawarah(next);
+      return next;
+    });
+  };
+
+  const handleDeleteMusyawarah = (id: string) => {
+    setMusyawarahList((prev) => {
+      const next = prev.filter((m) => m.id !== id);
+      saveLocalMusyawarah(next);
+      return next;
+    });
+    setPresensiList((prev) => {
+      const next = prev.filter((p) => p.musyawarahId !== id);
+      saveLocalPresensi(next);
+      return next;
+    });
+  };
+
+  const handleSavePresensiBatch = (musyawarahId: string, items: PresensiItem[]) => {
+    setPresensiList((prev) => {
+      const others = prev.filter((p) => p.musyawarahId !== musyawarahId);
+      const next = [...others, ...items];
+      saveLocalPresensi(next);
       return next;
     });
   };
@@ -287,137 +417,179 @@ export default function App() {
   };
 
   return (
-    <div id="top" className="min-h-screen duwd-ambient-bg flex flex-col text-[#0F2429]">
-      <TopBar
-        namaAplikasi={namaAplikasi}
-        logoUrl={logoDataUrl}
-        role={role}
-        activeView={activeView}
-        onChangeView={setActiveView}
-        onOpenLogin={() => setLoginOpen(true)}
-        onLogout={handleLogout}
-      />
-
-      {syncError && (
-        <div className="mx-auto mt-4 w-full max-w-[1160px] px-4 sm:px-6">
-          <div className="flex items-start justify-between gap-3 rounded-xl border border-amber-500/35 bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-900">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
-              <span>Sinkronisasi Spreadsheet gagal: {syncError}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSyncError('')}
-              className="cursor-pointer text-amber-700"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      <main className="flex-1">
-        {activeView === 'direktori' && (
-          <PengurusDirectory
-            role={role}
-            activePin={activePin}
-            webAppUrl={webAppUrl}
-            units={units}
-            pengurusList={pengurusList}
-            syncing={syncing}
-            onRefresh={syncFromSheet}
-            onSaveSuccess={handleSavePengurus}
-            onDeleteSuccess={handleDeletePengurus}
-          />
-        )}
-
-        {activeView === 'proker' && (
-          <ProkerRpkaView
-            role={role}
-            activePin={activePin}
-            webAppUrl={webAppUrl}
-            prokerList={prokerList}
-            kegiatanList={kegiatanList}
-            units={units}
-            rpkaDriveUrl={rpkaDriveUrl}
-            syncing={syncing}
-            onRefresh={syncFromSheet}
-            onSaveKegiatan={handleSaveKegiatan}
-            onDeleteKegiatan={handleDeleteKegiatan}
-          />
-        )}
-
-        {activeView === 'dpw_dpd' && (
-          <DpwDpdView
-            role={role}
-            activePin={activePin}
-            webAppUrl={webAppUrl}
-            wilayahConnected={wilayahConnected}
-            kodeWilayahList={kodeWilayahList}
-            dpwList={dpwList}
-            dpdList={dpdList}
-            dpcList={dpcList}
-            dprList={dprList}
-            syncing={syncing}
-            onRefresh={syncFromSheet}
-            onSaveDpw={handleSaveDpw}
-            onDeleteDpw={handleDeleteDpw}
-            onSaveDpd={handleSaveDpd}
-            onDeleteDpd={handleDeleteDpd}
-            onSaveDpc={handleSaveDpc}
-            onDeleteDpc={handleDeleteDpc}
-            onSaveDpr={handleSaveDpr}
-            onDeleteDpr={handleDeleteDpr}
-            onImportedKodeWilayah={handleImportedKodeWilayah}
-          />
-        )}
-
-        {activeView === 'unit' && role === 'superadmin' && (
-          <UnitManager
-            activePin={activePin}
-            webAppUrl={webAppUrl}
-            units={units}
-            onSaveUnit={handleSaveUnit}
-            onDeleteUnit={handleDeleteUnit}
-          />
-        )}
-
-        {activeView === 'pengaturan' && role === 'superadmin' && (
-          <SuperAdminSettings
-            activePin={activePin}
-            namaAplikasi={namaAplikasi}
-            logoDataUrl={logoDataUrl}
-            rpkaDriveUrl={rpkaDriveUrl}
-            wilayahSpreadsheetId={wilayahSpreadsheetId}
-            webAppUrl={webAppUrl}
-            onUpdateSettingsState={(next) => {
-              setNamaAplikasi(next.namaAplikasi);
-              setLogoDataUrl(next.logoDataUrl);
-              setRpkaDriveUrl(next.rpkaDriveUrl);
-              setWilayahSpreadsheetId(next.wilayahSpreadsheetId);
-              setWebAppUrl(next.webAppUrl);
-            }}
-            onSyncFromSheet={syncFromSheet}
-          />
-        )}
-      </main>
-
-      <footer className="border-t border-[#07525E]/10 bg-white/60 px-4 py-5 backdrop-blur-md sm:px-6">
-        <div className="mx-auto flex max-w-[1160px] flex-col justify-between gap-2 text-xs text-[#526A70] sm:flex-row sm:items-center">
-          <div>
-            &copy; 2026 Departemen Urusan Wilayah dan Daerah &middot; DPP Wahdah Islamiyah
-          </div>
-          <div>duwd.web.id</div>
-        </div>
-      </footer>
-
-      {loginOpen && (
-        <LoginModal
-          webAppUrl={webAppUrl}
-          onClose={() => setLoginOpen(false)}
-          onSuccess={handleLoginSuccess}
+    <div
+      id="top"
+      className="min-h-screen duwd-ambient-bg text-[#0F2429] transition-colors duration-200 dark:text-[#E6F4F7]"
+    >
+      <div
+        data-viewport={viewportMode}
+        style={{ '--duwd-container-width': `${screenWidthPct}%` } as CSSProperties}
+        className="duwd-viewport-shell flex min-h-screen flex-col"
+      >
+        <TopBar
+          namaAplikasi={namaAplikasi}
+          logoUrl={logoDataUrl}
+          role={role}
+          activeView={activeView}
+          viewportMode={viewportMode}
+          screenWidthPct={screenWidthPct}
+          themePref={themePref}
+          onChangeViewportMode={setViewportMode}
+          onChangeScreenWidthPct={setScreenWidthPct}
+          onChangeThemePref={setThemePref}
+          onChangeView={setActiveView}
+          onOpenLogin={() => setLoginOpen(true)}
+          onLogout={handleLogout}
         />
-      )}
+
+        {syncError && (
+          <div className="duwd-container mt-4 px-2 sm:px-4">
+            <div className="flex items-start justify-between gap-3 rounded-xl border border-amber-500/35 bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-900 dark:border-amber-400/30 dark:bg-amber-950/60 dark:text-amber-200">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
+                <span>Sinkronisasi Spreadsheet gagal: {syncError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSyncError('')}
+                className="cursor-pointer text-amber-700 dark:text-amber-300"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        <main className="flex-1">
+          {activeView === 'direktori' && (
+            <PengurusDirectory
+              role={role}
+              activePin={activePin}
+              webAppUrl={webAppUrl}
+              units={units}
+              pengurusList={pengurusList}
+              syncing={syncing}
+              onRefresh={syncFromSheet}
+              onSaveSuccess={handleSavePengurus}
+              onDeleteSuccess={handleDeletePengurus}
+            />
+          )}
+
+          {activeView === 'proker' && (
+            <ProkerRpkaView
+              role={role}
+              activePin={activePin}
+              webAppUrl={webAppUrl}
+              prokerList={prokerList}
+              kegiatanList={kegiatanList}
+              units={units}
+              rpkaDriveUrl={rpkaDriveUrl}
+              syncing={syncing}
+              onRefresh={syncFromSheet}
+              onSaveKegiatan={handleSaveKegiatan}
+              onDeleteKegiatan={handleDeleteKegiatan}
+            />
+          )}
+
+          {activeView === 'kalender' && (
+            <KalenderKegiatanView
+              prokerList={prokerList}
+              kegiatanList={kegiatanList}
+              musyawarahList={musyawarahList}
+              presensiList={presensiList}
+              units={units}
+            />
+          )}
+
+          {activeView === 'musyawarah' && (
+            <MusyawarahView
+              role={role}
+              activePin={activePin}
+              webAppUrl={webAppUrl}
+              units={units}
+              pengurusList={pengurusList}
+              musyawarahList={musyawarahList}
+              presensiList={presensiList}
+              syncing={syncing}
+              onRefresh={syncFromSheet}
+              onSaveMusyawarah={handleSaveMusyawarah}
+              onDeleteMusyawarah={handleDeleteMusyawarah}
+              onSavePresensiBatch={handleSavePresensiBatch}
+            />
+          )}
+
+          {activeView === 'dpw_dpd' && (
+            <DpwDpdView
+              role={role}
+              activePin={activePin}
+              webAppUrl={webAppUrl}
+              wilayahConnected={wilayahConnected}
+              kodeWilayahList={kodeWilayahList}
+              dpwList={dpwList}
+              dpdList={dpdList}
+              dpcList={dpcList}
+              dprList={dprList}
+              syncing={syncing}
+              onRefresh={syncFromSheet}
+              onSaveDpw={handleSaveDpw}
+              onDeleteDpw={handleDeleteDpw}
+              onSaveDpd={handleSaveDpd}
+              onDeleteDpd={handleDeleteDpd}
+              onSaveDpc={handleSaveDpc}
+              onDeleteDpc={handleDeleteDpc}
+              onSaveDpr={handleSaveDpr}
+              onDeleteDpr={handleDeleteDpr}
+              onImportedKodeWilayah={handleImportedKodeWilayah}
+            />
+          )}
+
+          {activeView === 'unit' && role === 'superadmin' && (
+            <UnitManager
+              activePin={activePin}
+              webAppUrl={webAppUrl}
+              units={units}
+              onSaveUnit={handleSaveUnit}
+              onDeleteUnit={handleDeleteUnit}
+            />
+          )}
+
+          {activeView === 'pengaturan' && role === 'superadmin' && (
+            <SuperAdminSettings
+              activePin={activePin}
+              namaAplikasi={namaAplikasi}
+              logoDataUrl={logoDataUrl}
+              rpkaDriveUrl={rpkaDriveUrl}
+              wilayahSpreadsheetId={wilayahSpreadsheetId}
+              webAppUrl={webAppUrl}
+              onUpdateSettingsState={(next) => {
+                setNamaAplikasi(next.namaAplikasi);
+                setLogoDataUrl(next.logoDataUrl);
+                setRpkaDriveUrl(next.rpkaDriveUrl);
+                setWilayahSpreadsheetId(next.wilayahSpreadsheetId);
+                setWebAppUrl(next.webAppUrl);
+              }}
+              onSyncFromSheet={syncFromSheet}
+            />
+          )}
+        </main>
+
+        <footer className="border-t border-[#07525E]/10 bg-white/60 px-2 py-5 backdrop-blur-md dark:border-[#3EC1D3]/15 dark:bg-[#081A20]/75 sm:px-4">
+          <div className="duwd-container flex flex-col justify-between gap-2 text-xs text-[#526A70] dark:text-[#8DA8B0] sm:flex-row sm:items-center">
+            <div>
+              &copy; 2027 Departemen Urusan Wilayah dan Daerah &middot; DPP Wahdah Islamiyah
+            </div>
+            <div className="font-mono">duwd.web.id</div>
+          </div>
+        </footer>
+
+        {loginOpen && (
+          <LoginModal
+            webAppUrl={webAppUrl}
+            onClose={() => setLoginOpen(false)}
+            onSuccess={handleLoginSuccess}
+          />
+        )}
+      </div>
     </div>
   );
 }

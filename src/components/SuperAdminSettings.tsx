@@ -219,12 +219,12 @@ export function SuperAdminSettings({
   };
 
   return (
-    <section className="mx-auto max-w-[1160px] px-4 py-8 sm:px-6 lg:py-10">
+    <section className="duwd-container px-2 py-7 sm:px-4 lg:py-9">
       <div>
-        <p className="text-xs font-semibold text-[#0C7A89]">
+        <p className="text-xs font-semibold text-[#0C7A89] dark:text-[#3EC1D3]">
           Khusus Super Admin &middot; Identitas, Logo &amp; Koneksi 2 Spreadsheet
         </p>
-        <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-[#07525E] sm:text-3xl">
+        <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-[#07525E] dark:text-[#E6F4F7] sm:text-3xl">
           Pengaturan Aplikasi &amp; Backend Apps Script
         </h1>
       </div>
@@ -237,10 +237,10 @@ export function SuperAdminSettings({
         >
           <div className="space-y-5">
             <div>
-              <h2 className="text-base font-bold text-[#07525E]">
+              <h2 className="text-base font-bold text-[#07525E] dark:text-[#E6F4F7]">
                 Logo Wahdah Islamiyah Global &amp; Favicon
               </h2>
-              <p className="mt-1 text-xs text-[#526A70]">
+              <p className="mt-1 text-xs text-[#526A70] dark:text-[#9BB5BC]">
                 Logo ini digunakan secara global di seluruh halaman portal dan semua menu (header, favicon browser, dan pengaturan induk).
               </p>
 
@@ -253,12 +253,12 @@ export function SuperAdminSettings({
                       e.currentTarget.src = defaultLogoWi;
                     }
                   }}
-                  className="h-16 w-16 rounded-2xl border border-[#07525E]/15 bg-white object-contain p-1.5"
+                  className="h-16 w-16 rounded-2xl border border-[#07525E]/15 bg-white object-contain p-1.5 dark:border-[#3EC1D3]/25"
                 />
 
                 <div className="flex flex-wrap gap-2">
-                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#EBF5F8] px-3.5 py-2 text-xs font-semibold text-[#07525E] hover:bg-[#DCEEF4]">
-                    <ImagePlus className="h-3.5 w-3.5 text-[#0C7A89]" />
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#EBF5F8] px-3.5 py-2 text-xs font-semibold text-[#07525E] hover:bg-[#DCEEF4] dark:bg-[#113540] dark:text-[#E6F4F7] dark:hover:bg-[#164452]">
+                    <ImagePlus className="h-3.5 w-3.5 text-[#0C7A89] dark:text-[#3EC1D3]" />
                     <span>Upload Logo</span>
                     <input
                       type="file"
@@ -281,7 +281,7 @@ export function SuperAdminSettings({
                           webAppUrl,
                         });
                       }}
-                      className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-[#07525E]/15 px-3 py-2 text-xs font-medium text-[#526A70] hover:bg-white"
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-[#07525E]/15 px-3 py-2 text-xs font-medium text-[#526A70] hover:bg-white dark:border-[#3EC1D3]/25 dark:text-[#9BB5BC] dark:hover:bg-[#113540]"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
                       <span>Reset</span>
@@ -290,19 +290,17 @@ export function SuperAdminSettings({
                 </div>
               </div>
 
-              <div className="mt-3 rounded-xl border border-[#0C7A89]/15 bg-[#F4FAFB] p-3 text-[11px] leading-relaxed text-[#355158]">
-                <span className="font-bold text-[#07525E]">Catatan Favicon &amp; Preview Link WhatsApp:</span>{' '}
-                Logo Wahdah Islamiyah sudah tertanam langsung di aplikasi. File{' '}
-                <span className="font-mono font-semibold text-[#07525E]">/favicon.ico</span>,{' '}
-                <span className="font-mono font-semibold text-[#07525E]">/favicon.png</span>, dan{' '}
-                <span className="font-mono font-semibold text-[#07525E]">/og-preview.jpg</span> (600&times;600 px) tersedia di{' '}
-                <span className="font-mono">/public/</span> untuk domain <span className="font-mono">duwd.web.id</span>.
+              <div className="mt-3 rounded-xl border border-[#0C7A89]/15 bg-[#F4FAFB] p-3 text-[11px] leading-relaxed text-[#355158] dark:border-[#3EC1D3]/20 dark:bg-[#0D2A33] dark:text-[#B4CCD3]">
+                <span className="font-bold text-[#07525E] dark:text-[#3EC1D3]">
+                  Catatan Favicon &amp; Preview Link WhatsApp:
+                </span>{' '}
+                Banner preview link WhatsApp (<span className="font-mono font-semibold text-[#07525E] dark:text-[#E6F4F7]">/og-preview.jpg</span>, 1200&times;630 px) telah dilengkapi logo Wahdah Islamiyah dan teks resmi <em>DEPARTEMEN URUSAN WILAYAH DAN DAERAH · DEWAN PIMPINAN PUSAT · WAHDAH ISLAMIYAH · 2027</em>.
                 {logoDataUrl && logoDataUrl.startsWith('data:image/png') && (
                   <div className="mt-2">
                     <a
                       href={logoDataUrl}
                       download="logo-wi.png"
-                      className="inline-flex items-center gap-1 font-semibold text-[#0C7A89] hover:underline"
+                      className="inline-flex items-center gap-1 font-semibold text-[#0C7A89] hover:underline dark:text-[#3EC1D3]"
                     >
                       <Download className="h-3 w-3" />
                       <span>Unduh hasil konversi sebagai logo-wi.png</span>
@@ -312,21 +310,21 @@ export function SuperAdminSettings({
               </div>
             </div>
 
-            <div className="border-t border-[#07525E]/10 pt-4 space-y-3.5">
+            <div className="space-y-3.5 border-t border-[#07525E]/10 pt-4 dark:border-[#3EC1D3]/15">
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                   Judul Aplikasi
                 </label>
                 <input
                   type="text"
                   value={namaAplikasi}
                   onChange={(e) => setNamaAplikasi(e.target.value)}
-                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                   Tautan Google Drive PDF RPKA 2027 (Opsional)
                 </label>
                 <input
@@ -334,12 +332,12 @@ export function SuperAdminSettings({
                   value={rpkaDriveUrl}
                   onChange={(e) => setRpkaDriveUrl(e.target.value)}
                   placeholder="https://drive.google.com/file/d/.../view"
-                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                   URL Web App Google Apps Script (/exec — Spreadsheet #1 Induk)
                 </label>
                 <div className="flex gap-2">
@@ -348,13 +346,13 @@ export function SuperAdminSettings({
                     value={webAppUrl}
                     onChange={(e) => setWebAppUrl(e.target.value)}
                     placeholder="https://script.google.com/macros/s/.../exec"
-                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                   />
                   <button
                     type="button"
                     onClick={handleTestAndSyncGas}
                     disabled={testingGas}
-                    className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-xl border border-[#0C7A89]/30 bg-[#EBF5F8] px-3 py-2 text-xs font-semibold text-[#07525E] hover:bg-[#DCEEF4]"
+                    className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-xl border border-[#0C7A89]/30 bg-[#EBF5F8] px-3 py-2 text-xs font-semibold text-[#07525E] hover:bg-[#DCEEF4] dark:border-[#3EC1D3]/30 dark:bg-[#113540] dark:text-[#E6F4F7] dark:hover:bg-[#164452]"
                   >
                     <RefreshCw className={`h-3.5 w-3.5 ${testingGas ? 'animate-spin' : ''}`} />
                     <span>Uji</span>
@@ -363,7 +361,7 @@ export function SuperAdminSettings({
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                   ID / Link Google Spreadsheet #2 (DPW, DPD, DPC &amp; DPR)
                 </label>
                 <div className="flex gap-2">
@@ -372,20 +370,20 @@ export function SuperAdminSettings({
                     value={wilayahSpreadsheetId}
                     onChange={(e) => setWilayahSpreadsheetId(e.target.value)}
                     placeholder="Tempel ID atau URL https://docs.google.com/spreadsheets/d/..."
-                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                   />
                   <button
                     type="button"
                     onClick={handleSetupWilayahSheet}
                     disabled={settingUpWilayah}
                     title="Buat tab DPW, DPD, DPC, dan DPR otomatis di Spreadsheet #2"
-                    className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-xl border border-[#D88B15]/35 bg-[#FFF9EE] px-3 py-2 text-xs font-semibold text-[#9A6008] hover:bg-[#FEF1D8] disabled:opacity-60"
+                    className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-xl border border-[#D88B15]/35 bg-[#FFF9EE] px-3 py-2 text-xs font-semibold text-[#9A6008] hover:bg-[#FEF1D8] disabled:opacity-60 dark:border-[#F0B243]/35 dark:bg-[#2A2010] dark:text-[#F0B243] dark:hover:bg-[#3A2D16]"
                   >
                     <Database className="h-3.5 w-3.5" />
                     <span>{settingUpWilayah ? 'Menyiapkan...' : 'Siapkan Tab'}</span>
                   </button>
                 </div>
-                <p className="mt-1 text-[11px] text-[#526A70]">
+                <p className="mt-1 text-[11px] text-[#526A70] dark:text-[#9BB5BC]">
                   Buat 1 Google Spreadsheet baru, pastikan akun Google pemilik skrip menjadi Editor, lalu tempel URL/ID-nya di sini dan klik <strong>Siapkan Tab</strong>.
                 </p>
               </div>
@@ -394,14 +392,14 @@ export function SuperAdminSettings({
                 <div
                   className={`flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs font-medium ${
                     gasStatus.status === 'ok'
-                      ? 'bg-[#ECF6F2] text-emerald-900'
-                      : 'bg-amber-50 text-amber-900'
+                      ? 'bg-[#ECF6F2] text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200'
+                      : 'bg-amber-50 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200'
                   }`}
                 >
                   {gasStatus.status === 'ok' ? (
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-400" />
                   ) : (
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
                   )}
                   <span>{gasStatus.text}</span>
                 </div>
@@ -409,7 +407,7 @@ export function SuperAdminSettings({
 
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                  <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                     Ubah PIN Admin
                   </label>
                   <input
@@ -417,11 +415,11 @@ export function SuperAdminSettings({
                     value={adminPin}
                     onChange={(e) => setAdminPin(e.target.value)}
                     placeholder="Opsional (min 4)"
-                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                  <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                     Ubah PIN Super Admin
                   </label>
                   <input
@@ -429,7 +427,7 @@ export function SuperAdminSettings({
                     value={superAdminPin}
                     onChange={(e) => setSuperAdminPin(e.target.value)}
                     placeholder="Opsional (min 4)"
-                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                   />
                 </div>
               </div>
@@ -439,8 +437,8 @@ export function SuperAdminSettings({
               <div
                 className={`rounded-xl border px-3.5 py-2.5 text-xs font-medium ${
                   settingsMsg.ok
-                    ? 'border-[#0C7A89]/20 bg-[#ECF6F2] text-[#07525E]'
-                    : 'border-amber-500/30 bg-amber-50 text-amber-900'
+                    ? 'border-[#0C7A89]/20 bg-[#ECF6F2] text-[#07525E] dark:border-[#3EC1D3]/30 dark:bg-[#0D2E36] dark:text-[#BCEAF0]'
+                    : 'border-amber-500/30 bg-amber-50 text-amber-900 dark:border-amber-400/30 dark:bg-amber-950/60 dark:text-amber-200'
                 }`}
               >
                 {settingsMsg.text}
@@ -448,7 +446,7 @@ export function SuperAdminSettings({
             )}
           </div>
 
-          <div className="mt-5 border-t border-[#07525E]/10 pt-4">
+          <div className="mt-5 border-t border-[#07525E]/10 pt-4 dark:border-[#3EC1D3]/15">
             <button
               type="submit"
               disabled={savingSettings}
@@ -461,14 +459,14 @@ export function SuperAdminSettings({
 
         {/* Right: Copy-paste Code.gs for Spreadsheet #1 (with Hybrid openById for Spreadsheet #2) */}
         <div className="glass-surface-strong flex flex-col overflow-hidden lg:col-span-7">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#07525E]/10 bg-[#F4FAFB] px-5 py-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#07525E]/10 bg-[#F4FAFB] px-5 py-3.5 dark:border-[#3EC1D3]/15 dark:bg-[#0C2730]">
             <div className="flex items-center gap-2">
-              <Code2 className="h-4 w-4 text-[#0C7A89]" />
+              <Code2 className="h-4 w-4 text-[#0C7A89] dark:text-[#3EC1D3]" />
               <div>
-                <h2 className="text-sm font-bold text-[#07525E]">
+                <h2 className="text-sm font-bold text-[#07525E] dark:text-[#E6F4F7]">
                   Kode Backend Hybrid (/backend-gas/Code.gs)
                 </h2>
-                <p className="text-[11px] text-[#526A70]">
+                <p className="text-[11px] text-[#526A70] dark:text-[#9BB5BC]">
                   Tempel ke Apps Script Spreadsheet #1 &rarr; Run <span className="font-mono">setupDatabase</span> &rarr; Deploy <span className="font-mono">New version</span>
                 </p>
               </div>
@@ -477,12 +475,12 @@ export function SuperAdminSettings({
             <button
               type="button"
               onClick={handleCopyGasCode}
-              className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#07525E]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[#07525E] hover:bg-[#EBF5F8]"
+              className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#07525E]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[#07525E] hover:bg-[#EBF5F8] dark:border-[#3EC1D3]/25 dark:bg-[#0D2B33] dark:text-[#E6F4F7] dark:hover:bg-[#13424F]"
             >
               {copiedCode ? (
                 <>
-                  <Check className="h-3.5 w-3.5 text-emerald-700" />
-                  <span className="text-emerald-700">Kode Tersalin</span>
+                  <Check className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
+                  <span className="text-emerald-700 dark:text-emerald-400">Kode Tersalin</span>
                 </>
               ) : (
                 <>

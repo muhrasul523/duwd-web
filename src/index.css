@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   :root {
@@ -10,6 +11,19 @@
     --duwd-canvas: #F6FAFB;
     --duwd-ink: #0F2429;
     --duwd-muted: #526A70;
+    color-scheme: light;
+  }
+
+  .dark {
+    --duwd-teal: #22B8CF;
+    --duwd-deep-cyan: #E6F4F7;
+    --duwd-amber-gold: #F0A93B;
+    --duwd-soft-blue: #102A32;
+    --duwd-soft-green: #0E2B26;
+    --duwd-canvas: #071418;
+    --duwd-ink: #EAF4F6;
+    --duwd-muted: #93B1B9;
+    color-scheme: dark;
   }
 
   html {
@@ -19,11 +33,44 @@
     color: var(--duwd-ink);
   }
 
+  .dark body {
+    letter-spacing: 0.006em;
+  }
+
   code,
   pre,
   .font-mono {
     font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   }
+}
+
+/* Fluid customizable desktop width container (default 95%, adapts when tablet/mobile preview is active) */
+.duwd-container {
+  width: var(--duwd-container-width, 95%);
+  max-width: 100%;
+  margin-inline: auto;
+  transition: width 180ms ease;
+}
+
+.duwd-viewport-shell[data-viewport='tablet'] {
+  max-width: 1024px;
+  margin-inline: auto;
+  min-height: 100vh;
+  border-inline: 1px solid rgba(12, 122, 137, 0.18);
+  box-shadow: 0 24px 70px -20px rgba(7, 43, 49, 0.25);
+}
+
+.duwd-viewport-shell[data-viewport='mobile'] {
+  max-width: 412px;
+  margin-inline: auto;
+  min-height: 100vh;
+  border-inline: 1px solid rgba(12, 122, 137, 0.22);
+  box-shadow: 0 24px 70px -20px rgba(7, 43, 49, 0.32);
+}
+
+.duwd-viewport-shell[data-viewport='tablet'] .duwd-container,
+.duwd-viewport-shell[data-viewport='mobile'] .duwd-container {
+  width: 100%;
 }
 
 .duwd-ambient-bg {
@@ -34,17 +81,31 @@
     radial-gradient(ellipse 70% 60% at 50% 95%, rgba(16, 145, 115, 0.06) 0%, transparent 65%);
 }
 
+.dark .duwd-ambient-bg {
+  background-color: #071418;
+  background-image:
+    radial-gradient(ellipse 75% 55% at 10% 0%, rgba(12, 122, 137, 0.22) 0%, transparent 65%),
+    radial-gradient(ellipse 65% 50% at 92% 8%, rgba(216, 139, 21, 0.13) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 60% at 50% 95%, rgba(16, 145, 115, 0.12) 0%, transparent 65%);
+}
+
 .glass-surface {
-  background: rgba(255, 255, 255, 0.74);
+  background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(12, 122, 137, 0.12);
+  border: 1px solid rgba(12, 122, 137, 0.13);
   box-shadow: 0 10px 32px -12px rgba(7, 82, 94, 0.08);
   border-radius: 16px;
 }
 
+.dark .glass-surface {
+  background: rgba(13, 30, 36, 0.80);
+  border: 1px solid rgba(56, 198, 217, 0.14);
+  box-shadow: 0 12px 34px -12px rgba(0, 0, 0, 0.45);
+}
+
 .glass-surface-strong {
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.90);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(12, 122, 137, 0.15);
@@ -52,11 +113,47 @@
   border-radius: 16px;
 }
 
+.dark .glass-surface-strong {
+  background: rgba(15, 36, 43, 0.92);
+  border: 1px solid rgba(56, 198, 217, 0.18);
+  box-shadow: 0 18px 44px -14px rgba(0, 0, 0, 0.55);
+}
+
 .glass-nav {
-  background: rgba(246, 250, 251, 0.78);
+  background: rgba(246, 250, 251, 0.82);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid rgba(7, 82, 94, 0.09);
+  border-bottom: 1px solid rgba(7, 82, 94, 0.10);
+}
+
+.dark .glass-nav {
+  background: rgba(7, 20, 24, 0.86);
+  border-bottom: 1px solid rgba(56, 198, 217, 0.14);
+}
+
+/* Zebra striping for all data tables (distinct subtle odd/even contrast in Light & Dark mode) */
+.duwd-zebra-table tbody tr:nth-child(odd) {
+  background-color: rgba(255, 255, 255, 0.72);
+}
+
+.duwd-zebra-table tbody tr:nth-child(even) {
+  background-color: rgba(231, 244, 248, 0.68);
+}
+
+.duwd-zebra-table tbody tr:hover {
+  background-color: rgba(212, 236, 243, 0.82);
+}
+
+.dark .duwd-zebra-table tbody tr:nth-child(odd) {
+  background-color: rgba(12, 29, 35, 0.62);
+}
+
+.dark .duwd-zebra-table tbody tr:nth-child(even) {
+  background-color: rgba(21, 47, 56, 0.74);
+}
+
+.dark .duwd-zebra-table tbody tr:hover {
+  background-color: rgba(28, 63, 74, 0.88);
 }
 
 .tabular-nums {

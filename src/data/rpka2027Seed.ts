@@ -47,6 +47,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 128975000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10001.00002',
@@ -61,6 +62,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 20000000,
     belanja: 10325000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10001.00003',
@@ -75,6 +77,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 1000000000,
     belanja: 898575000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10001.00004',
@@ -89,6 +92,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 109000000,
     belanja: 6002400000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10001.00005',
@@ -103,6 +107,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 2800000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10001.00006',
@@ -117,6 +122,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 14000000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10001.00007',
@@ -131,6 +137,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 134407000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10001.00008',
@@ -145,6 +152,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 350000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10001.00009',
@@ -159,6 +167,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 14400000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10001.00010',
@@ -173,6 +182,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 6600000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10001.00011',
@@ -187,6 +197,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 6000000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10001.00012',
@@ -201,6 +212,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 800000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10001.00013',
@@ -215,6 +227,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 2400000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10002.00001',
@@ -229,6 +242,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 8250000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10002.00002',
@@ -243,6 +257,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 30000000,
     belanja: 30625000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10002.00003',
@@ -257,6 +272,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 6375000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10002.00004',
@@ -271,6 +287,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 1750000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10003.00001',
@@ -285,6 +302,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 8500000,
     belanja: 10130000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10003.00002',
@@ -299,6 +317,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 2100000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10003.00003',
@@ -313,6 +332,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 1250000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10003.00004',
@@ -327,6 +347,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 17500000,
     belanja: 9350000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10004.00001',
@@ -341,6 +362,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 1050000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10004.00002',
@@ -355,6 +377,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 400000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10004.00003',
@@ -369,6 +392,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 13200000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10004.00004',
@@ -383,6 +407,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 13200000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10004.00005',
@@ -397,6 +422,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 13200000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10004.00006',
@@ -411,6 +437,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 13200000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10004.00007',
@@ -425,6 +452,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 13200000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10004.00008',
@@ -439,6 +467,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 13200000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10004.00009',
@@ -453,6 +482,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 24000000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10004.00010',
@@ -467,6 +497,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 13200000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10004.00011',
@@ -481,6 +512,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 2200000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10004.00012',
@@ -495,6 +527,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 2200000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
   {
     kodeKegiatan: '10005.00001',
@@ -509,6 +542,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 1100000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10005.00002',
@@ -523,6 +557,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 18125000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10005.00003',
@@ -537,6 +572,7 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 3200000,
     status: 'Rencana',
+    jenisKegiatan: 'Event',
   },
   {
     kodeKegiatan: '10005.00004',
@@ -551,5 +587,6 @@ export const RPKA_2027_KEGIATAN: KegiatanRpkaItem[] = [
     pendapatan: 0,
     belanja: 3120000,
     status: 'Rencana',
+    jenisKegiatan: 'Monev',
   },
 ];

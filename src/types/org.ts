@@ -1,5 +1,9 @@
 export type UserRole = 'publik' | 'admin' | 'superadmin';
 
+export type ThemePreference = 'system' | 'light' | 'dark';
+
+export type ViewportMode = 'desktop' | 'tablet' | 'mobile';
+
 export interface UnitItem {
   id: string;
   kodeUnit: string;
@@ -29,6 +33,10 @@ export interface ProgramKerjaItem {
 
 export type KegiatanStatus = 'Rencana' | 'Berjalan' | 'Terlaksana';
 
+export type KegiatanJenis = 'Event' | 'Monev';
+
+export type KegiatanPolaJadwal = 'Tunggal' | 'Pekanan' | 'DwiPekanan' | 'Bulanan';
+
 export interface KegiatanRpkaItem {
   kodeKegiatan: string;
   kodeProker: string;
@@ -43,7 +51,60 @@ export interface KegiatanRpkaItem {
   belanja: number;
   unitPj?: string;
   status?: KegiatanStatus;
+  jenisKegiatan?: KegiatanJenis;
+  polaJadwal?: KegiatanPolaJadwal;
   tautanDrive?: string;
+}
+
+export type JenisMusyawarah = 'Pleno' | 'Unit';
+
+export type PresensiStatus =
+  | 'Hadir'
+  | 'Tidak Hadir'
+  | 'Izin Sebelum Rapat'
+  | 'Izin Setelah Rapat';
+
+export type NotulaMode = 'file' | 'teks' | '';
+
+export interface MusyawarahItem {
+  id: string;
+  judul: string;
+  jenis: JenisMusyawarah;
+  musyawarahKe: number; // 1 - 52
+  unitId?: string;
+  namaUnit?: string;
+  tanggal: string; // YYYY-MM-DD
+  waktuMulai?: string; // HH:mm (opsional)
+  waktuSelesai?: string; // HH:mm (opsional)
+  tempat?: string;
+  pimpinanRapat?: string;
+  notulaMode?: NotulaMode;
+  notulaTeks?: string;
+  notulaFileName?: string;
+  notulaFileUrl?: string;
+  notulaFileId?: string;
+  dokumentasiFileName?: string;
+  dokumentasiFileUrl?: string;
+  dokumentasiFileId?: string;
+  dokumentasiPreviewUrl?: string; // fallback preview lokal / thumbnail Drive
+  notulensiRingkas?: string;
+  tautanDrive?: string;
+  pesertaTambahanIds: string[];
+  dibuatPada?: string;
+  diperbaruiPada?: string;
+}
+
+export interface PresensiItem {
+  id: string;
+  musyawarahId: string;
+  pengurusId: string;
+  namaLengkap: string;
+  unitKode: string;
+  amanah: string;
+  sumberPeserta: 'Wajib' | 'Tambahan';
+  status: PresensiStatus;
+  keterangan?: string;
+  diperbaruiPada?: string;
 }
 
 export type TingkatWilayah = 'Pulau' | 'Provinsi' | 'KabKota' | 'Kecamatan' | 'KelDesa';
@@ -180,6 +241,8 @@ export interface OrgDataset {
   pengurus: PengurusItem[];
   proker: ProgramKerjaItem[];
   kegiatan: KegiatanRpkaItem[];
+  musyawarah: MusyawarahItem[];
+  presensi: PresensiItem[];
   kodeWilayah: KodeWilayahItem[];
   dpw: DpwItem[];
   dpd: DpdItem[];

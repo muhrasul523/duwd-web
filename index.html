@@ -3,44 +3,76 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DUWD DPP WI</title>
+    <title>DUWD DPP WI — Portal Departemen Urusan Wilayah dan Daerah</title>
     <meta
       name="description"
-      content="DUWD DPP WI — Portal Departemen Urusan Wilayah dan Daerah DPP Wahdah Islamiyah"
+      content="Portal resmi Departemen Urusan Wilayah dan Daerah Dewan Pimpinan Pusat Wahdah Islamiyah 2027: direktori pengurus, program kerja, kalender kegiatan, presensi musyawarah, serta data DPW, DPD, DPC, dan DPR."
     />
     <meta property="og:site_name" content="DUWD DPP WI" />
-    <meta property="og:title" content="DUWD DPP WI" />
+    <meta property="og:title" content="DUWD DPP WI — Departemen Urusan Wilayah dan Daerah" />
     <meta
       property="og:description"
-      content="Departemen Urusan Wilayah dan Daerah — DPP Wahdah Islamiyah"
+      content="Departemen Urusan Wilayah dan Daerah · Dewan Pimpinan Pusat Wahdah Islamiyah 2027"
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://duwd.web.id/" />
-    <meta property="og:image" content="https://duwd.web.id/og-preview.jpg" />
-    <meta property="og:image:secure_url" content="https://duwd.web.id/og-preview.jpg" />
+    <meta property="og:image" content="https://duwd.web.id/og-preview.jpg?v=5" />
+    <meta property="og:image:secure_url" content="https://duwd.web.id/og-preview.jpg?v=5" />
     <meta property="og:image:type" content="image/jpeg" />
-    <meta property="og:image:width" content="600" />
-    <meta property="og:image:height" content="600" />
-    <meta property="og:image:alt" content="Logo Wahdah Islamiyah — DUWD DPP WI" />
-    <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="DUWD DPP WI" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Logo Wahdah Islamiyah — Departemen Urusan Wilayah dan Daerah Dewan Pimpinan Pusat Wahdah Islamiyah 2027"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="DUWD DPP WI — Departemen Urusan Wilayah dan Daerah" />
     <meta
       name="twitter:description"
-      content="Departemen Urusan Wilayah dan Daerah — DPP Wahdah Islamiyah"
+      content="Departemen Urusan Wilayah dan Daerah · Dewan Pimpinan Pusat Wahdah Islamiyah 2027"
     />
-    <meta name="twitter:image" content="https://duwd.web.id/og-preview.jpg" />
-    <link id="app-favicon" rel="icon" type="image/png" href="/logo_wi.png?v=4" />
-    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png?v=4" />
-    <link rel="shortcut icon" href="/favicon.ico?v=4" />
-    <link rel="apple-touch-icon" href="/logo_wi.png?v=4" />
+    <meta name="twitter:image" content="https://duwd.web.id/og-preview.jpg?v=5" />
+    <link rel="canonical" href="https://duwd.web.id/" />
+    <link id="app-favicon" rel="icon" type="image/png" href="/logo_wi.png?v=5" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png?v=5" />
+    <link rel="shortcut icon" href="/favicon.ico?v=5" />
+    <link rel="apple-touch-icon" href="/logo_wi.png?v=5" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Montserrat:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "DUWD DPP WI",
+        "url": "https://duwd.web.id/",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "All",
+        "description": "Portal resmi Departemen Urusan Wilayah dan Daerah Dewan Pimpinan Pusat Wahdah Islamiyah 2027 untuk pengelolaan pengurus, program kerja, kalender kegiatan, presensi musyawarah, serta direktori DPW, DPD, DPC, dan DPR."
+      }
+    </script>
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem('duwd_theme_pref_v1') || 'system';
+          var isDark =
+            pref === 'dark' ||
+            (pref === 'system' &&
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body class="antialiased selection:bg-[#0C7A89]/15 selection:text-[#07525E]">
+  <body class="antialiased selection:bg-[#0C7A89]/15 selection:text-[#07525E] dark:selection:bg-[#38C6D9]/25 dark:selection:text-[#E8F6F8]">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

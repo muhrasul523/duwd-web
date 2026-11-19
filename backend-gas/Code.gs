@@ -21,6 +21,8 @@ const SHEETS = {
   UNIT: 'UNIT',
   PROGRAM_KERJA: 'PROGRAM_KERJA',
   KEGIATAN_RPKA: 'KEGIATAN_RPKA',
+  MUSYAWARAH: 'MUSYAWARAH',
+  PRESENSI_MUSYAWARAH: 'PRESENSI_MUSYAWARAH',
   PENGATURAN: 'PENGATURAN',
   LOGS: 'SYSTEM_LOGS'
 };
@@ -32,6 +34,8 @@ const WILAYAH_SHEETS = {
   DPR: 'DPR'
 };
 
+const DEFAULT_MUSYAWARAH_DRIVE_FOLDER_ID = '1Ua_AgStLPfpH5xfFIfqXZkOVwJgCLG98';
+
 /**
  * Menambahkan menu khusus di Google Spreadsheet Induk.
  */
@@ -39,6 +43,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('DUWD DPP WI')
     .addItem('Setup Database Induk', 'setupDatabase')
+    .addItem('Otorisasi Drive & Docs (Upload Musyawarah)', 'otorisasiGoogleDrive')
     .addItem('Sinkronkan Unit 0-5 & Proker 1-5', 'sinkronUnitDanProkerRPKA')
     .addItem('Setup Spreadsheet Wilayah (#2)', 'setupWilayahSpreadsheetManual')
     .addToUi();
@@ -84,7 +89,40 @@ function setupDatabase() {
     },
     {
       name: SHEETS.KEGIATAN_RPKA,
-      headers: ['Kode_Kegiatan', 'Kode_Proker', 'Nama_Proker', 'Nama_Kegiatan', 'Tujuan', 'Sasaran', 'Indikator', 'Tempat', 'Waktu', 'Pendapatan', 'Belanja', 'Unit_PJ', 'Status_Pelaksanaan', 'Tautan_Drive']
+      headers: ['Kode_Kegiatan', 'Kode_Proker', 'Nama_Proker', 'Nama_Kegiatan', 'Tujuan', 'Sasaran', 'Indikator', 'Tempat', 'Waktu', 'Pendapatan', 'Belanja', 'Unit_PJ', 'Status_Pelaksanaan', 'Jenis_Kegiatan', 'Pola_Jadwal', 'Tautan_Drive']
+    },
+    {
+      name: SHEETS.MUSYAWARAH,
+      headers: [
+        'ID_Musyawarah',
+        'Judul',
+        'Jenis',
+        'Musyawarah_Ke',
+        'ID_Unit',
+        'Nama_Unit',
+        'Tanggal',
+        'Waktu_Mulai',
+        'Waktu_Selesai',
+        'Tempat',
+        'Pimpinan_Rapat',
+        'Notula_Mode',
+        'Notula_Teks',
+        'Notula_File_Name',
+        'Notula_File_URL',
+        'Notula_File_ID',
+        'Dokumentasi_File_Name',
+        'Dokumentasi_File_URL',
+        'Dokumentasi_File_ID',
+        'Notulensi_Ringkas',
+        'Tautan_Drive',
+        'Peserta_Tambahan_IDs',
+        'Dibuat_Pada',
+        'Diperbarui_Pada'
+      ]
+    },
+    {
+      name: SHEETS.PRESENSI_MUSYAWARAH,
+      headers: ['ID_Presensi', 'ID_Musyawarah', 'ID_Pengurus', 'Nama_Lengkap', 'Unit_Kode', 'Amanah', 'Sumber_Peserta', 'Status_Kehadiran', 'Keterangan', 'Diperbarui_Pada']
     },
     {
       name: SHEETS.PENGATURAN,
@@ -138,11 +176,13 @@ function setupDatabase() {
       ['ADMIN_PIN', 'duwd-admin-2026', 'PIN akses Admin Pengurus DUWD'],
       ['LOGO_DATA_URL', '', 'URL atau Data URL logo Wahdah Islamiyah'],
       ['RPKA_DRIVE_URL', '', 'Link Google Drive file PDF asli RPKA DUWD 2027'],
-      ['WILAYAH_SPREADSHEET_ID', '', 'ID atau URL Google Spreadsheet #2 (Kode Wilayah, DPW, DPD)']
+      ['WILAYAH_SPREADSHEET_ID', '', 'ID atau URL Google Spreadsheet #2 (DPW, DPD, DPC, DPR)'],
+      ['MUSYAWARAH_DRIVE_FOLDER_ID', DEFAULT_MUSYAWARAH_DRIVE_FOLDER_ID, 'ID Folder Google Drive penyimpanan Notula & Dokumentasi Musyawarah']
     ];
     settingsSheet.getRange(2, 1, defaultSettings.length, 3).setValues(defaultSettings);
   } else {
-    ensureSettingKey_('WILAYAH_SPREADSHEET_ID', '', 'ID atau URL Google Spreadsheet #2 (Kode Wilayah, DPW, DPD)');
+    ensureSettingKey_('WILAYAH_SPREADSHEET_ID', '', 'ID atau URL Google Spreadsheet #2 (DPW, DPD, DPC, DPR)');
+    ensureSettingKey_('MUSYAWARAH_DRIVE_FOLDER_ID', DEFAULT_MUSYAWARAH_DRIVE_FOLDER_ID, 'ID Folder Google Drive penyimpanan Notula & Dokumentasi Musyawarah');
   }
 
   // Jika ID Spreadsheet #2 sudah diisi di PENGATURAN, siapkan sheet-nya juga
@@ -156,6 +196,25 @@ function setupDatabase() {
   }
 
   writeLog_('SUPERADMIN', 'setupDatabase', 'Struktur database Induk siap digunakan.');
+}
+
+/**
+ * Jalankan 1x dari editor Apps Script atau menu Spreadsheet "DUWD DPP WI > Otorisasi Drive & Docs"
+ * agar izin Google Drive (upload notula/foto) dan Google Docs (konversi teks notula -> PDF) aktif.
+ */
+function otorisasiGoogleDrive() {
+  const folder = getMusyawarahDriveFolder_();
+  const testDoc = DocumentApp.create('DUWD_Test_Otorisasi_Sementara');
+  const testId = testDoc.getId();
+  testDoc.saveAndClose();
+  const testFile = DriveApp.getFileById(testId);
+  testFile.setTrashed(true);
+  const msg = 'Otorisasi Google Drive & Google Docs BERHASIL untuk folder: "' + folder.getName() + '" (ID: ' + folder.getId() + ').';
+  writeLog_('SUPERADMIN', 'otorisasiGoogleDrive', msg);
+  try {
+    SpreadsheetApp.getUi().alert('Otorisasi Berhasil', msg, SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (ignore) {}
+  return msg;
 }
 
 function setupWilayahSpreadsheetManual() {
@@ -359,6 +418,27 @@ function doGet(e) {
       return jsonOut_({ ok: true, role: role });
     }
 
+    if (action === 'checkDriveAuth') {
+      try {
+        const folder = getMusyawarahDriveFolder_();
+        return jsonOut_({
+          ok: true,
+          message: 'Izin Google Drive aktif untuk folder "' + folder.getName() + '".',
+          data: {
+            authorized: true,
+            folderId: folder.getId(),
+            folderName: folder.getName(),
+            folderUrl: folder.getUrl()
+          }
+        });
+      } catch (dErr) {
+        return jsonOut_({
+          ok: false,
+          error: 'Izin Google Drive belum aktif atau folder tidak dapat diakses: ' + dErr.message + '. Jalankan fungsi otorisasiGoogleDrive() di Apps Script lalu Deploy New Version.'
+        });
+      }
+    }
+
     if (action === 'getWilayahChildren') {
       return jsonOut_({ ok: true, data: [] });
     }
@@ -414,7 +494,59 @@ function doGet(e) {
           belanja: Number(k.Belanja || 0),
           unitPj: String(k.Unit_PJ || ''),
           status: String(k.Status_Pelaksanaan || 'Rencana'),
+          jenisKegiatan: String(k.Jenis_Kegiatan || ''),
+          polaJadwal: String(k.Pola_Jadwal || ''),
           tautanDrive: String(k.Tautan_Drive || '')
+        };
+      });
+
+      const musyawarah = readRowsOptional_(SHEETS.MUSYAWARAH).map(function (m) {
+        const rawIds = String(m.Peserta_Tambahan_IDs || '').trim();
+        const extraIds = rawIds
+          ? rawIds.split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+          : [];
+        const dokId = String(m.Dokumentasi_File_ID || '').trim();
+        return {
+          id: String(m.ID_Musyawarah || ''),
+          judul: String(m.Judul || ''),
+          jenis: String(m.Jenis || 'Pleno') === 'Unit' ? 'Unit' : 'Pleno',
+          musyawarahKe: Math.min(52, Math.max(1, Number(m.Musyawarah_Ke || 1))),
+          unitId: String(m.ID_Unit || ''),
+          namaUnit: String(m.Nama_Unit || ''),
+          tanggal: formatDateCell_(m.Tanggal),
+          waktuMulai: String(m.Waktu_Mulai || ''),
+          waktuSelesai: String(m.Waktu_Selesai || ''),
+          tempat: String(m.Tempat || ''),
+          pimpinanRapat: String(m.Pimpinan_Rapat || ''),
+          notulaMode: String(m.Notula_Mode || ''),
+          notulaTeks: String(m.Notula_Teks || ''),
+          notulaFileName: String(m.Notula_File_Name || ''),
+          notulaFileUrl: String(m.Notula_File_URL || ''),
+          notulaFileId: String(m.Notula_File_ID || ''),
+          dokumentasiFileName: String(m.Dokumentasi_File_Name || ''),
+          dokumentasiFileUrl: String(m.Dokumentasi_File_URL || ''),
+          dokumentasiFileId: dokId,
+          dokumentasiPreviewUrl: dokId ? ('https://drive.google.com/thumbnail?id=' + dokId + '&sz=w1200') : '',
+          notulensiRingkas: String(m.Notulensi_Ringkas || ''),
+          tautanDrive: String(m.Tautan_Drive || ''),
+          pesertaTambahanIds: extraIds,
+          dibuatPada: String(m.Dibuat_Pada || ''),
+          diperbaruiPada: String(m.Diperbarui_Pada || '')
+        };
+      });
+
+      const presensi = readRowsOptional_(SHEETS.PRESENSI_MUSYAWARAH).map(function (p) {
+        return {
+          id: String(p.ID_Presensi || ''),
+          musyawarahId: String(p.ID_Musyawarah || ''),
+          pengurusId: String(p.ID_Pengurus || ''),
+          namaLengkap: String(p.Nama_Lengkap || ''),
+          unitKode: String(p.Unit_Kode || ''),
+          amanah: String(p.Amanah || ''),
+          sumberPeserta: String(p.Sumber_Peserta || 'Wajib') === 'Tambahan' ? 'Tambahan' : 'Wajib',
+          status: String(p.Status_Kehadiran || 'Hadir'),
+          keterangan: String(p.Keterangan || ''),
+          diperbaruiPada: String(p.Diperbarui_Pada || '')
         };
       });
 
@@ -464,6 +596,8 @@ function doGet(e) {
           pengurus: pengurus,
           proker: proker,
           kegiatan: kegiatan,
+          musyawarah: musyawarah,
+          presensi: presensi,
           kodeWilayah: kodeWilayah,
           dpw: dpw,
           dpd: dpd,
@@ -506,7 +640,13 @@ function doPost(e) {
     saveDpw: true,
     saveDpd: true,
     saveDpc: true,
-    saveDpr: true
+    saveDpr: true,
+    updateKegiatanJenis: true,
+    saveMusyawarah: true,
+    deleteMusyawarah: true,
+    savePresensiBatch: true,
+    uploadMusyawarahFile: true,
+    uploadMusyawarahNotulaText: true
   };
 
   try {
@@ -517,7 +657,7 @@ function doPost(e) {
     if (role !== 'superadmin' && !(role === 'admin' && ADMIN_ALLOWED_ACTIONS[action])) {
       return jsonOut_({
         ok: false,
-        error: 'Akses terbatas: Admin hanya dapat mengedit nama dan WhatsApp Ketua/Sekretaris DPW/DPD/DPC/DPR.'
+        error: 'Akses terbatas: Admin hanya dapat mengedit kontak DPW/DPD/DPC/DPR, menandai Event/Monev, serta mengelola musyawarah & presensi.'
       });
     }
 
@@ -608,14 +748,20 @@ function doPost(e) {
         Belanja: Number(payload.belanja || 0),
         Unit_PJ: String(payload.unitPj || '').trim(),
         Status_Pelaksanaan: String(payload.status || 'Rencana').trim(),
+        Jenis_Kegiatan: String(payload.jenisKegiatan || 'Event').trim(),
+        Pola_Jadwal: String(payload.polaJadwal || 'Tunggal').trim(),
         Tautan_Drive: String(payload.tautanDrive || '').trim()
       };
       const ss = getSpreadsheet_();
+      const kegSheet = ss.getSheetByName(SHEETS.KEGIATAN_RPKA);
+      if (kegSheet) {
+        ensureHeaderColumns_(kegSheet, ['Jenis_Kegiatan', 'Pola_Jadwal']);
+      }
       const updated = updateRowByIdInSs_(ss, SHEETS.KEGIATAN_RPKA, 'Kode_Kegiatan', kodeKegiatan, rowObj);
       if (!updated) {
         appendRowInSs_(ss, SHEETS.KEGIATAN_RPKA, rowObj);
       }
-      writeLog_('SUPERADMIN', 'saveKegiatan', kodeKegiatan + ' — ' + namaKegiatan);
+      writeLog_(role.toUpperCase(), 'saveKegiatan', kodeKegiatan + ' — ' + namaKegiatan + ' [' + rowObj.Jenis_Kegiatan + ' · ' + rowObj.Pola_Jadwal + ']');
       return jsonOut_({
         ok: true,
         data: {
@@ -632,7 +778,72 @@ function doPost(e) {
           belanja: rowObj.Belanja,
           unitPj: rowObj.Unit_PJ,
           status: rowObj.Status_Pelaksanaan,
+          jenisKegiatan: rowObj.Jenis_Kegiatan,
+          polaJadwal: rowObj.Pola_Jadwal,
           tautanDrive: rowObj.Tautan_Drive
+        }
+      });
+    }
+
+    if (action === 'updateKegiatanJenis') {
+      const kodeKegiatan = String(payload.kodeKegiatan || '').trim();
+      const jenisKegiatan = String(payload.jenisKegiatan || 'Event').trim() === 'Monev' ? 'Monev' : 'Event';
+      if (!kodeKegiatan) {
+        return jsonOut_({ ok: false, error: 'Kode kegiatan wajib diisi.' });
+      }
+      const ss = getSpreadsheet_();
+      const kegSheet = ss.getSheetByName(SHEETS.KEGIATAN_RPKA);
+      if (kegSheet) {
+        ensureHeaderColumns_(kegSheet, ['Jenis_Kegiatan', 'Pola_Jadwal']);
+      }
+      const existing = findRowInSs_(ss, SHEETS.KEGIATAN_RPKA, 'Kode_Kegiatan', kodeKegiatan);
+      const itemFallback = payload.item || {};
+      const rowObj = existing
+        ? Object.assign({}, existing, { Jenis_Kegiatan: jenisKegiatan })
+        : {
+            Kode_Kegiatan: kodeKegiatan,
+            Kode_Proker: String(itemFallback.kodeProker || '').trim(),
+            Nama_Proker: String(itemFallback.namaProker || '').trim(),
+            Nama_Kegiatan: String(itemFallback.namaKegiatan || '').trim(),
+            Tujuan: String(itemFallback.tujuan || '').trim(),
+            Sasaran: String(itemFallback.sasaran || '').trim(),
+            Indikator: String(itemFallback.indikator || '').trim(),
+            Tempat: String(itemFallback.tempat || '').trim(),
+            Waktu: String(itemFallback.waktu || '').trim(),
+            Pendapatan: Number(itemFallback.pendapatan || 0),
+            Belanja: Number(itemFallback.belanja || 0),
+            Unit_PJ: String(itemFallback.unitPj || '').trim(),
+            Status_Pelaksanaan: String(itemFallback.status || 'Rencana').trim(),
+            Jenis_Kegiatan: jenisKegiatan,
+            Pola_Jadwal: String(itemFallback.polaJadwal || 'Tunggal').trim(),
+            Tautan_Drive: String(itemFallback.tautanDrive || '').trim()
+          };
+      const updated = existing
+        ? updateRowByIdInSs_(ss, SHEETS.KEGIATAN_RPKA, 'Kode_Kegiatan', kodeKegiatan, rowObj)
+        : false;
+      if (!updated) {
+        appendRowInSs_(ss, SHEETS.KEGIATAN_RPKA, rowObj);
+      }
+      writeLog_(role.toUpperCase(), 'updateKegiatanJenis', kodeKegiatan + ' -> ' + jenisKegiatan);
+      return jsonOut_({
+        ok: true,
+        data: {
+          kodeKegiatan: String(rowObj.Kode_Kegiatan || kodeKegiatan),
+          kodeProker: String(rowObj.Kode_Proker || ''),
+          namaProker: String(rowObj.Nama_Proker || ''),
+          namaKegiatan: String(rowObj.Nama_Kegiatan || ''),
+          tujuan: String(rowObj.Tujuan || ''),
+          sasaran: String(rowObj.Sasaran || ''),
+          indikator: String(rowObj.Indikator || ''),
+          tempat: String(rowObj.Tempat || ''),
+          waktu: String(rowObj.Waktu || ''),
+          pendapatan: Number(rowObj.Pendapatan || 0),
+          belanja: Number(rowObj.Belanja || 0),
+          unitPj: String(rowObj.Unit_PJ || ''),
+          status: String(rowObj.Status_Pelaksanaan || 'Rencana'),
+          jenisKegiatan: jenisKegiatan,
+          polaJadwal: String(rowObj.Pola_Jadwal || 'Tunggal'),
+          tautanDrive: String(rowObj.Tautan_Drive || '')
         }
       });
     }
@@ -644,6 +855,309 @@ function doPost(e) {
       const deleted = deleteRowByIdInSs_(ss, SHEETS.KEGIATAN_RPKA, 'Kode_Kegiatan', kode);
       writeLog_('SUPERADMIN', 'deleteKegiatan', kode + ' (deleted=' + deleted + ')');
       return jsonOut_({ ok: deleted, error: deleted ? undefined : 'Kegiatan tidak ditemukan.' });
+    }
+
+    if (action === 'uploadMusyawarahFile') {
+      const kind = String(payload.kind || '').trim(); // 'notula_file' | 'dokumentasi'
+      const fileName = sanitizeDriveFileName_(payload.fileName || 'Berkas_Musyawarah');
+      const mimeType = String(payload.mimeType || 'application/octet-stream').trim();
+      const base64Data = String(payload.base64Data || '').trim();
+      if (!base64Data) {
+        return jsonOut_({ ok: false, error: 'Data berkas base64 kosong.' });
+      }
+
+      const lowerName = fileName.toLowerCase();
+      if (kind === 'dokumentasi') {
+        if (!/\.(jpg|jpeg|png)$/i.test(lowerName)) {
+          return jsonOut_({ ok: false, error: 'File dokumentasi harus berupa gambar JPG atau PNG.' });
+        }
+      } else if (kind === 'notula_file') {
+        if (!/\.(pdf|doc|docx)$/i.test(lowerName)) {
+          return jsonOut_({ ok: false, error: 'File notula harus berupa PDF atau Word (.doc/.docx).' });
+        }
+      }
+
+      const folder = getMusyawarahDriveFolder_();
+      const bytes = Utilities.base64Decode(base64Data);
+      const blob = Utilities.newBlob(bytes, mimeType, fileName);
+
+      // Ganti berkas lama dengan nama yang persis sama di folder agar tidak menumpuk duplikat
+      trashExistingFileByName_(folder, fileName);
+
+      const savedFile = folder.createFile(blob);
+      setDriveFilePublicViewSafe_(savedFile);
+      const fileId = savedFile.getId();
+
+      writeLog_(role.toUpperCase(), 'uploadMusyawarahFile', kind + ': ' + fileName + ' (' + fileId + ')');
+      return jsonOut_({
+        ok: true,
+        data: {
+          fileId: fileId,
+          fileName: savedFile.getName(),
+          url: savedFile.getUrl(),
+          previewUrl: 'https://drive.google.com/file/d/' + fileId + '/preview',
+          thumbnailUrl: kind === 'dokumentasi' ? ('https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1200') : ''
+        }
+      });
+    }
+
+    if (action === 'uploadMusyawarahNotulaText') {
+      const baseFileName = sanitizeDriveFileName_(payload.baseFileName || 'Notula_Musyawarah');
+      const pdfFileName = baseFileName + '.pdf';
+      const notulaTeks = String(payload.notulaTeks || '').trim();
+      if (!notulaTeks) {
+        return jsonOut_({ ok: false, error: 'Isi teks notula masih kosong.' });
+      }
+
+      const folder = getMusyawarahDriveFolder_();
+      const judul = String(payload.judul || baseFileName).trim();
+      const jenisLabel = String(payload.jenis || 'Pleno') === 'Unit'
+        ? ('Musyawarah Unit' + (payload.unitLabel ? ' (' + payload.unitLabel + ')' : ''))
+        : 'Musyawarah Pleno';
+      const musyawarahKe = Math.min(52, Math.max(1, Number(payload.musyawarahKe || 1)));
+      const tanggalFormatted = String(payload.tanggalFormatted || '').trim();
+      const presensiRingkasan = String(payload.presensiRingkasan || '').trim();
+
+      // 1. Buat dokumen Word/Google Docs terlebih dahulu
+      const doc = DocumentApp.create(baseFileName);
+      const docId = doc.getId();
+      try {
+        const body = doc.getBody();
+        body.setMarginTop(54);
+        body.setMarginBottom(54);
+        body.setMarginLeft(60);
+        body.setMarginRight(60);
+
+        const orgHeader = body.appendParagraph('DEPARTEMEN URUSAN WILAYAH DAN DAERAH');
+        orgHeader.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+        orgHeader.editAsText().setFontFamily('Arial').setFontSize(12).setBold(true).setForegroundColor('#07525E');
+
+        const subHeader = body.appendParagraph('DEWAN PIMPINAN PUSAT WAHDAH ISLAMIYAH');
+        subHeader.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+        subHeader.editAsText().setFontFamily('Arial').setFontSize(10).setBold(true).setForegroundColor('#0C7A89');
+
+        const docTitle = body.appendParagraph('NOTULA MUSYAWARAH');
+        docTitle.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+        docTitle.setSpacingBefore(10);
+        docTitle.setSpacingAfter(8);
+        docTitle.editAsText().setFontFamily('Arial').setFontSize(14).setBold(true).setForegroundColor('#0F2429');
+
+        body.appendHorizontalRule();
+
+        const metaLines = [
+          'Agenda / Judul : ' + judul,
+          'Jenis          : ' + jenisLabel,
+          'Musyawarah Ke  : ' + musyawarahKe,
+          'Tanggal        : ' + (tanggalFormatted || '-')
+        ];
+        if (presensiRingkasan) {
+          metaLines.push('Kehadiran      : ' + presensiRingkasan);
+        }
+        metaLines.forEach(function (line) {
+          const p = body.appendParagraph(line);
+          p.setSpacingAfter(2);
+          p.editAsText().setFontFamily('Arial').setFontSize(10).setForegroundColor('#233B41');
+        });
+
+        body.appendHorizontalRule();
+
+        const isiHeader = body.appendParagraph('ISI NOTULA / KEPUTUSAN MUSYAWARAH');
+        isiHeader.setSpacingBefore(10);
+        isiHeader.setSpacingAfter(6);
+        isiHeader.editAsText().setFontFamily('Arial').setFontSize(11).setBold(true).setForegroundColor('#07525E');
+
+        const rawParagraphs = notulaTeks.replace(/\r\n/g, '\n').split('\n');
+        rawParagraphs.forEach(function (line) {
+          const p = body.appendParagraph(line);
+          p.setSpacingAfter(4);
+          p.setLineSpacing(1.25);
+          p.editAsText().setFontFamily('Arial').setFontSize(10.5).setForegroundColor('#0F2429');
+        });
+
+        doc.saveAndClose();
+
+        // 2. Konversi dokumen ke PDF dan simpan ke folder tujuan
+        const tempDriveFile = DriveApp.getFileById(docId);
+        const pdfBlob = tempDriveFile.getAs(MimeType.PDF).setName(pdfFileName);
+        trashExistingFileByName_(folder, pdfFileName);
+        const pdfFile = folder.createFile(pdfBlob);
+        setDriveFilePublicViewSafe_(pdfFile);
+        const pdfId = pdfFile.getId();
+
+        // 3. Hapus dokumen sementara agar Drive tetap rapi
+        tempDriveFile.setTrashed(true);
+
+        writeLog_(role.toUpperCase(), 'uploadMusyawarahNotulaText', pdfFileName + ' (' + pdfId + ')');
+        return jsonOut_({
+          ok: true,
+          data: {
+            fileId: pdfId,
+            fileName: pdfFile.getName(),
+            url: pdfFile.getUrl(),
+            previewUrl: 'https://drive.google.com/file/d/' + pdfId + '/preview'
+          }
+        });
+      } catch (convErr) {
+        try {
+          DriveApp.getFileById(docId).setTrashed(true);
+        } catch (ignore) {}
+        throw convErr;
+      }
+    }
+
+    if (action === 'saveMusyawarah') {
+      const judul = String(payload.judul || '').trim();
+      const tanggal = String(payload.tanggal || '').trim();
+      const jenis = String(payload.jenis || 'Pleno').trim() === 'Unit' ? 'Unit' : 'Pleno';
+      const musyawarahKe = Math.min(52, Math.max(1, Number(payload.musyawarahKe || 1)));
+      if (!judul || !tanggal) {
+        return jsonOut_({ ok: false, error: 'Judul dan tanggal musyawarah wajib diisi.' });
+      }
+      const ss = getSpreadsheet_();
+      ensureMusyawarahSheets_(ss);
+      const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
+      const isEdit = Boolean(payload.id);
+      const idMsy = isEdit ? String(payload.id).trim() : generateId_('MSY');
+      const extraIdsArr = Array.isArray(payload.pesertaTambahanIds)
+        ? payload.pesertaTambahanIds.map(function (x) { return String(x).trim(); }).filter(Boolean)
+        : [];
+      const dokId = String(payload.dokumentasiFileId || '').trim();
+      const rowObj = {
+        ID_Musyawarah: idMsy,
+        Judul: judul,
+        Jenis: jenis,
+        Musyawarah_Ke: musyawarahKe,
+        ID_Unit: jenis === 'Unit' ? String(payload.unitId || '').trim() : '',
+        Nama_Unit: jenis === 'Unit' ? String(payload.namaUnit || '').trim() : '',
+        Tanggal: tanggal,
+        Waktu_Mulai: String(payload.waktuMulai || '').trim(),
+        Waktu_Selesai: String(payload.waktuSelesai || '').trim(),
+        Tempat: String(payload.tempat || 'Online').trim(),
+        Pimpinan_Rapat: String(payload.pimpinanRapat || '').trim(),
+        Notula_Mode: String(payload.notulaMode || '').trim(),
+        Notula_Teks: String(payload.notulaTeks || '').trim(),
+        Notula_File_Name: String(payload.notulaFileName || '').trim(),
+        Notula_File_URL: String(payload.notulaFileUrl || '').trim(),
+        Notula_File_ID: String(payload.notulaFileId || '').trim(),
+        Dokumentasi_File_Name: String(payload.dokumentasiFileName || '').trim(),
+        Dokumentasi_File_URL: String(payload.dokumentasiFileUrl || '').trim(),
+        Dokumentasi_File_ID: dokId,
+        Notulensi_Ringkas: String(payload.notulensiRingkas || '').trim(),
+        Tautan_Drive: String(payload.tautanDrive || payload.notulaFileUrl || '').trim(),
+        Peserta_Tambahan_IDs: extraIdsArr.join(','),
+        Dibuat_Pada: isEdit ? String(payload.dibuatPada || nowStr) : nowStr,
+        Diperbarui_Pada: nowStr
+      };
+      const updated = isEdit
+        ? updateRowByIdInSs_(ss, SHEETS.MUSYAWARAH, 'ID_Musyawarah', idMsy, rowObj)
+        : false;
+      if (!updated) {
+        appendRowInSs_(ss, SHEETS.MUSYAWARAH, rowObj);
+      }
+      writeLog_(role.toUpperCase(), isEdit ? 'updateMusyawarah' : 'createMusyawarah', idMsy + ' — ' + judul + ' (Ke-' + musyawarahKe + ')');
+      return jsonOut_({
+        ok: true,
+        data: {
+          id: idMsy,
+          judul: rowObj.Judul,
+          jenis: rowObj.Jenis,
+          musyawarahKe: musyawarahKe,
+          unitId: rowObj.ID_Unit,
+          namaUnit: rowObj.Nama_Unit,
+          tanggal: rowObj.Tanggal,
+          waktuMulai: rowObj.Waktu_Mulai,
+          waktuSelesai: rowObj.Waktu_Selesai,
+          tempat: rowObj.Tempat,
+          pimpinanRapat: rowObj.Pimpinan_Rapat,
+          notulaMode: rowObj.Notula_Mode,
+          notulaTeks: rowObj.Notula_Teks,
+          notulaFileName: rowObj.Notula_File_Name,
+          notulaFileUrl: rowObj.Notula_File_URL,
+          notulaFileId: rowObj.Notula_File_ID,
+          dokumentasiFileName: rowObj.Dokumentasi_File_Name,
+          dokumentasiFileUrl: rowObj.Dokumentasi_File_URL,
+          dokumentasiFileId: dokId,
+          dokumentasiPreviewUrl: dokId ? ('https://drive.google.com/thumbnail?id=' + dokId + '&sz=w1200') : '',
+          notulensiRingkas: rowObj.Notulensi_Ringkas,
+          tautanDrive: rowObj.Tautan_Drive,
+          pesertaTambahanIds: extraIdsArr,
+          dibuatPada: rowObj.Dibuat_Pada,
+          diperbaruiPada: rowObj.Diperbarui_Pada
+        }
+      });
+    }
+
+    if (action === 'deleteMusyawarah') {
+      const id = String(payload.id || '').trim();
+      if (!id) return jsonOut_({ ok: false, error: 'ID musyawarah wajib diisi.' });
+      const ss = getSpreadsheet_();
+      const deleted = deleteRowByIdInSs_(ss, SHEETS.MUSYAWARAH, 'ID_Musyawarah', id);
+      deleteRowsByColumnInSs_(ss, SHEETS.PRESENSI_MUSYAWARAH, 'ID_Musyawarah', id);
+      writeLog_(role.toUpperCase(), 'deleteMusyawarah', id + ' (deleted=' + deleted + ')');
+      return jsonOut_({ ok: deleted, error: deleted ? undefined : 'Musyawarah tidak ditemukan.' });
+    }
+
+    if (action === 'savePresensiBatch') {
+      const musyawarahId = String(payload.musyawarahId || '').trim();
+      const entries = Array.isArray(payload.entries) ? payload.entries : [];
+      if (!musyawarahId) {
+        return jsonOut_({ ok: false, error: 'ID musyawarah wajib diisi.' });
+      }
+      const ss = getSpreadsheet_();
+      ensureMusyawarahSheets_(ss);
+      const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
+      deleteRowsByColumnInSs_(ss, SHEETS.PRESENSI_MUSYAWARAH, 'ID_Musyawarah', musyawarahId);
+
+      const savedList = [];
+      const sheet = ss.getSheetByName(SHEETS.PRESENSI_MUSYAWARAH);
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function (h) {
+        return String(h).trim();
+      });
+      const rowsToInsert = [];
+
+      entries.forEach(function (entry) {
+        const pid = String(entry.pengurusId || '').trim();
+        if (!pid) return;
+        const idPres = musyawarahId + '__' + pid;
+        const obj = {
+          ID_Presensi: idPres,
+          ID_Musyawarah: musyawarahId,
+          ID_Pengurus: pid,
+          Nama_Lengkap: String(entry.namaLengkap || '').trim(),
+          Unit_Kode: String(entry.unitKode || '').trim(),
+          Amanah: String(entry.amanah || '').trim(),
+          Sumber_Peserta: String(entry.sumberPeserta || 'Wajib') === 'Tambahan' ? 'Tambahan' : 'Wajib',
+          Status_Kehadiran: String(entry.status || 'Hadir').trim(),
+          Keterangan: String(entry.keterangan || '').trim(),
+          Diperbarui_Pada: nowStr
+        };
+        rowsToInsert.push(headers.map(function (h) { return obj.hasOwnProperty(h) ? obj[h] : ''; }));
+        savedList.push({
+          id: idPres,
+          musyawarahId: musyawarahId,
+          pengurusId: pid,
+          namaLengkap: obj.Nama_Lengkap,
+          unitKode: obj.Unit_Kode,
+          amanah: obj.Amanah,
+          sumberPeserta: obj.Sumber_Peserta,
+          status: obj.Status_Kehadiran,
+          keterangan: obj.Keterangan,
+          diperbaruiPada: nowStr
+        });
+      });
+
+      if (rowsToInsert.length > 0) {
+        const lock = LockService.getScriptLock();
+        lock.waitLock(10000);
+        try {
+          sheet.getRange(sheet.getLastRow() + 1, 1, rowsToInsert.length, headers.length).setValues(rowsToInsert);
+        } finally {
+          lock.releaseLock();
+        }
+      }
+
+      writeLog_(role.toUpperCase(), 'savePresensiBatch', musyawarahId + ' (' + savedList.length + ' peserta)');
+      return jsonOut_({ ok: true, data: savedList });
     }
 
     if (action === 'saveUnit') {
@@ -1532,3 +2046,133 @@ function sinkronUnitDanProkerRPKA() {
 
   writeLog_('SUPERADMIN', 'sinkronUnitDanProkerRPKA', 'Sheet UNIT (0-5) dan PROGRAM_KERJA (10001-10005) disinkronkan.');
 }
+
+function readRowsOptional_(sheetName) {
+  const ss = getSpreadsheet_();
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return [];
+  return readSheetObjects_(sheet);
+}
+
+function formatDateCell_(val) {
+  if (!val) return '';
+  if (Object.prototype.toString.call(val) === '[object Date]' && !isNaN(val.getTime())) {
+    return Utilities.formatDate(val, 'Asia/Makassar', 'yyyy-MM-dd');
+  }
+  return String(val).trim();
+}
+
+function ensureMusyawarahSheets_(ss) {
+  const defs = [
+    {
+      name: SHEETS.MUSYAWARAH,
+      headers: [
+        'ID_Musyawarah',
+        'Judul',
+        'Jenis',
+        'Musyawarah_Ke',
+        'ID_Unit',
+        'Nama_Unit',
+        'Tanggal',
+        'Waktu_Mulai',
+        'Waktu_Selesai',
+        'Tempat',
+        'Pimpinan_Rapat',
+        'Notula_Mode',
+        'Notula_Teks',
+        'Notula_File_Name',
+        'Notula_File_URL',
+        'Notula_File_ID',
+        'Dokumentasi_File_Name',
+        'Dokumentasi_File_URL',
+        'Dokumentasi_File_ID',
+        'Notulensi_Ringkas',
+        'Tautan_Drive',
+        'Peserta_Tambahan_IDs',
+        'Dibuat_Pada',
+        'Diperbarui_Pada'
+      ]
+    },
+    {
+      name: SHEETS.PRESENSI_MUSYAWARAH,
+      headers: ['ID_Presensi', 'ID_Musyawarah', 'ID_Pengurus', 'Nama_Lengkap', 'Unit_Kode', 'Amanah', 'Sumber_Peserta', 'Status_Kehadiran', 'Keterangan', 'Diperbarui_Pada']
+    }
+  ];
+  defs.forEach(function (def) {
+    let sheet = ss.getSheetByName(def.name);
+    if (!sheet) {
+      sheet = ss.insertSheet(def.name);
+    }
+    if (sheet.getLastRow() === 0) {
+      sheet.getRange(1, 1, 1, def.headers.length).setValues([def.headers]);
+      sheet.getRange(1, 1, 1, def.headers.length)
+        .setFontWeight('bold')
+        .setBackground('#07525E')
+        .setFontColor('#FFFFFF');
+      sheet.setFrozenRows(1);
+    } else {
+      ensureHeaderColumns_(sheet, def.headers);
+    }
+  });
+}
+
+function getMusyawarahDriveFolder_() {
+  const settingsMap = getSettingsMap_();
+  const raw = String(settingsMap.MUSYAWARAH_DRIVE_FOLDER_ID || DEFAULT_MUSYAWARAH_DRIVE_FOLDER_ID).trim();
+  const folderMatch = raw.match(/\/folders\/([a-zA-Z0-9-_]+)/);
+  const folderId = (folderMatch && folderMatch[1]) ? folderMatch[1] : (raw || DEFAULT_MUSYAWARAH_DRIVE_FOLDER_ID);
+  try {
+    return DriveApp.getFolderById(folderId);
+  } catch (err) {
+    throw new Error('Tidak dapat mengakses folder Google Drive (ID: ' + folderId + '). Pastikan akun pemilik Apps Script memiliki akses Editor ke folder tersebut dan sudah menjalankan otorisasiGoogleDrive(). Detail: ' + err.message);
+  }
+}
+
+function sanitizeDriveFileName_(name) {
+  return String(name || 'Berkas_Musyawarah')
+    .replace(/[\\/:*?"<>|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function trashExistingFileByName_(folder, fileName) {
+  try {
+    const files = folder.getFilesByName(fileName);
+    while (files.hasNext()) {
+      const f = files.next();
+      f.setTrashed(true);
+    }
+  } catch (ignore) {}
+}
+
+function setDriveFilePublicViewSafe_(file) {
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (ignore) {
+    // Tetap aman jika kebijakan domain Workspace membatasi sharing publik
+  }
+}
+
+function deleteRowsByColumnInSs_(ss, sheetName, colName, targetVal) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastRow() <= 1) return 0;
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map(function (h) { return String(h).trim(); });
+    const colIdx = headers.indexOf(colName);
+    if (colIdx === -1) return 0;
+    let count = 0;
+    for (let r = data.length - 1; r >= 1; r--) {
+      if (String(data[r][colIdx]).trim() === String(targetVal).trim()) {
+        sheet.deleteRow(r + 1);
+        count++;
+      }
+    }
+    return count;
+  } finally {
+    lock.releaseLock();
+  }
+}
+

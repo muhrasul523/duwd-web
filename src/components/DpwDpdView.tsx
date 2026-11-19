@@ -1339,17 +1339,17 @@ export function DpwDpdView({
     targetMode === 'visi2030' ? VISI_2030_DPD_TARGET : kpi.dpdFullTotal;
 
   return (
-    <section className="mx-auto max-w-[1160px] px-4 py-8 sm:px-6 lg:py-10">
+    <section className="duwd-container px-2 py-7 sm:px-4 lg:py-9">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[#0C7A89]">
+          <p className="text-xs font-semibold text-[#0C7A89] dark:text-[#3EC1D3]">
             Departemen Urusan Wilayah &amp; Daerah &middot; DPP Wahdah Islamiyah
           </p>
-          <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-[#07525E] sm:text-3xl">
+          <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-[#07525E] dark:text-[#E6F4F7] sm:text-3xl">
             Direktori Kelembagaan Wilayah &amp; Daerah
           </h1>
-          <p className="mt-1 text-sm text-[#526A70]">
+          <p className="mt-1 text-sm text-[#526A70] dark:text-[#9BB5BC]">
             Data kepengurusan DPW, DPD, DPC, dan DPR Wahdah Islamiyah seluruh Indonesia beserta kontak Ketua dan Sekretaris.
           </p>
         </div>
@@ -1359,9 +1359,9 @@ export function DpwDpdView({
             type="button"
             disabled={filteredRows.length === 0}
             onClick={handleOpenFilteredCopyModal}
-            className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap shrink-0 rounded-xl border border-[#0C7A89]/25 bg-[#EBF5F8] px-3.5 py-2.5 text-xs font-semibold text-[#07525E] hover:bg-[#DCEEF4] disabled:opacity-50"
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#0C7A89]/25 bg-[#EBF5F8] px-3.5 py-2.5 text-xs font-semibold text-[#07525E] hover:bg-[#DCEEF4] disabled:opacity-50 dark:border-[#3EC1D3]/30 dark:bg-[#113540] dark:text-[#E6F4F7] dark:hover:bg-[#164452]"
           >
-            <Copy className="h-3.5 w-3.5 text-[#0C7A89]" />
+            <Copy className="h-3.5 w-3.5 text-[#0C7A89] dark:text-[#3EC1D3]" />
             <span>Salin Hasil ({filteredRows.length.toLocaleString('id-ID')})</span>
           </button>
 
@@ -1369,9 +1369,9 @@ export function DpwDpdView({
             type="button"
             disabled={filteredRows.length === 0}
             onClick={handleExportCsv}
-            className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap shrink-0 rounded-xl border border-[#07525E]/15 bg-white/85 px-3.5 py-2.5 text-xs font-semibold text-[#07525E] hover:bg-white disabled:opacity-50"
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#07525E]/15 bg-white/85 px-3.5 py-2.5 text-xs font-semibold text-[#07525E] hover:bg-white disabled:opacity-50 dark:border-[#3EC1D3]/25 dark:bg-[#0D2B33] dark:text-[#E6F4F7] dark:hover:bg-[#113540]"
           >
-            <Download className="h-3.5 w-3.5 text-[#0C7A89]" />
+            <Download className="h-3.5 w-3.5 text-[#0C7A89] dark:text-[#3EC1D3]" />
             <span>Unduh CSV</span>
           </button>
 
@@ -1380,7 +1380,7 @@ export function DpwDpdView({
               type="button"
               onClick={onRefresh}
               disabled={syncing}
-              className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap shrink-0 rounded-xl border border-[#07525E]/15 bg-white/85 px-3.5 py-2.5 text-xs font-semibold text-[#07525E] hover:bg-white disabled:opacity-60"
+              className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#07525E]/15 bg-white/85 px-3.5 py-2.5 text-xs font-semibold text-[#07525E] hover:bg-white disabled:opacity-60 dark:border-[#3EC1D3]/25 dark:bg-[#0D2B33] dark:text-[#E6F4F7] dark:hover:bg-[#113540]"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
               <span>{syncing ? 'Menyinkronkan...' : 'Sinkronkan Sheet'}</span>
@@ -1391,7 +1391,7 @@ export function DpwDpdView({
             <button
               type="button"
               onClick={() => openManualCreateModal(subTab.toUpperCase() as JenisLembaga)}
-              className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap shrink-0 rounded-xl bg-gradient-to-r from-[#0C7A89] to-[#07525E] px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5"
+              className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-[#0C7A89] to-[#07525E] px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5"
             >
               <Plus className="h-4 w-4" />
               <span>Tambah {subTab.toUpperCase()}</span>
@@ -1402,8 +1402,8 @@ export function DpwDpdView({
 
       {/* Warning jika Spreadsheet #2 belum tersambung */}
       {(!webAppUrl.trim() || !wilayahConnected) && (
-        <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-[#D88B15]/35 bg-[#FFF9EE] px-4 py-3 text-xs text-[#7D4D06]">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#D88B15]" />
+        <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-[#D88B15]/35 bg-[#FFF9EE] px-4 py-3 text-xs text-[#7D4D06] dark:border-[#F0B243]/30 dark:bg-[#2A2010] dark:text-[#F6CB77]">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#D88B15] dark:text-[#F0B243]" />
           <div>
             <span className="font-bold">Info Koneksi Spreadsheet #2:</span>{' '}
             {!webAppUrl.trim()
@@ -1415,24 +1415,24 @@ export function DpwDpdView({
 
       {/* Role Permissions Info for Admin */}
       {role === 'admin' && (
-        <div className="mt-3 rounded-xl border border-[#0C7A89]/20 bg-[#F2FAFB] px-4 py-2.5 text-xs text-[#07525E]">
+        <div className="mt-3 rounded-xl border border-[#0C7A89]/20 bg-[#F2FAFB] px-4 py-2.5 text-xs text-[#07525E] dark:border-[#3EC1D3]/25 dark:bg-[#0D2E36] dark:text-[#BCEAF0]">
           <span className="font-bold">Hak Akses Admin:</span> Anda dapat mengedit <strong>Nama &amp; Nomor WhatsApp Ketua dan Sekretaris</strong> pada DPW, DPD, DPC, dan DPR. Pengaturan status pembentukan lembaga dikelola oleh Super Admin.
         </div>
       )}
 
       {/* Target Mode Switcher + KPI Summary Strip */}
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-xs font-semibold text-[#526A70]">
+        <div className="text-xs font-semibold text-[#526A70] dark:text-[#9BB5BC]">
           Rekapitulasi Capaian Kelembagaan
         </div>
-        <div className="inline-flex flex-wrap gap-1 rounded-xl bg-[#EBF5F8]/90 p-1">
+        <div className="inline-flex flex-wrap gap-1 rounded-xl bg-[#EBF5F8]/90 p-1 dark:bg-[#0D2A33]">
           <button
             type="button"
             onClick={() => setTargetMode('full')}
-            className={`cursor-pointer whitespace-nowrap shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+            className={`shrink-0 cursor-pointer whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
               targetMode === 'full'
-                ? 'bg-white text-[#07525E] shadow-xs'
-                : 'text-[#526A70] hover:text-[#07525E]'
+                ? 'bg-white text-[#07525E] shadow-xs dark:bg-[#13424F] dark:text-[#E6F4F7]'
+                : 'text-[#526A70] hover:text-[#07525E] dark:text-[#9BB5BC] dark:hover:text-[#E6F4F7]'
             }`}
           >
             Keseluruhan (38 DPW &middot; 514 DPD)
@@ -1440,10 +1440,10 @@ export function DpwDpdView({
           <button
             type="button"
             onClick={() => setTargetMode('visi2030')}
-            className={`cursor-pointer whitespace-nowrap shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+            className={`shrink-0 cursor-pointer whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
               targetMode === 'visi2030'
-                ? 'bg-white text-[#07525E] shadow-xs'
-                : 'text-[#526A70] hover:text-[#07525E]'
+                ? 'bg-white text-[#07525E] shadow-xs dark:bg-[#13424F] dark:text-[#E6F4F7]'
+                : 'text-[#526A70] hover:text-[#07525E] dark:text-[#9BB5BC] dark:hover:text-[#E6F4F7]'
             }`}
           >
             Target Visi 2030 (38 DPW &middot; 412 DPD)
@@ -1455,21 +1455,21 @@ export function DpwDpdView({
         <button
           type="button"
           onClick={() => handleSelectTab('dpw')}
-          className="glass-surface cursor-pointer px-4 py-3.5 text-left transition-colors hover:bg-white/85"
+          className="glass-surface cursor-pointer px-4 py-3.5 text-left transition-colors hover:bg-white/85 dark:hover:bg-[#113540]"
         >
-          <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-[#526A70]">
+          <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-[#526A70] dark:text-[#9BB5BC]">
             <span>DPW &middot; Provinsi</span>
-            <span className="font-bold text-[#0C7A89] tabular-nums">
+            <span className="font-bold text-[#0C7A89] tabular-nums dark:text-[#3EC1D3]">
               {formatPct(kpi.dpwTerbentuk, activeDpwTarget)}
             </span>
           </div>
-          <div className="mt-1 text-2xl font-bold text-[#07525E] tabular-nums">
+          <div className="mt-1 text-2xl font-bold text-[#07525E] tabular-nums dark:text-[#E6F4F7]">
             {kpi.dpwTerbentuk}
-            <span className="ml-1 text-sm font-medium text-[#6B8187]">
+            <span className="ml-1 text-sm font-medium text-[#6B8187] dark:text-[#8DA8B0]">
               / {activeDpwTarget}
             </span>
           </div>
-          <div className="mt-0.5 text-[11px] text-[#6B8187]">
+          <div className="mt-0.5 text-[11px] text-[#6B8187] dark:text-[#8DA8B0]">
             {targetMode === 'visi2030'
               ? 'Target Visi 2030 (100% Provinsi)'
               : 'Sudah Terbentuk · Total Provinsi'}
@@ -1479,21 +1479,21 @@ export function DpwDpdView({
         <button
           type="button"
           onClick={() => handleSelectTab('dpd')}
-          className="glass-surface cursor-pointer px-4 py-3.5 text-left transition-colors hover:bg-white/85"
+          className="glass-surface cursor-pointer px-4 py-3.5 text-left transition-colors hover:bg-white/85 dark:hover:bg-[#113540]"
         >
-          <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-[#526A70]">
+          <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-[#526A70] dark:text-[#9BB5BC]">
             <span>DPD &middot; Kab/Kota</span>
-            <span className="font-bold text-[#0C7A89] tabular-nums">
+            <span className="font-bold text-[#0C7A89] tabular-nums dark:text-[#3EC1D3]">
               {formatPct(kpi.dpdTerbentuk, activeDpdTarget)}
             </span>
           </div>
-          <div className="mt-1 text-2xl font-bold text-[#0C7A89] tabular-nums">
+          <div className="mt-1 text-2xl font-bold text-[#0C7A89] tabular-nums dark:text-[#3EC1D3]">
             {kpi.dpdTerbentuk}
-            <span className="ml-1 text-sm font-medium text-[#6B8187]">
+            <span className="ml-1 text-sm font-medium text-[#6B8187] dark:text-[#8DA8B0]">
               / {activeDpdTarget}
             </span>
           </div>
-          <div className="mt-0.5 text-[11px] text-[#6B8187]">
+          <div className="mt-0.5 text-[11px] text-[#6B8187] dark:text-[#8DA8B0]">
             {targetMode === 'visi2030'
               ? 'Target Visi 2030: 80% (412 dari 514)'
               : 'Sudah Terbentuk · Total Kab/Kota'}
@@ -1503,21 +1503,21 @@ export function DpwDpdView({
         <button
           type="button"
           onClick={() => handleSelectTab('dpc')}
-          className="glass-surface cursor-pointer px-4 py-3.5 text-left transition-colors hover:bg-white/85"
+          className="glass-surface cursor-pointer px-4 py-3.5 text-left transition-colors hover:bg-white/85 dark:hover:bg-[#113540]"
         >
-          <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-[#526A70]">
+          <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-[#526A70] dark:text-[#9BB5BC]">
             <span>DPC &middot; Kecamatan</span>
-            <span className="font-bold text-[#07525E] tabular-nums">
+            <span className="font-bold text-[#07525E] tabular-nums dark:text-[#BCEAF0]">
               {formatPct(kpi.dpcTerbentuk, kpi.dpcTotal)}
             </span>
           </div>
-          <div className="mt-1 text-2xl font-bold text-[#07525E] tabular-nums">
+          <div className="mt-1 text-2xl font-bold text-[#07525E] tabular-nums dark:text-[#E6F4F7]">
             {kpi.dpcTerbentuk}
-            <span className="ml-1 text-sm font-medium text-[#6B8187]">
+            <span className="ml-1 text-sm font-medium text-[#6B8187] dark:text-[#8DA8B0]">
               / {kpi.dpcTotal.toLocaleString('id-ID')}
             </span>
           </div>
-          <div className="mt-0.5 text-[11px] text-[#6B8187]">
+          <div className="mt-0.5 text-[11px] text-[#6B8187] dark:text-[#8DA8B0]">
             Sudah Terbentuk &middot; Total Kecamatan
           </div>
         </button>
@@ -1525,33 +1525,33 @@ export function DpwDpdView({
         <button
           type="button"
           onClick={() => handleSelectTab('dpr')}
-          className="glass-surface cursor-pointer px-4 py-3.5 text-left transition-colors hover:bg-white/85"
+          className="glass-surface cursor-pointer px-4 py-3.5 text-left transition-colors hover:bg-white/85 dark:hover:bg-[#113540]"
         >
-          <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-[#526A70]">
+          <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-[#526A70] dark:text-[#9BB5BC]">
             <span>DPR &middot; Kel/Desa</span>
-            <span className="font-bold text-[#D88B15] tabular-nums">
+            <span className="font-bold text-[#D88B15] tabular-nums dark:text-[#F0B243]">
               {formatPct(kpi.dprTerbentuk, kpi.dprTotal)}
             </span>
           </div>
-          <div className="mt-1 text-2xl font-bold text-[#D88B15] tabular-nums">
+          <div className="mt-1 text-2xl font-bold text-[#D88B15] tabular-nums dark:text-[#F0B243]">
             {kpi.dprTerbentuk}
-            <span className="ml-1 text-sm font-medium text-[#6B8187]">
+            <span className="ml-1 text-sm font-medium text-[#6B8187] dark:text-[#8DA8B0]">
               / {kpi.dprTotal.toLocaleString('id-ID')}
             </span>
           </div>
-          <div className="mt-0.5 text-[11px] text-[#6B8187]">
+          <div className="mt-0.5 text-[11px] text-[#6B8187] dark:text-[#8DA8B0]">
             Sudah Terbentuk &middot; Total Kel/Desa
           </div>
         </button>
       </div>
 
       {notice && (
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[#0C7A89]/25 bg-[#ECF6F2] px-4 py-2.5 text-xs font-medium text-[#07525E]">
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[#0C7A89]/25 bg-[#ECF6F2] px-4 py-2.5 text-xs font-medium text-[#07525E] dark:border-[#3EC1D3]/30 dark:bg-[#0D2E36] dark:text-[#BCEAF0]">
           <span>{notice}</span>
           <button
             type="button"
             onClick={() => setNotice('')}
-            className="cursor-pointer text-[#526A70]"
+            className="cursor-pointer text-[#526A70] dark:text-[#9BB5BC]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -1559,12 +1559,12 @@ export function DpwDpdView({
       )}
 
       {errorBanner && (
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-900">
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-900 dark:border-amber-400/30 dark:bg-amber-950/60 dark:text-amber-200">
           <span>{errorBanner}</span>
           <button
             type="button"
             onClick={() => setErrorBanner('')}
-            className="cursor-pointer text-amber-700"
+            className="cursor-pointer text-amber-700 dark:text-amber-300"
           >
             <X className="h-4 w-4" />
           </button>
@@ -1572,18 +1572,18 @@ export function DpwDpdView({
       )}
 
       {/* Sub-navigation + Cascading Multi-Filter Bar */}
-      <div className="mt-5 glass-surface p-4 space-y-3.5">
+      <div className="mt-5 glass-surface space-y-3.5 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex flex-wrap gap-1 rounded-xl bg-[#EBF5F8]/85 p-1">
+          <div className="inline-flex flex-wrap gap-1 rounded-xl bg-[#EBF5F8]/85 p-1 dark:bg-[#0D2A33]">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => handleSelectTab(tab.id)}
-                className={`cursor-pointer whitespace-nowrap shrink-0 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors ${
+                className={`shrink-0 cursor-pointer whitespace-nowrap rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors ${
                   subTab === tab.id
-                    ? 'bg-white text-[#07525E] shadow-xs'
-                    : 'text-[#526A70] hover:text-[#07525E]'
+                    ? 'bg-white text-[#07525E] shadow-xs dark:bg-[#13424F] dark:text-[#E6F4F7]'
+                    : 'text-[#526A70] hover:text-[#07525E] dark:text-[#9BB5BC] dark:hover:text-[#E6F4F7]'
                 }`}
               >
                 {tab.label}
@@ -1595,13 +1595,13 @@ export function DpwDpdView({
         {/* Row 1 Filters: Search, Pulau, Provinsi, Kab/Kota, Kecamatan */}
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-12">
           <div className="relative lg:col-span-4">
-            <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-[#6B8187]" />
+            <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-[#6B8187] dark:text-[#8DA8B0]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Cari kode, wilayah, ketua, sekretaris, WA..."
-              className="w-full rounded-xl border border-[#07525E]/15 bg-white/90 py-2.5 pr-4 pl-10 text-xs text-[#0F2429] placeholder:text-[#7D9197] focus:border-[#0C7A89] focus:outline-none"
+              className="w-full rounded-xl border border-[#07525E]/15 bg-white/90 py-2.5 pr-4 pl-10 text-xs text-[#0F2429] placeholder:text-[#7D9197] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7] dark:placeholder:text-[#6D8B94] dark:focus:border-[#3EC1D3]"
             />
           </div>
 
@@ -1615,7 +1615,7 @@ export function DpwDpdView({
                 setFilterKecamatan('ALL');
               }}
               aria-label="Filter Pulau"
-              className="w-full rounded-xl border border-[#07525E]/15 bg-white/90 px-3 py-2.5 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none"
+              className="w-full rounded-xl border border-[#07525E]/15 bg-white/90 px-3 py-2.5 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
             >
               <option value="ALL">Semua Pulau (7)</option>
               {pulauOptions.map((p) => (
@@ -1635,7 +1635,7 @@ export function DpwDpdView({
                 setFilterKecamatan('ALL');
               }}
               aria-label="Filter Provinsi"
-              className="w-full rounded-xl border border-[#07525E]/15 bg-white/90 px-3 py-2.5 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none"
+              className="w-full rounded-xl border border-[#07525E]/15 bg-white/90 px-3 py-2.5 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
             >
               <option value="ALL">Semua Provinsi</option>
               {provOptions.map((p) => (
@@ -1655,7 +1655,7 @@ export function DpwDpdView({
                   setFilterKecamatan('ALL');
                 }}
                 aria-label="Filter Kabupaten/Kota"
-                className="w-full rounded-xl border border-[#07525E]/15 bg-white/90 px-3 py-2.5 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none"
+                className="w-full rounded-xl border border-[#07525E]/15 bg-white/90 px-3 py-2.5 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
               >
                 <option value="ALL">Semua Kab/Kota</option>
                 {kabOptions.map((k) => (
@@ -1674,7 +1674,7 @@ export function DpwDpdView({
                 onChange={(e) => setFilterKecamatan(e.target.value)}
                 disabled={!kecsLoaded}
                 aria-label="Filter Kecamatan"
-                className="w-full rounded-xl border border-[#07525E]/15 bg-white/90 px-3 py-2.5 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none disabled:opacity-60"
+                className="w-full rounded-xl border border-[#07525E]/15 bg-white/90 px-3 py-2.5 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none disabled:opacity-60 dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
               >
                 <option value="ALL">
                   {kecsLoaded ? 'Semua Kecamatan' : 'Memuat Kecamatan...'}
@@ -1696,7 +1696,7 @@ export function DpwDpdView({
               value={filterJenis}
               onChange={(e) => setFilterJenis(e.target.value as 'ALL' | JenisLembaga)}
               aria-label="Filter Jenis Lembaga"
-              className="rounded-xl border border-[#07525E]/15 bg-white/90 px-3 py-2 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none"
+              className="rounded-xl border border-[#07525E]/15 bg-white/90 px-3 py-2 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
             >
               <option value="ALL">Semua Jenis (DPW/DPD/DPC/DPR)</option>
               <option value="DPW">DPW (Provinsi)</option>
@@ -1710,7 +1710,7 @@ export function DpwDpdView({
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as StatusFilter)}
             aria-label="Filter Status Pembentukan"
-            className="rounded-xl border border-[#07525E]/15 bg-white/90 px-3 py-2 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none"
+            className="rounded-xl border border-[#07525E]/15 bg-white/90 px-3 py-2 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
           >
             <option value="Sudah Terbentuk">Sudah Terbentuk</option>
             <option value="ALL">Semua Status (Terbentuk &amp; Belum)</option>
@@ -1721,7 +1721,7 @@ export function DpwDpdView({
             value={filterContact}
             onChange={(e) => setFilterContact(e.target.value as ContactFilter)}
             aria-label="Filter Kelengkapan Kontak"
-            className="rounded-xl border border-[#07525E]/15 bg-white/90 px-3 py-2 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none"
+            className="rounded-xl border border-[#07525E]/15 bg-white/90 px-3 py-2 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
           >
             <option value="ALL">Semua Kelengkapan Kontak</option>
             <option value="LENGKAP">Kontak Lengkap (Ketua &amp; Sekretaris)</option>
@@ -1735,7 +1735,7 @@ export function DpwDpdView({
               type="button"
               onClick={() => void ensureKelurahanLoaded('ALL', true)}
               disabled={loadingKels}
-              className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#0C7A89]/25 bg-[#F2FAFB] px-3 py-2 text-xs font-semibold text-[#07525E] hover:bg-[#E3F3F7] disabled:opacity-60"
+              className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#0C7A89]/25 bg-[#F2FAFB] px-3 py-2 text-xs font-semibold text-[#07525E] hover:bg-[#E3F3F7] disabled:opacity-60 dark:border-[#3EC1D3]/30 dark:bg-[#113540] dark:text-[#E6F4F7] dark:hover:bg-[#164452]"
             >
               {loadingKels && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               <span>Muat 83.762 DPR (Kel/Desa)</span>
@@ -1746,42 +1746,42 @@ export function DpwDpdView({
             <button
               type="button"
               onClick={handleResetFilters}
-              className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-xl border border-[#07525E]/15 bg-white px-3 py-2 text-xs font-semibold text-[#526A70] hover:text-[#07525E]"
+              className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-xl border border-[#07525E]/15 bg-white px-3 py-2 text-xs font-semibold text-[#526A70] hover:text-[#07525E] dark:border-[#3EC1D3]/25 dark:bg-[#0D2B33] dark:text-[#9BB5BC] dark:hover:text-[#E6F4F7]"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               <span>Reset Filter</span>
             </button>
           )}
 
-          <span className="ml-auto text-xs font-medium text-[#526A70] tabular-nums">
+          <span className="ml-auto text-xs font-medium text-[#526A70] tabular-nums dark:text-[#9BB5BC]">
             {filteredRows.length.toLocaleString('id-ID')} hasil ditemukan
           </span>
         </div>
       </div>
 
-      {/* MAIN TABLE (5 Kolom Bersih) */}
+      {/* MAIN TABLE (5 Kolom Bersih + Zebra Striping) */}
       <div className="mt-5 glass-surface-strong overflow-visible">
         {isLoadingTabData && pagedRows.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-[#0C7A89]" />
-            <p className="mt-3 text-sm font-semibold text-[#07525E]">
+            <Loader2 className="h-8 w-8 animate-spin text-[#0C7A89] dark:text-[#3EC1D3]" />
+            <p className="mt-3 text-sm font-semibold text-[#07525E] dark:text-[#E6F4F7]">
               Memuat data wilayah Indonesia...
             </p>
-            <p className="mt-1 text-xs text-[#526A70]">
+            <p className="mt-1 text-xs text-[#526A70] dark:text-[#9BB5BC]">
               Menyiapkan daftar kode wilayah dan status kelembagaan.
             </p>
           </div>
         ) : pagedRows.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EBF5F8] text-[#0C7A89]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EBF5F8] text-[#0C7A89] dark:bg-[#113540] dark:text-[#3EC1D3]">
               <Building2 className="h-6 w-6" />
             </div>
-            <h2 className="mt-3 text-base font-bold text-[#07525E]">
+            <h2 className="mt-3 text-base font-bold text-[#07525E] dark:text-[#E6F4F7]">
               {filterStatus === 'Sudah Terbentuk'
                 ? 'Belum Ada Lembaga Berstatus Sudah Terbentuk pada Filter Ini'
                 : 'Tidak Ada Data yang Cocok'}
             </h2>
-            <p className="mt-1 max-w-md text-xs leading-relaxed text-[#526A70]">
+            <p className="mt-1 max-w-md text-xs leading-relaxed text-[#526A70] dark:text-[#9BB5BC]">
               {filterStatus === 'Sudah Terbentuk'
                 ? 'Ubah filter status ke "Semua Status" untuk menampilkan seluruh wilayah yang belum terbentuk ataupun mengatur statusnya.'
                 : 'Ubah kata kunci pencarian atau atur ulang filter Pulau, Provinsi, Kabupaten, Kecamatan, maupun status.'}
@@ -1800,7 +1800,7 @@ export function DpwDpdView({
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-[#07525E]/20 bg-white px-4 py-2 text-xs font-semibold text-[#07525E]"
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-[#07525E]/20 bg-white px-4 py-2 text-xs font-semibold text-[#07525E] dark:border-[#3EC1D3]/25 dark:bg-[#0D2B33] dark:text-[#E6F4F7]"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   <span>Reset Filter</span>
@@ -1810,9 +1810,9 @@ export function DpwDpdView({
           </div>
         ) : (
           <div className="overflow-x-auto" ref={copyMenuContainerRef}>
-            <table className="w-full min-w-[880px] border-collapse text-left text-xs">
+            <table className="duwd-zebra-table w-full min-w-[880px] border-collapse text-left text-xs">
               <thead>
-                <tr className="border-b border-[#07525E]/10 bg-[#F4FAFB] text-[11px] font-bold tracking-wide text-[#355158] uppercase">
+                <tr className="border-b border-[#07525E]/10 bg-[#F4FAFB] text-[11px] font-bold tracking-wide text-[#355158] uppercase dark:border-[#3EC1D3]/15 dark:bg-[#0C2730] dark:text-[#9BB5BC]">
                   <th className="px-4 py-3.5">Kode &amp; Tingkat</th>
                   <th className="px-4 py-3.5">Wilayah &amp; Status</th>
                   <th className="px-4 py-3.5">Ketua</th>
@@ -1820,7 +1820,7 @@ export function DpwDpdView({
                   <th className="px-4 py-3.5 text-right">Salin &amp; Kelola</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#07525E]/8">
+              <tbody className="divide-y divide-[#07525E]/8 dark:divide-[#3EC1D3]/10">
                 {pagedRows.map((row) => {
                   const rowKey = `${row.jenis}-${row.kodeWilayah}`;
                   const isMenuOpen = openCopyKey === rowKey;
@@ -1835,26 +1835,28 @@ export function DpwDpdView({
                     .join(' / ');
 
                   return (
-                    <tr key={rowKey} className="align-top hover:bg-white/75">
+                    <tr key={rowKey} className="align-top">
                       <td className="px-4 py-3.5">
-                        <div className="font-mono font-bold text-[#07525E] tabular-nums">
+                        <div className="font-mono font-bold text-[#07525E] tabular-nums dark:text-[#E6F4F7]">
                           {row.kodeWilayah}
                         </div>
-                        <div className="mt-0.5 text-[11px] font-medium text-[#526A70]">
+                        <div className="mt-0.5 text-[11px] font-medium text-[#526A70] dark:text-[#8DA8B0]">
                           {getJenisLabel(row.jenis)}
                         </div>
                       </td>
 
                       <td className="px-4 py-3.5">
-                        <div className="font-bold text-[#07525E]">{displayName}</div>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-[#526A70]">
+                        <div className="font-bold text-[#07525E] dark:text-[#E6F4F7]">
+                          {displayName}
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-[#526A70] dark:text-[#9BB5BC]">
                           <span>{parentTrail || '-'}</span>
                           <span aria-hidden="true">&middot;</span>
                           <span
                             className={
                               row.statusTerbentuk === 'Sudah Terbentuk'
-                                ? 'font-semibold text-emerald-700'
-                                : 'font-medium text-[#6B8187]'
+                                ? 'font-semibold text-emerald-700 dark:text-emerald-400'
+                                : 'font-medium text-[#6B8187] dark:text-[#7D9CA4]'
                             }
                           >
                             {row.statusTerbentuk}
@@ -1866,7 +1868,7 @@ export function DpwDpdView({
                                 href={row.tautanDrive}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 font-semibold text-[#0C7A89] hover:underline"
+                                className="inline-flex items-center gap-1 font-semibold text-[#0C7A89] hover:underline dark:text-[#3EC1D3]"
                               >
                                 <ExternalLink className="h-3 w-3" />
                                 <span>Drive SK</span>
@@ -1877,7 +1879,7 @@ export function DpwDpdView({
                       </td>
 
                       <td className="px-4 py-3.5">
-                        <div className="font-semibold text-[#0F2429]">
+                        <div className="font-semibold text-[#0F2429] dark:text-[#E6F4F7]">
                           {row.ketuaNama || '-'}
                         </div>
                         {row.ketuaWa ? (
@@ -1885,18 +1887,20 @@ export function DpwDpdView({
                             href={buildWhatsAppLink(row.ketuaWa)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-[#0C7A89] hover:underline tabular-nums"
+                            className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-[#0C7A89] hover:underline tabular-nums dark:text-[#3EC1D3]"
                           >
-                            <MessageCircle className="h-3.5 w-3.5 text-emerald-700" />
+                            <MessageCircle className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
                             <span>{row.ketuaWa}</span>
                           </a>
                         ) : (
-                          <div className="mt-0.5 text-[11px] text-[#7D9197]">WA belum diisi</div>
+                          <div className="mt-0.5 text-[11px] text-[#7D9197] dark:text-[#6D8B94]">
+                            WA belum diisi
+                          </div>
                         )}
                       </td>
 
                       <td className="px-4 py-3.5">
-                        <div className="font-semibold text-[#0F2429]">
+                        <div className="font-semibold text-[#0F2429] dark:text-[#E6F4F7]">
                           {row.sekretarisNama || '-'}
                         </div>
                         {row.sekretarisWa ? (
@@ -1904,13 +1908,15 @@ export function DpwDpdView({
                             href={buildWhatsAppLink(row.sekretarisWa)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-[#0C7A89] hover:underline tabular-nums"
+                            className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-[#0C7A89] hover:underline tabular-nums dark:text-[#3EC1D3]"
                           >
-                            <MessageCircle className="h-3.5 w-3.5 text-emerald-700" />
+                            <MessageCircle className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
                             <span>{row.sekretarisWa}</span>
                           </a>
                         ) : (
-                          <div className="mt-0.5 text-[11px] text-[#7D9197]">WA belum diisi</div>
+                          <div className="mt-0.5 text-[11px] text-[#7D9197] dark:text-[#6D8B94]">
+                            WA belum diisi
+                          </div>
                         )}
                       </td>
 
@@ -1921,9 +1927,9 @@ export function DpwDpdView({
                             onClick={() =>
                               setOpenCopyKey((prev) => (prev === rowKey ? null : rowKey))
                             }
-                            className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-lg border border-[#0C7A89]/25 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#07525E] hover:bg-[#EBF5F8]"
+                            className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-lg border border-[#0C7A89]/25 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#07525E] hover:bg-[#EBF5F8] dark:border-[#3EC1D3]/30 dark:bg-[#0D2B33] dark:text-[#E6F4F7] dark:hover:bg-[#13424F]"
                           >
-                            <Copy className="h-3 w-3 text-[#0C7A89]" />
+                            <Copy className="h-3 w-3 text-[#0C7A89] dark:text-[#3EC1D3]" />
                             <span>Salin</span>
                             <ChevronDown className="h-3 w-3" />
                           </button>
@@ -1932,43 +1938,43 @@ export function DpwDpdView({
                             <button
                               type="button"
                               onClick={() => openEditModal(row)}
-                              className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-lg border border-[#07525E]/15 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#07525E] hover:bg-[#EBF5F8]"
+                              className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-lg border border-[#07525E]/15 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#07525E] hover:bg-[#EBF5F8] dark:border-[#3EC1D3]/25 dark:bg-[#0D2B33] dark:text-[#E6F4F7] dark:hover:bg-[#13424F]"
                             >
-                              <Pencil className="h-3 w-3 text-[#0C7A89]" />
+                              <Pencil className="h-3 w-3 text-[#0C7A89] dark:text-[#3EC1D3]" />
                               <span>{isSuperAdmin ? 'Edit' : 'Edit Kontak'}</span>
                             </button>
                           )}
 
                           {isMenuOpen && (
-                            <div className="absolute top-full right-0 z-30 mt-1.5 w-64 rounded-xl border border-[#07525E]/15 bg-white p-1.5 text-left shadow-xl">
-                              <div className="px-2.5 py-1 text-[10px] font-bold tracking-wide text-[#6B8187] uppercase">
+                            <div className="absolute top-full right-0 z-30 mt-1.5 w-64 rounded-xl border border-[#07525E]/15 bg-white p-1.5 text-left shadow-xl dark:border-[#3EC1D3]/25 dark:bg-[#0B2229]">
+                              <div className="px-2.5 py-1 text-[10px] font-bold tracking-wide text-[#6B8187] uppercase dark:text-[#8DA8B0]">
                                 Salin Baris Ini
                               </div>
                               <button
                                 type="button"
                                 onClick={() => void handleQuickRowCopy(row, 'ketua_sekretaris')}
-                                className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-[#0F2429] hover:bg-[#EBF5F8]"
+                                className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-[#0F2429] hover:bg-[#EBF5F8] dark:text-[#E6F4F7] dark:hover:bg-[#113540]"
                               >
                                 Salin Ketua &amp; Sekretaris
                               </button>
                               <button
                                 type="button"
                                 onClick={() => void handleQuickRowCopy(row, 'ketua_saja')}
-                                className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-[#0F2429] hover:bg-[#EBF5F8]"
+                                className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-[#0F2429] hover:bg-[#EBF5F8] dark:text-[#E6F4F7] dark:hover:bg-[#113540]"
                               >
                                 Salin Ketua Saja
                               </button>
                               <button
                                 type="button"
                                 onClick={() => void handleQuickRowCopy(row, 'sekretaris_saja')}
-                                className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-[#0F2429] hover:bg-[#EBF5F8]"
+                                className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-[#0F2429] hover:bg-[#EBF5F8] dark:text-[#E6F4F7] dark:hover:bg-[#113540]"
                               >
                                 Salin Sekretaris Saja
                               </button>
                               <button
                                 type="button"
                                 onClick={() => void handleQuickRowCopy(row, 'lengkap')}
-                                className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-[#0F2429] hover:bg-[#EBF5F8]"
+                                className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-[#0F2429] hover:bg-[#EBF5F8] dark:text-[#E6F4F7] dark:hover:bg-[#113540]"
                               >
                                 Salin Info Lengkap
                               </button>
@@ -1982,15 +1988,15 @@ export function DpwDpdView({
                                     initialMode: 'ketua_sekretaris',
                                   });
                                 }}
-                                className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-[#0C7A89] hover:bg-[#EBF5F8]"
+                                className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-[#0C7A89] hover:bg-[#EBF5F8] dark:text-[#3EC1D3] dark:hover:bg-[#113540]"
                               >
                                 Buka Pengaturan Salin...
                               </button>
 
                               {row.jenis !== 'DPR' && (
                                 <>
-                                  <div className="my-1 border-t border-[#07525E]/10" />
-                                  <div className="px-2.5 py-1 text-[10px] font-bold tracking-wide text-[#0C7A89] uppercase">
+                                  <div className="my-1 border-t border-[#07525E]/10 dark:border-[#3EC1D3]/15" />
+                                  <div className="px-2.5 py-1 text-[10px] font-bold tracking-wide text-[#0C7A89] uppercase dark:text-[#3EC1D3]">
                                     Salin Wilayah Turunan
                                   </div>
                                   {row.jenis === 'DPW' && (
@@ -2000,7 +2006,7 @@ export function DpwDpdView({
                                         onClick={() =>
                                           void handleOpenChildCopyModal(row, 'nama_saja')
                                         }
-                                        className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-[#07525E] hover:bg-[#EBF5F8]"
+                                        className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-[#07525E] hover:bg-[#EBF5F8] dark:text-[#E6F4F7] dark:hover:bg-[#113540]"
                                       >
                                         Daftar Nama DPD di Prov. ini
                                       </button>
@@ -2009,7 +2015,7 @@ export function DpwDpdView({
                                         onClick={() =>
                                           void handleOpenChildCopyModal(row, 'ketua_sekretaris')
                                         }
-                                        className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-[#07525E] hover:bg-[#EBF5F8]"
+                                        className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-[#07525E] hover:bg-[#EBF5F8] dark:text-[#B4CCD3] dark:hover:bg-[#113540]"
                                       >
                                         Ketua &amp; Sek DPD di Prov. ini
                                       </button>
@@ -2022,7 +2028,7 @@ export function DpwDpdView({
                                         onClick={() =>
                                           void handleOpenChildCopyModal(row, 'nama_saja')
                                         }
-                                        className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-[#07525E] hover:bg-[#EBF5F8]"
+                                        className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-[#07525E] hover:bg-[#EBF5F8] dark:text-[#E6F4F7] dark:hover:bg-[#113540]"
                                       >
                                         Daftar Nama DPC di Kab/Kota ini
                                       </button>
@@ -2031,7 +2037,7 @@ export function DpwDpdView({
                                         onClick={() =>
                                           void handleOpenChildCopyModal(row, 'ketua_sekretaris')
                                         }
-                                        className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-[#07525E] hover:bg-[#EBF5F8]"
+                                        className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-[#07525E] hover:bg-[#EBF5F8] dark:text-[#B4CCD3] dark:hover:bg-[#113540]"
                                       >
                                         Ketua &amp; Sek DPC di Kab/Kota ini
                                       </button>
@@ -2044,7 +2050,7 @@ export function DpwDpdView({
                                         onClick={() =>
                                           void handleOpenChildCopyModal(row, 'nama_saja')
                                         }
-                                        className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-[#07525E] hover:bg-[#EBF5F8]"
+                                        className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-[#07525E] hover:bg-[#EBF5F8] dark:text-[#E6F4F7] dark:hover:bg-[#113540]"
                                       >
                                         Daftar Nama DPR di Kec. ini
                                       </button>
@@ -2053,7 +2059,7 @@ export function DpwDpdView({
                                         onClick={() =>
                                           void handleOpenChildCopyModal(row, 'ketua_sekretaris')
                                         }
-                                        className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-[#07525E] hover:bg-[#EBF5F8]"
+                                        className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-[#07525E] hover:bg-[#EBF5F8] dark:text-[#B4CCD3] dark:hover:bg-[#113540]"
                                       >
                                         Ketua &amp; Sek DPR di Kec. ini
                                       </button>
@@ -2076,7 +2082,7 @@ export function DpwDpdView({
 
       {/* Pagination Bar */}
       {activeItemCount > PAGE_SIZE && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#07525E]/10 bg-white/70 px-4 py-2.5 text-xs text-[#355158]">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#07525E]/10 bg-white/70 px-4 py-2.5 text-xs text-[#355158] dark:border-[#3EC1D3]/15 dark:bg-[#0B2229]/85 dark:text-[#B4CCD3]">
           <span className="font-medium tabular-nums">
             Menampilkan {(pageStart + 1).toLocaleString('id-ID')}–
             {Math.min(pageStart + PAGE_SIZE, activeItemCount).toLocaleString('id-ID')} dari{' '}
@@ -2088,7 +2094,7 @@ export function DpwDpdView({
               type="button"
               disabled={safePage <= 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#07525E]/15 bg-white px-3 py-1.5 font-semibold text-[#07525E] hover:bg-[#EBF5F8] disabled:cursor-not-allowed disabled:opacity-45"
+              className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#07525E]/15 bg-white px-3 py-1.5 font-semibold text-[#07525E] hover:bg-[#EBF5F8] disabled:cursor-not-allowed disabled:opacity-45 dark:border-[#3EC1D3]/25 dark:bg-[#0D2B33] dark:text-[#E6F4F7] dark:hover:bg-[#13424F]"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
               <span>Sebelumnya</span>
@@ -2097,7 +2103,7 @@ export function DpwDpdView({
               type="button"
               disabled={safePage >= totalPages}
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#07525E]/15 bg-white px-3 py-1.5 font-semibold text-[#07525E] hover:bg-[#EBF5F8] disabled:cursor-not-allowed disabled:opacity-45"
+              className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#07525E]/15 bg-white px-3 py-1.5 font-semibold text-[#07525E] hover:bg-[#EBF5F8] disabled:cursor-not-allowed disabled:opacity-45 dark:border-[#3EC1D3]/25 dark:bg-[#0D2B33] dark:text-[#E6F4F7] dark:hover:bg-[#13424F]"
             >
               <span>Berikutnya</span>
               <ChevronRight className="h-3.5 w-3.5" />
@@ -2123,26 +2129,29 @@ export function DpwDpdView({
           role="dialog"
           aria-modal="true"
           aria-labelledby="kelembagaan-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[#072B31]/45 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#072B31]/50 p-4 backdrop-blur-sm dark:bg-black/70"
         >
-          <div className="glass-surface-strong relative max-h-[92vh] w-full max-w-xl overflow-y-auto bg-white p-6">
+          <div className="glass-surface-strong relative max-h-[92vh] w-full max-w-xl overflow-y-auto bg-white p-6 dark:bg-[#0B2229]">
             <button
               type="button"
               onClick={() => setEditModalOpen(false)}
               aria-label="Tutup form"
-              className="absolute top-4 right-4 cursor-pointer rounded-lg p-1.5 text-[#526A70] hover:bg-[#EBF5F8]"
+              className="absolute top-4 right-4 cursor-pointer rounded-lg p-1.5 text-[#526A70] hover:bg-[#EBF5F8] dark:text-[#9BB5BC] dark:hover:bg-[#113540]"
             >
               <X className="h-4 w-4" />
             </button>
 
-            <h2 id="kelembagaan-modal-title" className="text-lg font-bold text-[#07525E]">
+            <h2
+              id="kelembagaan-modal-title"
+              className="text-lg font-bold text-[#07525E] dark:text-[#E6F4F7]"
+            >
               {isManualCreate
                 ? `Tambah Data ${formJenis}`
                 : isSuperAdmin
                   ? `Kelola ${formJenis} · ${formKodeWilayah}`
                   : `Edit Kontak ${formJenis} · ${formKodeWilayah}`}
             </h2>
-            <p className="mt-1 text-xs text-[#526A70]">
+            <p className="mt-1 text-xs text-[#526A70] dark:text-[#9BB5BC]">
               {isSuperAdmin
                 ? `Pengaturan status pembentukan, nama lembaga, serta kontak Ketua & Sekretaris ${formJenis} di Spreadsheet #2.`
                 : 'Mode Admin: Anda hanya diperkenankan mengubah Nama dan Nomor WhatsApp Ketua & Sekretaris.'}
@@ -2152,7 +2161,7 @@ export function DpwDpdView({
               {isManualCreate && isSuperAdmin ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                    <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                       Kode Wilayah *
                     </label>
                     <input
@@ -2160,11 +2169,11 @@ export function DpwDpdView({
                       value={formKodeWilayah}
                       onChange={(e) => setFormKodeWilayah(e.target.value)}
                       placeholder="Contoh: 73 atau 73.71 atau 73.71.01"
-                      className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                      className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                    <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                       Pulau
                     </label>
                     <input
@@ -2172,11 +2181,11 @@ export function DpwDpdView({
                       value={formPulau}
                       onChange={(e) => setFormPulau(e.target.value)}
                       placeholder="Contoh: Sulawesi"
-                      className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                      className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                    <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                       Nama Provinsi
                     </label>
                     <input
@@ -2184,12 +2193,12 @@ export function DpwDpdView({
                       value={formNamaProvinsi}
                       onChange={(e) => setFormNamaProvinsi(e.target.value)}
                       placeholder="Contoh: Sulawesi Selatan"
-                      className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                      className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                     />
                   </div>
                   {formJenis !== 'DPW' && (
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                      <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                         Nama Kab/Kota
                       </label>
                       <input
@@ -2197,40 +2206,42 @@ export function DpwDpdView({
                         value={formNamaKabKota}
                         onChange={(e) => setFormNamaKabKota(e.target.value)}
                         placeholder="Contoh: Kota Makassar"
-                        className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                        className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                       />
                     </div>
                   )}
                   {(formJenis === 'DPC' || formJenis === 'DPR') && (
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                      <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                         Nama Kecamatan
                       </label>
                       <input
                         type="text"
                         value={formNamaKecamatan}
                         onChange={(e) => setFormNamaKecamatan(e.target.value)}
-                        className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                        className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                       />
                     </div>
                   )}
                   {formJenis === 'DPR' && (
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                      <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                         Nama Kelurahan/Desa
                       </label>
                       <input
                         type="text"
                         value={formNamaKelDesa}
                         onChange={(e) => setFormNamaKelDesa(e.target.value)}
-                        className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                        className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                       />
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="rounded-xl border border-[#07525E]/10 bg-[#F4FAFB] px-3.5 py-2.5 text-xs text-[#355158]">
-                  <span className="font-mono font-bold text-[#07525E]">{formKodeWilayah}</span>
+                <div className="rounded-xl border border-[#07525E]/10 bg-[#F4FAFB] px-3.5 py-2.5 text-xs text-[#355158] dark:border-[#3EC1D3]/20 dark:bg-[#0D2A33] dark:text-[#B4CCD3]">
+                  <span className="font-mono font-bold text-[#07525E] dark:text-[#3EC1D3]">
+                    {formKodeWilayah}
+                  </span>
                   <span className="mx-1.5 text-[#7D9197]">&middot;</span>
                   <span>
                     {[
@@ -2248,7 +2259,7 @@ export function DpwDpdView({
 
               <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
                 <div className="sm:col-span-2">
-                  <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                  <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                     Nama {formJenis}
                   </label>
                   <input
@@ -2256,18 +2267,18 @@ export function DpwDpdView({
                     disabled={!isSuperAdmin}
                     value={formNamaLembaga}
                     onChange={(e) => setFormNamaLembaga(e.target.value)}
-                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none disabled:bg-[#F4FAFB] disabled:text-[#526A70]"
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none disabled:bg-[#F4FAFB] disabled:text-[#526A70] dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7] dark:disabled:bg-[#0D2A33] dark:disabled:text-[#8DA8B0]"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                  <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                     Status Kelembagaan
                   </label>
                   <select
                     disabled={!isSuperAdmin}
                     value={formStatus}
                     onChange={(e) => setFormStatus(e.target.value as StatusTerbentuk)}
-                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none disabled:bg-[#F4FAFB] disabled:text-[#526A70]"
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none disabled:bg-[#F4FAFB] disabled:text-[#526A70] dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7] dark:disabled:bg-[#0D2A33] dark:disabled:text-[#8DA8B0]"
                   >
                     {STATUS_TERBENTUK_OPTIONS.map((st) => (
                       <option key={st} value={st}>
@@ -2280,7 +2291,7 @@ export function DpwDpdView({
 
               <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                  <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                     Nama Ketua {formJenis}
                   </label>
                   <input
@@ -2288,13 +2299,13 @@ export function DpwDpdView({
                     value={formKetuaNama}
                     onChange={(e) => setFormKetuaNama(e.target.value)}
                     placeholder="Nama lengkap Ketua"
-                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                   />
                 </div>
                 <div>
                   <label
                     htmlFor="form-ketua-wa"
-                    className="mb-1 block text-xs font-semibold text-[#355158]"
+                    className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]"
                   >
                     Nomor WA Ketua
                   </label>
@@ -2308,7 +2319,7 @@ export function DpwDpdView({
 
               <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                  <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                     Nama Sekretaris {formJenis}
                   </label>
                   <input
@@ -2316,13 +2327,13 @@ export function DpwDpdView({
                     value={formSekNama}
                     onChange={(e) => setFormSekNama(e.target.value)}
                     placeholder="Nama lengkap Sekretaris"
-                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                   />
                 </div>
                 <div>
                   <label
                     htmlFor="form-sek-wa"
-                    className="mb-1 block text-xs font-semibold text-[#355158]"
+                    className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]"
                   >
                     Nomor WA Sekretaris
                   </label>
@@ -2335,7 +2346,7 @@ export function DpwDpdView({
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                   Alamat Kantor / Sekretariat (Opsional)
                 </label>
                 <input
@@ -2344,12 +2355,12 @@ export function DpwDpdView({
                   value={formAlamat}
                   onChange={(e) => setFormAlamat(e.target.value)}
                   placeholder="Jl. ..."
-                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none disabled:bg-[#F4FAFB] disabled:text-[#526A70]"
+                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none disabled:bg-[#F4FAFB] disabled:text-[#526A70] dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7] dark:disabled:bg-[#0D2A33] dark:disabled:text-[#8DA8B0]"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#355158]">
+                <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
                   Tautan Google Drive SK / Dokumen (Opsional)
                 </label>
                 <input
@@ -2358,18 +2369,18 @@ export function DpwDpdView({
                   value={formDrive}
                   onChange={(e) => setFormDrive(e.target.value)}
                   placeholder="https://drive.google.com/..."
-                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none disabled:bg-[#F4FAFB] disabled:text-[#526A70]"
+                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none disabled:bg-[#F4FAFB] disabled:text-[#526A70] dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7] dark:disabled:bg-[#0D2A33] dark:disabled:text-[#8DA8B0]"
                 />
               </div>
 
               {formErr && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-50 px-3.5 py-2.5 text-xs font-medium text-amber-900">
+                <div className="rounded-xl border border-amber-500/30 bg-amber-50 px-3.5 py-2.5 text-xs font-medium text-amber-900 dark:border-amber-400/30 dark:bg-amber-950/60 dark:text-amber-200">
                   {formErr}
                 </div>
               )}
 
               {confirmDeleteOpen && isSuperAdmin && formHasSheetRecord && formId && (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-900">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-900 dark:border-red-500/30 dark:bg-red-950/60 dark:text-red-200">
                   <span className="font-medium">
                     Hapus catatan ini dari Spreadsheet #2? Wilayah akan kembali ke status Belum Terbentuk.
                   </span>
@@ -2377,7 +2388,7 @@ export function DpwDpdView({
                     <button
                       type="button"
                       onClick={() => setConfirmDeleteOpen(false)}
-                      className="cursor-pointer rounded-lg px-2.5 py-1 font-semibold text-[#355158] hover:bg-white"
+                      className="cursor-pointer rounded-lg px-2.5 py-1 font-semibold text-[#355158] hover:bg-white dark:text-[#B4CCD3] dark:hover:bg-[#113540]"
                     >
                       Batal
                     </button>
@@ -2400,7 +2411,7 @@ export function DpwDpdView({
                     <button
                       type="button"
                       onClick={() => setConfirmDeleteOpen(true)}
-                      className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-950/60"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       <span>Hapus dari Sheet</span>
@@ -2412,7 +2423,7 @@ export function DpwDpdView({
                   <button
                     type="button"
                     onClick={() => setEditModalOpen(false)}
-                    className="cursor-pointer rounded-xl px-4 py-2.5 text-xs font-semibold text-[#526A70] hover:bg-[#F4FAFB]"
+                    className="cursor-pointer rounded-xl px-4 py-2.5 text-xs font-semibold text-[#526A70] hover:bg-[#F4FAFB] dark:text-[#9BB5BC] dark:hover:bg-[#113540]"
                   >
                     Batal
                   </button>

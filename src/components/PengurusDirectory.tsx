@@ -267,17 +267,17 @@ export function PengurusDirectory({
   };
 
   return (
-    <section className="mx-auto max-w-[1160px] px-4 py-8 sm:px-6 lg:py-10">
+    <section className="duwd-container px-2 py-7 sm:px-4 lg:py-9">
       {/* Header */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="text-xs font-semibold text-[#0C7A89]">
+          <p className="text-xs font-semibold text-[#0C7A89] dark:text-[#3EC1D3]">
             Departemen Urusan Wilayah dan Daerah · DPP Wahdah Islamiyah
           </p>
-          <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-[#07525E] sm:text-3xl">
+          <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-[#07525E] dark:text-[#E6F4F7] sm:text-3xl">
             Daftar Pengurus Internal DUWD
           </h1>
-          <p className="mt-1.5 text-xs font-medium text-[#526A70] tabular-nums">
+          <p className="mt-1.5 text-xs font-medium text-[#526A70] tabular-nums dark:text-[#9BB5BC]">
             <span>{pengurusList.length} Pengurus Terdata</span>
             <span aria-hidden="true" className="mx-2">·</span>
             <span>{activeUnits.length} Unit Aktif</span>
@@ -293,13 +293,13 @@ export function PengurusDirectory({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+        <div className="flex shrink-0 flex-wrap items-center gap-2.5">
           {webAppUrl && (
             <button
               type="button"
               onClick={onRefresh}
               disabled={syncing}
-              className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#07525E]/15 bg-white/85 px-3.5 py-2 text-xs font-semibold text-[#07525E] hover:bg-white disabled:opacity-60"
+              className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#07525E]/15 bg-white/85 px-3.5 py-2 text-xs font-semibold text-[#07525E] hover:bg-white disabled:opacity-60 dark:border-[#3EC1D3]/25 dark:bg-[#0D2B33] dark:text-[#E6F4F7] dark:hover:bg-[#113540]"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
               <span>{syncing ? 'Memuat...' : 'Sinkronkan Sheet'}</span>
@@ -320,13 +320,13 @@ export function PengurusDirectory({
       </div>
 
       {notice && (
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[#0C7A89]/20 bg-[#ECF6F2] px-4 py-2.5 text-xs font-medium text-[#07525E]">
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[#0C7A89]/20 bg-[#ECF6F2] px-4 py-2.5 text-xs font-medium text-[#07525E] dark:border-[#3EC1D3]/30 dark:bg-[#0D2E36] dark:text-[#BCEAF0]">
           <span>{notice}</span>
           <button
             type="button"
             aria-label="Tutup pemberitahuan"
             onClick={() => setNotice('')}
-            className="cursor-pointer text-[#526A70] hover:text-[#07525E]"
+            className="cursor-pointer text-[#526A70] hover:text-[#07525E] dark:text-[#9BB5BC] dark:hover:text-[#E6F4F7]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -335,26 +335,26 @@ export function PengurusDirectory({
 
       {/* Search & Unit Filter Bar */}
       <div className="mt-6 glass-surface-strong overflow-hidden">
-        <div className="flex flex-col justify-between gap-3 border-b border-[#07525E]/10 px-5 py-4 lg:flex-row lg:items-center">
+        <div className="flex flex-col justify-between gap-3 border-b border-[#07525E]/10 px-5 py-4 dark:border-[#3EC1D3]/15 lg:flex-row lg:items-center">
           <div className="relative w-full lg:max-w-xs">
-            <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-[#526A70]" />
+            <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-[#526A70] dark:text-[#8DA8B0]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Cari nama, panggilan, unit, amanah, WA..."
-              className="w-full rounded-xl border border-[#07525E]/15 bg-white/90 py-2 pr-3.5 pl-10 text-sm text-[#0F2429] placeholder:text-[#738A90] focus:border-[#0C7A89] focus:outline-none"
+              className="w-full rounded-xl border border-[#07525E]/15 bg-white/90 py-2 pr-3.5 pl-10 text-sm text-[#0F2429] placeholder:text-[#738A90] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7] dark:placeholder:text-[#6D8B94] dark:focus:border-[#3EC1D3]"
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-1 rounded-xl bg-[#EBF5F8]/80 p-1">
+          <div className="flex flex-wrap items-center gap-1 rounded-xl bg-[#EBF5F8]/80 p-1 dark:bg-[#0D2A33]">
             <button
               type="button"
               onClick={() => setSelectedUnitId('ALL')}
               className={`cursor-pointer whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                 selectedUnitId === 'ALL'
-                  ? 'bg-white text-[#07525E] shadow-xs'
-                  : 'text-[#526A70] hover:text-[#07525E]'
+                  ? 'bg-white text-[#07525E] shadow-xs dark:bg-[#13424F] dark:text-[#E6F4F7]'
+                  : 'text-[#526A70] hover:text-[#07525E] dark:text-[#9BB5BC] dark:hover:text-[#E6F4F7]'
               }`}
             >
               Semua Unit
@@ -367,8 +367,8 @@ export function PengurusDirectory({
                 onClick={() => setSelectedUnitId(u.id)}
                 className={`cursor-pointer whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                   selectedUnitId === u.id
-                    ? 'bg-white text-[#07525E] shadow-xs'
-                    : 'text-[#526A70] hover:text-[#07525E]'
+                    ? 'bg-white text-[#07525E] shadow-xs dark:bg-[#13424F] dark:text-[#E6F4F7]'
+                    : 'text-[#526A70] hover:text-[#07525E] dark:text-[#9BB5BC] dark:hover:text-[#E6F4F7]'
                 }`}
               >
                 {u.kodeUnit}
@@ -380,15 +380,15 @@ export function PengurusDirectory({
         {/* Empty State vs Populated Table */}
         {filteredPengurus.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EBF5F8] text-[#0C7A89]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EBF5F8] text-[#0C7A89] dark:bg-[#113540] dark:text-[#3EC1D3]">
               <Users className="h-6 w-6" />
             </div>
-            <h2 className="mt-4 text-base font-bold text-[#07525E]">
+            <h2 className="mt-4 text-base font-bold text-[#07525E] dark:text-[#E6F4F7]">
               {pengurusList.length === 0
                 ? 'Belum Ada Data Pengurus DUWD'
                 : 'Data Tidak Ditemukan'}
             </h2>
-            <p className="mt-1.5 max-w-md text-xs leading-relaxed text-[#526A70]">
+            <p className="mt-1.5 max-w-md text-xs leading-relaxed text-[#526A70] dark:text-[#9BB5BC]">
               {pengurusList.length === 0
                 ? canEdit
                   ? 'Mulai susun struktur internal DUWD DPP Wahdah Islamiyah dengan menambahkan pengurus pertama.'
@@ -408,9 +408,9 @@ export function PengurusDirectory({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left text-sm">
+            <table className="duwd-zebra-table w-full border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-[#07525E]/10 bg-[#F8FBFC] text-xs font-semibold text-[#526A70]">
+                <tr className="border-b border-[#07525E]/10 bg-[#F8FBFC] text-xs font-semibold text-[#526A70] dark:border-[#3EC1D3]/15 dark:bg-[#0C2730] dark:text-[#9BB5BC]">
                   <th className="px-6 py-3.5">No</th>
                   <th className="px-4 py-3.5">Nama Lengkap</th>
                   <th className="px-4 py-3.5">Nama Panggilan</th>
@@ -420,25 +420,25 @@ export function PengurusDirectory({
                   {canEdit && <th className="px-6 py-3.5 text-right">Kelola</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#07525E]/8">
+              <tbody className="divide-y divide-[#07525E]/8 dark:divide-[#3EC1D3]/10">
                 {filteredPengurus.map((item, idx) => (
-                  <tr key={item.id} className="transition-colors hover:bg-[#EBF5F8]/45">
-                    <td className="px-6 py-4 font-mono text-xs text-[#526A70] tabular-nums">
+                  <tr key={item.id}>
+                    <td className="px-6 py-4 font-mono text-xs text-[#526A70] tabular-nums dark:text-[#8DA8B0]">
                       {idx + 1}
                     </td>
-                    <td className="px-4 py-4 font-semibold text-[#0F2429]">
+                    <td className="px-4 py-4 font-semibold text-[#0F2429] dark:text-[#E6F4F7]">
                       {item.namaLengkap}
                     </td>
-                    <td className="px-4 py-4 text-[13px] text-[#355158]">
+                    <td className="px-4 py-4 text-[13px] text-[#355158] dark:text-[#B4CCD3]">
                       {item.namaPanggilan}
                     </td>
                     <td
                       title={unitByIdMap.get(item.unitId)?.namaUnit || item.namaUnit}
-                      className="px-4 py-4 text-[13px] font-semibold text-[#07525E]"
+                      className="px-4 py-4 text-[13px] font-semibold text-[#07525E] dark:text-[#E6F4F7]"
                     >
                       {unitByIdMap.get(item.unitId)?.kodeUnit || item.namaUnit}
                     </td>
-                    <td className="px-4 py-4 text-[13px] font-semibold text-[#0C7A89]">
+                    <td className="px-4 py-4 text-[13px] font-semibold text-[#0C7A89] dark:text-[#3EC1D3]">
                       {item.amanah || '-'}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
@@ -446,9 +446,9 @@ export function PengurusDirectory({
                         href={buildWhatsAppLink(item.whatsapp)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold text-[#0C7A89] hover:text-[#07525E] hover:underline tabular-nums"
+                        className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold text-[#0C7A89] hover:text-[#07525E] hover:underline tabular-nums dark:text-[#3EC1D3] dark:hover:text-[#7CE0ED]"
                       >
-                        <MessageCircle className="h-3.5 w-3.5 text-emerald-700" />
+                        <MessageCircle className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
                         <span>{item.whatsapp}</span>
                       </a>
                     </td>
@@ -466,7 +466,7 @@ export function PengurusDirectory({
                             <button
                               type="button"
                               onClick={() => setConfirmDeleteId(null)}
-                              className="cursor-pointer text-xs font-medium text-[#526A70] hover:text-[#07525E]"
+                              className="cursor-pointer text-xs font-medium text-[#526A70] hover:text-[#07525E] dark:text-[#9BB5BC] dark:hover:text-[#E6F4F7]"
                             >
                               Batal
                             </button>
@@ -476,7 +476,7 @@ export function PengurusDirectory({
                             <button
                               type="button"
                               onClick={() => openEditForm(item)}
-                              className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-[#0C7A89] hover:text-[#07525E]"
+                              className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-[#0C7A89] hover:text-[#07525E] dark:text-[#3EC1D3] dark:hover:text-[#7CE0ED]"
                             >
                               <Pencil className="h-3.5 w-3.5" />
                               <span>Edit</span>
@@ -484,7 +484,7 @@ export function PengurusDirectory({
                             <button
                               type="button"
                               onClick={() => setConfirmDeleteId(item.id)}
-                              className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-[#526A70] hover:text-red-700"
+                              className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-[#526A70] hover:text-red-700 dark:text-[#9BB5BC] dark:hover:text-red-400"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                               <span>Hapus</span>
@@ -507,15 +507,18 @@ export function PengurusDirectory({
           role="dialog"
           aria-modal="true"
           aria-labelledby="pengurus-form-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[#042D35]/45 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#042D35]/50 p-4 backdrop-blur-sm dark:bg-black/70"
         >
-          <div className="glass-surface-strong w-full max-w-lg bg-white p-6 sm:p-7">
-            <div className="flex items-start justify-between gap-4 border-b border-[#07525E]/10 pb-3.5">
+          <div className="glass-surface-strong w-full max-w-lg bg-white p-6 dark:bg-[#0B2229] sm:p-7">
+            <div className="flex items-start justify-between gap-4 border-b border-[#07525E]/10 pb-3.5 dark:border-[#3EC1D3]/15">
               <div>
-                <h2 id="pengurus-form-title" className="text-base font-bold text-[#07525E]">
+                <h2
+                  id="pengurus-form-title"
+                  className="text-base font-bold text-[#07525E] dark:text-[#E6F4F7]"
+                >
                   {editingItem ? 'Edit Data Pengurus DUWD' : 'Tambah Pengurus DUWD'}
                 </h2>
-                <p className="mt-0.5 text-xs text-[#526A70]">
+                <p className="mt-0.5 text-xs text-[#526A70] dark:text-[#9BB5BC]">
                   Nomor WhatsApp berawalan 08 otomatis dikonversi menjadi 628.
                 </p>
               </div>
@@ -523,7 +526,7 @@ export function PengurusDirectory({
                 type="button"
                 aria-label="Tutup form pengurus"
                 onClick={() => setFormOpen(false)}
-                className="cursor-pointer rounded-xl p-1.5 text-[#526A70] hover:bg-[#EBF5F8]"
+                className="cursor-pointer rounded-xl p-1.5 text-[#526A70] hover:bg-[#EBF5F8] dark:text-[#9BB5BC] dark:hover:bg-[#113540]"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -531,7 +534,7 @@ export function PengurusDirectory({
 
             <form onSubmit={handleSubmitForm} className="mt-5 space-y-4">
               {formError && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-50 px-3.5 py-2.5 text-xs font-medium text-amber-900">
+                <div className="rounded-xl border border-amber-500/30 bg-amber-50 px-3.5 py-2.5 text-xs font-medium text-amber-900 dark:border-amber-400/30 dark:bg-amber-950/60 dark:text-amber-200">
                   {formError}
                 </div>
               )}
@@ -539,7 +542,7 @@ export function PengurusDirectory({
               <div>
                 <label
                   htmlFor="p-nama-lengkap"
-                  className="mb-1 block text-xs font-semibold text-[#355158]"
+                  className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]"
                 >
                   Nama Lengkap
                 </label>
@@ -550,14 +553,14 @@ export function PengurusDirectory({
                   value={namaLengkap}
                   onChange={(e) => setNamaLengkap(e.target.value)}
                   placeholder="Contoh: Muhammad Rasul, S.Kom."
-                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="p-nama-panggilan"
-                  className="mb-1 block text-xs font-semibold text-[#355158]"
+                  className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]"
                 >
                   Nama Panggilan
                 </label>
@@ -568,14 +571,14 @@ export function PengurusDirectory({
                   value={namaPanggilan}
                   onChange={(e) => setNamaPanggilan(e.target.value)}
                   placeholder="Contoh: Akh Rasul"
-                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="p-whatsapp"
-                  className="mb-1 block text-xs font-semibold text-[#355158]"
+                  className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]"
                 >
                   Nomor WhatsApp (Hanya Angka, Otomatis 08 &rarr; 628)
                 </label>
@@ -586,7 +589,7 @@ export function PengurusDirectory({
                   onChange={setWaRaw}
                 />
                 {normalizedWaPreview && (
-                  <p className="mt-1 font-mono text-[11px] text-[#0C7A89]">
+                  <p className="mt-1 font-mono text-[11px] text-[#0C7A89] dark:text-[#3EC1D3]">
                     Format tersimpan: {normalizedWaPreview}
                   </p>
                 )}
@@ -596,7 +599,7 @@ export function PengurusDirectory({
                 <div>
                   <label
                     htmlFor="p-unit"
-                    className="mb-1 block text-xs font-semibold text-[#355158]"
+                    className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]"
                   >
                     Pilih Unit
                   </label>
@@ -605,7 +608,7 @@ export function PengurusDirectory({
                     required
                     value={unitId}
                     onChange={(e) => handleUnitChangeInForm(e.target.value)}
-                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                   >
                     {activeUnits.map((u) => (
                       <option key={u.id} value={u.id}>
@@ -618,7 +621,7 @@ export function PengurusDirectory({
                 <div>
                   <label
                     htmlFor="p-amanah"
-                    className="mb-1 block text-xs font-semibold text-[#355158]"
+                    className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]"
                   >
                     Pilih Amanah
                   </label>
@@ -627,7 +630,7 @@ export function PengurusDirectory({
                     required
                     value={amanahSelect}
                     onChange={(e) => setAmanahSelect(e.target.value)}
-                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                   >
                     {amanahPresets.map((preset) => (
                       <option key={preset} value={preset}>
@@ -643,7 +646,7 @@ export function PengurusDirectory({
                 <div>
                   <label
                     htmlFor="p-amanah-custom"
-                    className="mb-1 block text-xs font-semibold text-[#355158]"
+                    className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]"
                   >
                     Tulis Nama Amanah
                   </label>
@@ -654,16 +657,16 @@ export function PengurusDirectory({
                     value={amanahCustom}
                     onChange={(e) => setAmanahCustom(e.target.value)}
                     placeholder="Contoh: Koordinator Wilayah Timur"
-                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2.5 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                   />
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-2 border-t border-[#07525E]/10 pt-4">
+              <div className="flex items-center justify-end gap-2 border-t border-[#07525E]/10 pt-4 dark:border-[#3EC1D3]/15">
                 <button
                   type="button"
                   onClick={() => setFormOpen(false)}
-                  className="cursor-pointer rounded-xl px-4 py-2.5 text-xs font-semibold text-[#526A70] hover:bg-[#F6FAFB]"
+                  className="cursor-pointer rounded-xl px-4 py-2.5 text-xs font-semibold text-[#526A70] hover:bg-[#F6FAFB] dark:text-[#9BB5BC] dark:hover:bg-[#113540]"
                 >
                   Batal
                 </button>

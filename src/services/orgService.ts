@@ -8,12 +8,19 @@ import type {
   DpwItem,
   KegiatanRpkaItem,
   KodeWilayahItem,
+  MusyawarahItem,
   OrgDataset,
   PengurusItem,
+  PresensiItem,
   ProgramKerjaItem,
   UnitItem,
   UserRole,
 } from '../types/org';
+import {
+  normalizePresensiStatus,
+  resolveJenisKegiatan,
+  resolvePolaJadwal,
+} from '../utils/scheduleParser';
 import { normalizeWhatsApp } from '../utils/whatsapp';
 
 const STORAGE_KEYS = {
@@ -22,6 +29,8 @@ const STORAGE_KEYS = {
   PENGURUS: 'duwd_pengurus_cache_v2',
   PROKER: 'duwd_proker_cache_v3',
   KEGIATAN: 'duwd_kegiatan_cache_v2',
+  MUSYAWARAH: 'duwd_musyawarah_cache_v1',
+  PRESENSI: 'duwd_presensi_cache_v1',
   KODE_WILAYAH: 'duwd_kode_wilayah_cache_v1',
   DPW: 'duwd_dpw_cache_v1',
   DPD: 'duwd_dpd_cache_v1',
@@ -161,7 +170,14 @@ export function loadLocalKegiatan(): KegiatanRpkaItem[] {
     const raw = window.localStorage.getItem(STORAGE_KEYS.KEGIATAN);
     if (!raw) return RPKA_2027_KEGIATAN;
     const parsed = JSON.parse(raw) as KegiatanRpkaItem[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : RPKA_2027_KEGIATAN;
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.map((k) => ({
+        ...k,
+        jenisKegiatan: resolveJenisKegiatan(k),
+        polaJadwal: resolvePolaJadwal(k),
+      }));
+    }
+    return RPKA_2027_KEGIATAN;
   } catch {
     return RPKA_2027_KEGIATAN;
   }
@@ -170,6 +186,55 @@ export function loadLocalKegiatan(): KegiatanRpkaItem[] {
 export function saveLocalKegiatan(list: KegiatanRpkaItem[]): void {
   try {
     window.localStorage.setItem(STORAGE_KEYS.KEGIATAN, JSON.stringify(list));
+  } catch {
+    // Ignore
+  }
+}
+
+export function loadLocalMusyawarah(): MusyawarahItem[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.MUSYAWARAH);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as MusyawarahItem[];
+    return Array.isArray(parsed)
+      ? parsed.map((m) => ({
+          ...m,
+          musyawarahKe: Math.min(52, Math.max(1, Number(m.musyawarahKe) || 1)),
+          pesertaTambahanIds: Array.isArray(m.pesertaTambahanIds) ? m.pesertaTambahanIds : [],
+        }))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalMusyawarah(list: MusyawarahItem[]): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.MUSYAWARAH, JSON.stringify(list));
+  } catch {
+    // Ignore
+  }
+}
+
+export function loadLocalPresensi(): PresensiItem[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.PRESENSI);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as PresensiItem[];
+    return Array.isArray(parsed)
+      ? parsed.map((p) => ({
+          ...p,
+          status: normalizePresensiStatus(p.status),
+        }))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalPresensi(list: PresensiItem[]): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.PRESENSI, JSON.stringify(list));
   } catch {
     // Ignore
   }
@@ -406,6 +471,8 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
     pengurus: loadLocalPengurus(),
     proker: loadLocalProker(),
     kegiatan: loadLocalKegiatan(),
+    musyawarah: loadLocalMusyawarah(),
+    presensi: loadLocalPresensi(),
     kodeWilayah: loadLocalKodeWilayah(),
     dpw: loadLocalDpw(),
     dpd: loadLocalDpd(),
@@ -428,7 +495,25 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
   if (res.ok && res.data) {
     const units = res.data.units?.length > 0 ? res.data.units : STARTER_UNITS;
     const proker = res.data.proker?.length > 0 ? res.data.proker : RPKA_2027_PROKER;
-    const kegiatan = res.data.kegiatan?.length > 0 ? res.data.kegiatan : RPKA_2027_KEGIATAN;
+    const rawKegiatan = res.data.kegiatan?.length > 0 ? res.data.kegiatan : RPKA_2027_KEGIATAN;
+    const kegiatan = rawKegiatan.map((k) => ({
+      ...k,
+      jenisKegiatan: resolveJenisKegiatan(k),
+      polaJadwal: resolvePolaJadwal(k),
+    }));
+    const musyawarah = Array.isArray(res.data.musyawarah)
+      ? res.data.musyawarah.map((m) => ({
+          ...m,
+          musyawarahKe: Math.min(52, Math.max(1, Number(m.musyawarahKe) || 1)),
+          pesertaTambahanIds: Array.isArray(m.pesertaTambahanIds) ? m.pesertaTambahanIds : [],
+        }))
+      : loadLocalMusyawarah();
+    const presensi = Array.isArray(res.data.presensi)
+      ? res.data.presensi.map((p) => ({
+          ...p,
+          status: normalizePresensiStatus(p.status),
+        }))
+      : loadLocalPresensi();
     const kodeWilayah =
       res.data.kodeWilayah?.length > 0 ? res.data.kodeWilayah : STARTER_KODE_WILAYAH;
     const dpw = Array.isArray(res.data.dpw) ? res.data.dpw : [];
@@ -441,6 +526,8 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
     saveLocalPengurus(res.data.pengurus || []);
     saveLocalProker(proker);
     saveLocalKegiatan(kegiatan);
+    saveLocalMusyawarah(musyawarah);
+    saveLocalPresensi(presensi);
     saveLocalKodeWilayah(kodeWilayah);
     saveLocalDpw(dpw);
     saveLocalDpd(dpd);
@@ -462,6 +549,8 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
         pengurus: res.data.pengurus || [],
         proker,
         kegiatan,
+        musyawarah,
+        presensi,
         kodeWilayah,
         dpw,
         dpd,
@@ -593,6 +682,38 @@ export async function saveKegiatanRecord(
   return { ok: true, item: input, synced: false };
 }
 
+export async function updateKegiatanJenisRecord(
+  item: KegiatanRpkaItem,
+  nextJenis: 'Event' | 'Monev',
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; item?: KegiatanRpkaItem; synced: boolean; error?: string }> {
+  const updatedLocal: KegiatanRpkaItem = { ...item, jenisKegiatan: nextJenis };
+  if (webAppUrl.trim()) {
+    const res = await gasPost<KegiatanRpkaItem>(webAppUrl.trim(), 'updateKegiatanJenis', pin, {
+      kodeKegiatan: item.kodeKegiatan,
+      jenisKegiatan: nextJenis,
+      item: updatedLocal,
+    });
+    if (res.ok) {
+      return { ok: true, item: res.data || updatedLocal, synced: true };
+    }
+    // Fallback ke saveKegiatan untuk GAS versi sebelumnya jika Super Admin
+    const fallback = await gasPost<KegiatanRpkaItem>(webAppUrl.trim(), 'saveKegiatan', pin, {
+      ...updatedLocal,
+    });
+    if (fallback.ok && fallback.data) {
+      return { ok: true, item: fallback.data, synced: true };
+    }
+    return {
+      ok: false,
+      synced: false,
+      error: res.error || fallback.error || 'Gagal memperbarui kategori Event/Monev.',
+    };
+  }
+  return { ok: true, item: updatedLocal, synced: false };
+}
+
 export async function deleteKegiatanRecord(
   kodeKegiatan: string,
   pin: string,
@@ -606,6 +727,237 @@ export async function deleteKegiatanRecord(
     return { ok: true, synced: true };
   }
   return { ok: true, synced: false };
+}
+
+export interface DriveUploadResult {
+  ok: boolean;
+  fileId?: string;
+  fileName?: string;
+  url?: string;
+  previewUrl?: string;
+  thumbnailUrl?: string;
+  error?: string;
+}
+
+export async function checkDriveAuthStatus(webAppUrl: string): Promise<{
+  ok: boolean;
+  authorized: boolean;
+  folderName?: string;
+  folderUrl?: string;
+  message?: string;
+}> {
+  const cleanUrl = webAppUrl.trim();
+  if (!cleanUrl) {
+    return {
+      ok: false,
+      authorized: false,
+      message: 'URL Web App Google Apps Script belum dihubungkan di menu Pengaturan.',
+    };
+  }
+  const res = await gasGet<{
+    authorized: boolean;
+    folderName?: string;
+    folderUrl?: string;
+  }>(cleanUrl, { action: 'checkDriveAuth' });
+  if (res.ok && res.data) {
+    return {
+      ok: true,
+      authorized: Boolean(res.data.authorized),
+      folderName: res.data.folderName,
+      folderUrl: res.data.folderUrl,
+      message: res.message,
+    };
+  }
+  return {
+    ok: false,
+    authorized: false,
+    message: res.error || 'Belum dapat memverifikasi izin Google Drive di Apps Script.',
+  };
+}
+
+export async function uploadMusyawarahFileToDrive(
+  input: {
+    kind: 'notula_file' | 'dokumentasi';
+    fileName: string;
+    mimeType: string;
+    base64Data: string;
+  },
+  pin: string,
+  webAppUrl: string,
+): Promise<DriveUploadResult> {
+  if (!webAppUrl.trim()) {
+    return {
+      ok: false,
+      error:
+        'URL Web App Google Apps Script belum terhubung. Hubungkan GAS di Pengaturan agar berkas otomatis terunggah ke Google Drive.',
+    };
+  }
+  const res = await gasPost<{
+    fileId: string;
+    fileName: string;
+    url: string;
+    previewUrl: string;
+    thumbnailUrl?: string;
+  }>(webAppUrl.trim(), 'uploadMusyawarahFile', pin, input);
+  if (res.ok && res.data) {
+    return {
+      ok: true,
+      fileId: res.data.fileId,
+      fileName: res.data.fileName,
+      url: res.data.url,
+      previewUrl: res.data.previewUrl,
+      thumbnailUrl: res.data.thumbnailUrl,
+    };
+  }
+  return {
+    ok: false,
+    error:
+      res.error ||
+      'Gagal mengunggah berkas ke Google Drive. Pastikan fungsi otorisasiGoogleDrive() sudah dijalankan di Apps Script.',
+  };
+}
+
+export async function uploadMusyawarahNotulaTextToDrive(
+  input: {
+    baseFileName: string;
+    judul: string;
+    jenis: 'Pleno' | 'Unit';
+    unitLabel?: string;
+    musyawarahKe: number;
+    tanggalFormatted: string;
+    notulaTeks: string;
+    presensiRingkasan?: string;
+  },
+  pin: string,
+  webAppUrl: string,
+): Promise<DriveUploadResult> {
+  if (!webAppUrl.trim()) {
+    return {
+      ok: false,
+      error:
+        'URL Web App Google Apps Script belum terhubung. Teks notula disimpan secara lokal, namun konversi PDF ke Google Drive memerlukan koneksi GAS.',
+    };
+  }
+  const res = await gasPost<{
+    fileId: string;
+    fileName: string;
+    url: string;
+    previewUrl: string;
+  }>(webAppUrl.trim(), 'uploadMusyawarahNotulaText', pin, input);
+  if (res.ok && res.data) {
+    return {
+      ok: true,
+      fileId: res.data.fileId,
+      fileName: res.data.fileName,
+      url: res.data.url,
+      previewUrl: res.data.previewUrl,
+    };
+  }
+  return {
+    ok: false,
+    error:
+      res.error ||
+      'Gagal mengonversi teks notula ke PDF di Google Drive. Pastikan izin Drive & Docs sudah diotorisasi di Apps Script.',
+  };
+}
+
+export async function saveMusyawarahRecord(
+  input: Omit<MusyawarahItem, 'id'> & { id?: string },
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; item?: MusyawarahItem; synced: boolean; error?: string }> {
+  const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const cleanPayload = {
+    ...input,
+    judul: input.judul.trim(),
+    musyawarahKe: Math.min(52, Math.max(1, Math.round(Number(input.musyawarahKe) || 1))),
+    tempat: (input.tempat || '').trim() || 'Online',
+    pesertaTambahanIds: Array.isArray(input.pesertaTambahanIds)
+      ? Array.from(new Set(input.pesertaTambahanIds))
+      : [],
+  };
+
+  if (webAppUrl.trim()) {
+    const res = await gasPost<MusyawarahItem>(webAppUrl.trim(), 'saveMusyawarah', pin, cleanPayload);
+    if (res.ok && res.data) {
+      return {
+        ok: true,
+        item: {
+          ...res.data,
+          musyawarahKe: Math.min(52, Math.max(1, Number(res.data.musyawarahKe) || cleanPayload.musyawarahKe)),
+          pesertaTambahanIds: Array.isArray(res.data.pesertaTambahanIds)
+            ? res.data.pesertaTambahanIds
+            : cleanPayload.pesertaTambahanIds,
+          dokumentasiPreviewUrl: input.dokumentasiPreviewUrl || res.data.dokumentasiPreviewUrl,
+        },
+        synced: true,
+      };
+    }
+    return {
+      ok: false,
+      synced: false,
+      error: res.error || 'Gagal menyimpan data musyawarah ke Spreadsheet.',
+    };
+  }
+
+  const item: MusyawarahItem = {
+    ...cleanPayload,
+    id: input.id || `MSY-${Date.now().toString().slice(-6)}`,
+    dibuatPada: input.dibuatPada || nowStr,
+    diperbaruiPada: nowStr,
+  };
+  return { ok: true, item, synced: false };
+}
+
+export async function deleteMusyawarahRecord(
+  id: string,
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; synced: boolean; error?: string }> {
+  if (webAppUrl.trim()) {
+    const res = await gasPost(webAppUrl.trim(), 'deleteMusyawarah', pin, { id });
+    if (!res.ok) {
+      return { ok: false, synced: false, error: res.error || 'Gagal menghapus musyawarah.' };
+    }
+    return { ok: true, synced: true };
+  }
+  return { ok: true, synced: false };
+}
+
+export async function savePresensiBatchRecord(
+  musyawarahId: string,
+  entries: PresensiItem[],
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; items?: PresensiItem[]; synced: boolean; error?: string }> {
+  const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const normalized: PresensiItem[] = entries.map((e) => ({
+    ...e,
+    id: e.id || `${musyawarahId}__${e.pengurusId}`,
+    musyawarahId,
+    diperbaruiPada: nowStr,
+  }));
+
+  if (webAppUrl.trim()) {
+    const res = await gasPost<PresensiItem[]>(webAppUrl.trim(), 'savePresensiBatch', pin, {
+      musyawarahId,
+      entries: normalized,
+    });
+    if (res.ok) {
+      return {
+        ok: true,
+        items: Array.isArray(res.data) ? res.data : normalized,
+        synced: true,
+      };
+    }
+    return {
+      ok: false,
+      synced: false,
+      error: res.error || 'Gagal menyimpan presensi ke Spreadsheet.',
+    };
+  }
+
+  return { ok: true, items: normalized, synced: false };
 }
 
 export async function saveUnitRecord(

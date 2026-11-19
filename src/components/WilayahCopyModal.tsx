@@ -283,27 +283,30 @@ export function WilayahCopyModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="copy-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#072B31]/45 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#072B31]/50 p-4 backdrop-blur-sm dark:bg-black/70"
     >
-      <div className="glass-surface-strong relative flex max-h-[90vh] w-full max-w-2xl flex-col bg-white p-6">
+      <div className="glass-surface-strong relative flex max-h-[90vh] w-full max-w-2xl flex-col bg-white p-6 dark:bg-[#0B2229]">
         <button
           type="button"
           onClick={onClose}
           aria-label="Tutup dialog salin"
-          className="absolute top-4 right-4 cursor-pointer rounded-lg p-1.5 text-[#526A70] hover:bg-[#EBF5F8]"
+          className="absolute top-4 right-4 cursor-pointer rounded-lg p-1.5 text-[#526A70] hover:bg-[#EBF5F8] dark:text-[#9BB5BC] dark:hover:bg-[#113540]"
         >
           <X className="h-4 w-4" />
         </button>
 
         <div className="flex items-start gap-3 pr-8">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EBF5F8] text-[#0C7A89]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EBF5F8] text-[#0C7A89] dark:bg-[#113540] dark:text-[#3EC1D3]">
             <FileText className="h-5 w-5" />
           </div>
           <div>
-            <h2 id="copy-modal-title" className="text-base font-bold text-[#07525E]">
+            <h2
+              id="copy-modal-title"
+              className="text-base font-bold text-[#07525E] dark:text-[#E6F4F7]"
+            >
               {title}
             </h2>
-            <p className="mt-0.5 text-xs text-[#526A70]">
+            <p className="mt-0.5 text-xs text-[#526A70] dark:text-[#9BB5BC]">
               {subtitle ||
                 `${rows.length.toLocaleString('id-ID')} data terpilih siap disalin ke WhatsApp, dokumen, atau Excel.`}
             </p>
@@ -311,16 +314,16 @@ export function WilayahCopyModal({
         </div>
 
         {/* Mode selector */}
-        <div className="mt-4 flex flex-wrap gap-1.5 rounded-xl bg-[#EBF5F8]/80 p-1.5">
+        <div className="mt-4 flex flex-wrap gap-1.5 rounded-xl bg-[#EBF5F8]/80 p-1.5 dark:bg-[#0D2A33]">
           {MODE_LABELS.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => setMode(item.id)}
-              className={`cursor-pointer whitespace-nowrap shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              className={`shrink-0 cursor-pointer whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                 mode === item.id
-                  ? 'bg-white text-[#07525E] shadow-xs'
-                  : 'text-[#526A70] hover:text-[#07525E]'
+                  ? 'bg-white text-[#07525E] shadow-xs dark:bg-[#13424F] dark:text-[#E6F4F7]'
+                  : 'text-[#526A70] hover:text-[#07525E] dark:text-[#9BB5BC] dark:hover:text-[#E6F4F7]'
               }`}
             >
               {item.label}
@@ -330,14 +333,14 @@ export function WilayahCopyModal({
 
         {/* Quick Toggles + Tombol Pengaturan */}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-3 text-xs text-[#355158]">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-[#355158] dark:text-[#B4CCD3]">
             <button
               type="button"
               onClick={() => setIncludeWi((prev) => !prev)}
               className={`inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
                 includeWi
-                  ? 'border-[#0C7A89]/40 bg-[#EBF5F8] text-[#07525E]'
-                  : 'border-[#07525E]/15 bg-white text-[#526A70] hover:text-[#07525E]'
+                  ? 'border-[#0C7A89]/40 bg-[#EBF5F8] text-[#07525E] dark:border-[#3EC1D3]/45 dark:bg-[#113540] dark:text-[#3EC1D3]'
+                  : 'border-[#07525E]/15 bg-white text-[#526A70] hover:text-[#07525E] dark:border-[#3EC1D3]/20 dark:bg-[#071A20] dark:text-[#9BB5BC] dark:hover:text-[#E6F4F7]'
               }`}
             >
               <span>{includeWi ? '✓ ' : ''}Sertakan "Wahdah Islamiyah"</span>
@@ -349,8 +352,8 @@ export function WilayahCopyModal({
                 onClick={() => setGroupByParent((prev) => !prev)}
                 className={`inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
                   groupByParent
-                    ? 'border-[#0C7A89]/40 bg-[#EBF5F8] text-[#07525E]'
-                    : 'border-[#07525E]/15 bg-white text-[#526A70] hover:text-[#07525E]'
+                    ? 'border-[#0C7A89]/40 bg-[#EBF5F8] text-[#07525E] dark:border-[#3EC1D3]/45 dark:bg-[#113540] dark:text-[#3EC1D3]'
+                    : 'border-[#07525E]/15 bg-white text-[#526A70] hover:text-[#07525E] dark:border-[#3EC1D3]/20 dark:bg-[#071A20] dark:text-[#9BB5BC] dark:hover:text-[#E6F4F7]'
                 }`}
               >
                 <span>{groupByParent ? '✓ ' : ''}Kelompokkan per Induk</span>
@@ -363,8 +366,8 @@ export function WilayahCopyModal({
             onClick={() => setSettingsOpen((prev) => !prev)}
             className={`inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
               settingsOpen
-                ? 'border-[#0C7A89] bg-[#07525E] text-white'
-                : 'border-[#07525E]/15 bg-white text-[#07525E] hover:bg-[#F4FAFB]'
+                ? 'border-[#0C7A89] bg-[#07525E] text-white dark:border-[#3EC1D3] dark:bg-[#0C7A89]'
+                : 'border-[#07525E]/15 bg-white text-[#07525E] hover:bg-[#F4FAFB] dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7] dark:hover:bg-[#113540]'
             }`}
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
@@ -374,8 +377,8 @@ export function WilayahCopyModal({
 
         {/* Panel Pengaturan Detail */}
         {settingsOpen && (
-          <div className="mt-2.5 rounded-xl border border-[#07525E]/12 bg-[#F4FAFB] p-3 text-xs text-[#355158]">
-            <div className="font-bold text-[#07525E]">Pengaturan Format Salin</div>
+          <div className="mt-2.5 rounded-xl border border-[#07525E]/12 bg-[#F4FAFB] p-3 text-xs text-[#355158] dark:border-[#3EC1D3]/20 dark:bg-[#0D2A33] dark:text-[#B4CCD3]">
+            <div className="font-bold text-[#07525E] dark:text-[#E6F4F7]">Pengaturan Format Salin</div>
             <div className="mt-2 flex flex-wrap items-center gap-4">
               {mode !== 'tsv_tabel' && mode !== 'wa_saja' && (
                 <>
@@ -427,12 +430,12 @@ export function WilayahCopyModal({
             readOnly
             value={generatedText}
             rows={12}
-            className="h-64 w-full resize-none rounded-xl border border-[#07525E]/15 bg-[#F8FBFC] p-3.5 font-mono text-xs leading-relaxed text-[#0F2429] focus:border-[#0C7A89] focus:outline-none"
+            className="h-64 w-full resize-none rounded-xl border border-[#07525E]/15 bg-[#F8FBFC] p-3.5 font-mono text-xs leading-relaxed text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/20 dark:bg-[#071A20] dark:text-[#E6F4F7]"
           />
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#07525E]/10 pt-3.5">
-          <span className="text-xs font-medium text-[#526A70] tabular-nums">
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#07525E]/10 pt-3.5 dark:border-[#3EC1D3]/15">
+          <span className="text-xs font-medium text-[#526A70] tabular-nums dark:text-[#9BB5BC]">
             Total {rows.length.toLocaleString('id-ID')} entri ·{' '}
             {generatedText.length.toLocaleString('id-ID')} karakter
           </span>
@@ -440,7 +443,7 @@ export function WilayahCopyModal({
             <button
               type="button"
               onClick={onClose}
-              className="cursor-pointer rounded-xl px-4 py-2 text-xs font-semibold text-[#526A70] hover:bg-[#F4FAFB]"
+              className="cursor-pointer rounded-xl px-4 py-2 text-xs font-semibold text-[#526A70] hover:bg-[#F4FAFB] dark:text-[#9BB5BC] dark:hover:bg-[#113540]"
             >
               Tutup
             </button>
