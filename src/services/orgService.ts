@@ -1004,15 +1004,29 @@ export async function deleteUnitRecord(
   return { ok: true, synced: false };
 }
 
+export function buildLembagaId(
+  jenis: 'DPW' | 'DPD' | 'DPC' | 'DPR',
+  kodeWilayah: string,
+): string {
+  const cleanKode = String(kodeWilayah || '').replace(/[^0-9a-zA-Z]/g, '');
+  return `${jenis.toLowerCase()}-${cleanKode || Date.now().toString().slice(-6)}`;
+}
+
 export async function saveDpwRecord(
   input: Omit<DpwItem, 'id'> & { id?: string },
   pin: string,
   webAppUrl: string,
 ): Promise<{ ok: boolean; item?: DpwItem; synced: boolean; error?: string }> {
+  const deterministicId = buildLembagaId('DPW', input.kodeWilayah);
   const payload = {
     ...input,
+    id: deterministicId,
+    ketuaNama: (input.ketuaNama || '').trim().toUpperCase(),
     ketuaWa: normalizeWhatsApp(input.ketuaWa),
+    sekretarisNama: (input.sekretarisNama || '').trim().toUpperCase(),
     sekretarisWa: normalizeWhatsApp(input.sekretarisWa),
+    alamatKantor: '',
+    tautanDrive: '',
   };
 
   if (webAppUrl.trim()) {
@@ -1033,7 +1047,7 @@ export async function saveDpwRecord(
     synced: false,
     item: {
       ...payload,
-      id: input.id || `DPW-${Date.now().toString().slice(-6)}`,
+      id: deterministicId,
       diperbaruiPada: nowStr,
     },
   };
@@ -1059,10 +1073,16 @@ export async function saveDpdRecord(
   pin: string,
   webAppUrl: string,
 ): Promise<{ ok: boolean; item?: DpdItem; synced: boolean; error?: string }> {
+  const deterministicId = buildLembagaId('DPD', input.kodeWilayah);
   const payload = {
     ...input,
+    id: deterministicId,
+    ketuaNama: (input.ketuaNama || '').trim().toUpperCase(),
     ketuaWa: normalizeWhatsApp(input.ketuaWa),
+    sekretarisNama: (input.sekretarisNama || '').trim().toUpperCase(),
     sekretarisWa: normalizeWhatsApp(input.sekretarisWa),
+    alamatKantor: '',
+    tautanDrive: '',
   };
 
   if (webAppUrl.trim()) {
@@ -1083,7 +1103,7 @@ export async function saveDpdRecord(
     synced: false,
     item: {
       ...payload,
-      id: input.id || `DPD-${Date.now().toString().slice(-6)}`,
+      id: deterministicId,
       diperbaruiPada: nowStr,
     },
   };
@@ -1109,10 +1129,16 @@ export async function saveDpcRecord(
   pin: string,
   webAppUrl: string,
 ): Promise<{ ok: boolean; item?: DpcItem; synced: boolean; error?: string }> {
+  const deterministicId = buildLembagaId('DPC', input.kodeWilayah);
   const payload = {
     ...input,
+    id: deterministicId,
+    ketuaNama: (input.ketuaNama || '').trim().toUpperCase(),
     ketuaWa: normalizeWhatsApp(input.ketuaWa),
+    sekretarisNama: (input.sekretarisNama || '').trim().toUpperCase(),
     sekretarisWa: normalizeWhatsApp(input.sekretarisWa),
+    alamatKantor: '',
+    tautanDrive: '',
   };
 
   if (webAppUrl.trim()) {
@@ -1133,7 +1159,7 @@ export async function saveDpcRecord(
     synced: false,
     item: {
       ...payload,
-      id: input.id || `DPC-${Date.now().toString().slice(-6)}`,
+      id: deterministicId,
       diperbaruiPada: nowStr,
     },
   };
@@ -1159,10 +1185,16 @@ export async function saveDprRecord(
   pin: string,
   webAppUrl: string,
 ): Promise<{ ok: boolean; item?: DprItem; synced: boolean; error?: string }> {
+  const deterministicId = buildLembagaId('DPR', input.kodeWilayah);
   const payload = {
     ...input,
+    id: deterministicId,
+    ketuaNama: (input.ketuaNama || '').trim().toUpperCase(),
     ketuaWa: normalizeWhatsApp(input.ketuaWa),
+    sekretarisNama: (input.sekretarisNama || '').trim().toUpperCase(),
     sekretarisWa: normalizeWhatsApp(input.sekretarisWa),
+    alamatKantor: '',
+    tautanDrive: '',
   };
 
   if (webAppUrl.trim()) {
@@ -1183,7 +1215,7 @@ export async function saveDprRecord(
     synced: false,
     item: {
       ...payload,
-      id: input.id || `DPR-${Date.now().toString().slice(-6)}`,
+      id: deterministicId,
       diperbaruiPada: nowStr,
     },
   };

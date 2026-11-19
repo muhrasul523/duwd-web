@@ -2,13 +2,14 @@ import {
   AlertTriangle,
   Building2,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Copy,
   Download,
-  ExternalLink,
   Loader2,
+  MapPin,
   MessageCircle,
   Pencil,
   Plus,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  buildLembagaId,
   deleteDpcRecord,
   deleteDpdRecord,
   deleteDprRecord,
@@ -89,8 +91,25 @@ type SubTab = 'dpw' | 'dpd' | 'dpc' | 'dpr' | 'semua';
 type StatusFilter = 'ALL' | StatusTerbentuk;
 type ContactFilter = 'ALL' | 'LENGKAP' | 'ADA_KETUA' | 'ADA_SEKRETARIS' | 'BELUM_ADA';
 type TargetMode = 'full' | 'visi2030';
+type PageSizeOption = 5 | 10 | 25 | 50 | 100 | 500 | 'ALL';
 
-const PAGE_SIZE = 50;
+interface PickerCandidate {
+  kode: string;
+  nama: string;
+  pulau: string;
+  kodeProv: string;
+  namaProv: string;
+  kodeKab?: string;
+  namaKab?: string;
+  kodeKec?: string;
+  namaKec?: string;
+  namaKel?: string;
+  subtitle: string;
+  alreadyTerbentuk: boolean;
+}
+
+const PAGE_SIZE_OPTIONS: PageSizeOption[] = [5, 10, 25, 50, 100, 500, 'ALL'];
+const MAX_ALL_RENDER_ROWS = 2000;
 const MAX_MODAL_COPY_ROWS = 5000;
 const VISI_2030_DPW_TARGET = 38;
 const VISI_2030_DPD_TARGET = 412;
@@ -188,11 +207,15 @@ export function DpwDpdView({
   const [filterStatus, setFilterStatus] = useState<StatusFilter>('Sudah Terbentuk');
   const [filterContact, setFilterContact] = useState<ContactFilter>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [pageSize, setPageSize] = useState<PageSizeOption>(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Notices & Errors
+  // Notices, Errors & Background Sync Status
   const [notice, setNotice] = useState('');
   const [errorBanner, setErrorBanner] = useState('');
+  const [bgPendingCount, setBgPendingCount] = useState(0);
+  const [bgSavedNotice, setBgSavedNotice] = useState('');
+  const bgNoticeTimerRef = useRef<number | null>(null);
 
   // Per-row Copy dropdown & Copy modal
   const [openCopyKey, setOpenCopyKey] = useState<string | null>(null);
@@ -225,12 +248,19 @@ export function DpwDpdView({
   const [formKetuaWa, setFormKetuaWa] = useState('');
   const [formSekNama, setFormSekNama] = useState('');
   const [formSekWa, setFormSekWa] = useState('');
-  const [formAlamat, setFormAlamat] = useState('');
-  const [formDrive, setFormDrive] = useState('');
-  const [formSaving, setFormSaving] = useState(false);
-  const [formDeleting, setFormDeleting] = useState(false);
   const [formErr, setFormErr] = useState('');
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+  // Smart Autodropdown Autosearch Territory Picker inside Create Modal
+  const [pickerPulauFilter, setPickerPulauFilter] = useState('ALL');
+  const [pickerProvFilter, setPickerProvFilter] = useState('ALL');
+  const [pickerKabFilter, setPickerKabFilter] = useState('ALL');
+  const [pickerKecFilter, setPickerKecFilter] = useState('ALL');
+  const [pickerQuery, setPickerQuery] = useState('');
+  const [pickerDropdownOpen, setPickerDropdownOpen] = useState(false);
+  const pickerContainerRef = useRef<HTMLDivElement | null>(null);
+  const [modalKels, setModalKels] = useState<WilayahKelOption[]>([]);
+  const [loadingModalKels, setLoadingModalKels] = useState(false);
 
   // Close copy dropdown on outside click or Escape
   useEffect(() => {
@@ -253,6 +283,55 @@ export function DpwDpdView({
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [openCopyKey]);
+
+  // Close territory picker dropdown on outside click
+  useEffect(() => {
+    if (!pickerDropdownOpen) return;
+    const handlePointerDown = (e: MouseEvent) => {
+      if (
+        pickerContainerRef.current &&
+        !pickerContainerRef.current.contains(e.target as Node)
+      ) {
+        setPickerDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, [pickerDropdownOpen]);
+
+  // Lazy-load kelurahan per provinsi for DPR picker inside Create Modal
+  useEffect(() => {
+    if (!editModalOpen || !isManualCreate || formJenis !== 'DPR') return;
+    if (pickerProvFilter === 'ALL') {
+      setModalKels([]);
+      return;
+    }
+    let active = true;
+    setLoadingModalKels(true);
+    void loadKelurahanByProv(pickerProvFilter)
+      .then((list) => {
+        if (active) setModalKels(list);
+      })
+      .catch(() => {
+        if (active) setModalKels([]);
+      })
+      .finally(() => {
+        if (active) setLoadingModalKels(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [editModalOpen, isManualCreate, formJenis, pickerProvFilter]);
+
+  useEffect(() => {
+    return () => {
+      if (bgNoticeTimerRef.current) {
+        window.clearTimeout(bgNoticeTimerRef.current);
+      }
+    };
+  }, []);
 
   // Load summary (pulau, prov, kab) on mount
   useEffect(() => {
@@ -357,6 +436,7 @@ export function DpwDpdView({
     filterStatus,
     filterContact,
     searchQuery,
+    pageSize,
   ]);
 
   const handleSelectTab = (tab: SubTab) => {
@@ -743,7 +823,6 @@ export function DpwDpdView({
           row.ketuaWa,
           row.sekretarisNama,
           row.sekretarisWa,
-          row.alamatKantor || '',
         ]
           .join(' ')
           .toLowerCase();
@@ -764,15 +843,24 @@ export function DpwDpdView({
     searchQuery,
   ]);
 
-  // Pagination
+  // Pagination (default 10, opsi 5/10/25/50/100/500/Semua)
   const activeItemCount = filteredRows.length;
-  const totalPages = Math.max(1, Math.ceil(activeItemCount / PAGE_SIZE));
+  const isAllMode = pageSize === 'ALL';
+  const effectivePageSize = isAllMode
+    ? Math.max(1, Math.min(activeItemCount, MAX_ALL_RENDER_ROWS))
+    : pageSize;
+  const totalPages = isAllMode
+    ? 1
+    : Math.max(1, Math.ceil(activeItemCount / effectivePageSize));
   const safePage = Math.min(currentPage, totalPages);
-  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const pageStart = isAllMode ? 0 : (safePage - 1) * effectivePageSize;
 
   const pagedRows = useMemo(
-    () => filteredRows.slice(pageStart, pageStart + PAGE_SIZE),
-    [filteredRows, pageStart],
+    () =>
+      isAllMode
+        ? filteredRows.slice(0, MAX_ALL_RENDER_ROWS)
+        : filteredRows.slice(pageStart, pageStart + effectivePageSize),
+    [filteredRows, isAllMode, pageStart, effectivePageSize],
   );
 
   // KPI Counters
@@ -999,11 +1087,259 @@ export function DpwDpdView({
     }
   };
 
+  // Options for Smart Territory Autodropdown inside Create Modal
+  const pickerProvOptions = useMemo(() => {
+    if (!summary) return [];
+    return summary.provs
+      .filter((p) => pickerPulauFilter === 'ALL' || p.pulau === pickerPulauFilter)
+      .sort((a, b) => compareKode(a.kode, b.kode));
+  }, [summary, pickerPulauFilter]);
+
+  const pickerKabOptions = useMemo(() => {
+    if (!summary) return [];
+    return summary.kabs
+      .filter((k) => {
+        if (pickerPulauFilter !== 'ALL' && k.pulau !== pickerPulauFilter) return false;
+        if (pickerProvFilter !== 'ALL' && k.kodeProv !== pickerProvFilter) return false;
+        return true;
+      })
+      .sort((a, b) => compareKode(a.kode, b.kode));
+  }, [summary, pickerPulauFilter, pickerProvFilter]);
+
+  const pickerKecOptions = useMemo(() => {
+    if (!kecsLoaded) return [];
+    return kecs
+      .filter((k) => {
+        if (pickerPulauFilter !== 'ALL' && k.pulau !== pickerPulauFilter) return false;
+        if (pickerProvFilter !== 'ALL' && k.kodeProv !== pickerProvFilter) return false;
+        if (pickerKabFilter !== 'ALL' && k.kodeKab !== pickerKabFilter) return false;
+        return true;
+      })
+      .sort((a, b) => compareKode(a.kode, b.kode));
+  }, [kecs, kecsLoaded, pickerPulauFilter, pickerProvFilter, pickerKabFilter]);
+
+  const pickerCandidates = useMemo<PickerCandidate[]>(() => {
+    if (!editModalOpen || !isManualCreate) return [];
+    const q = pickerQuery.trim().toLowerCase();
+
+    if (formJenis === 'DPW') {
+      const formedSet = new Set(
+        dpwList
+          .filter((d) => normalizeStatus(d.statusTerbentuk) === 'Sudah Terbentuk')
+          .map((d) => d.kodeWilayah),
+      );
+      const list = (summary?.provs || [])
+        .filter((p) => {
+          if (pickerPulauFilter !== 'ALL' && p.pulau !== pickerPulauFilter) return false;
+          if (!q) return true;
+          return `${p.kode} ${p.nama} ${p.pulau}`.toLowerCase().includes(q);
+        })
+        .sort((a, b) => compareKode(a.kode, b.kode));
+      return list.slice(0, 60).map((p) => ({
+        kode: p.kode,
+        nama: p.nama,
+        pulau: p.pulau,
+        kodeProv: p.kode,
+        namaProv: p.nama,
+        subtitle: `Pulau ${p.pulau}`,
+        alreadyTerbentuk: formedSet.has(p.kode),
+      }));
+    }
+
+    if (formJenis === 'DPD') {
+      const formedSet = new Set(
+        dpdList
+          .filter((d) => normalizeStatus(d.statusTerbentuk) === 'Sudah Terbentuk')
+          .map((d) => d.kodeWilayah),
+      );
+      const list = (summary?.kabs || [])
+        .filter((k) => {
+          if (pickerPulauFilter !== 'ALL' && k.pulau !== pickerPulauFilter) return false;
+          if (pickerProvFilter !== 'ALL' && k.kodeProv !== pickerProvFilter) return false;
+          if (!q) return true;
+          return `${k.kode} ${k.nama} ${k.namaProv} ${k.pulau}`.toLowerCase().includes(q);
+        })
+        .sort((a, b) => compareKode(a.kode, b.kode));
+      return list.slice(0, 60).map((k) => ({
+        kode: k.kode,
+        nama: k.nama,
+        pulau: k.pulau,
+        kodeProv: k.kodeProv,
+        namaProv: k.namaProv,
+        kodeKab: k.kode,
+        namaKab: k.nama,
+        subtitle: `${k.namaProv} · ${k.pulau}`,
+        alreadyTerbentuk: formedSet.has(k.kode),
+      }));
+    }
+
+    if (formJenis === 'DPC') {
+      const formedSet = new Set(
+        dpcList
+          .filter((d) => normalizeStatus(d.statusTerbentuk) === 'Sudah Terbentuk')
+          .map((d) => d.kodeWilayah),
+      );
+      const list = kecs
+        .filter((k) => {
+          if (pickerPulauFilter !== 'ALL' && k.pulau !== pickerPulauFilter) return false;
+          if (pickerProvFilter !== 'ALL' && k.kodeProv !== pickerProvFilter) return false;
+          if (pickerKabFilter !== 'ALL' && k.kodeKab !== pickerKabFilter) return false;
+          if (!q) return true;
+          return `${k.kode} ${k.nama} ${k.namaKab} ${k.namaProv}`.toLowerCase().includes(q);
+        })
+        .sort((a, b) => compareKode(a.kode, b.kode));
+      return list.slice(0, 60).map((k) => ({
+        kode: k.kode,
+        nama: k.nama,
+        pulau: k.pulau,
+        kodeProv: k.kodeProv,
+        namaProv: k.namaProv,
+        kodeKab: k.kodeKab,
+        namaKab: k.namaKab,
+        kodeKec: k.kode,
+        namaKec: k.nama,
+        subtitle: `${k.namaKab} · ${k.namaProv}`,
+        alreadyTerbentuk: formedSet.has(k.kode),
+      }));
+    }
+
+    // DPR
+    const formedSet = new Set(
+      dprList
+        .filter((d) => normalizeStatus(d.statusTerbentuk) === 'Sudah Terbentuk')
+        .map((d) => d.kodeWilayah),
+    );
+    const list = modalKels
+      .filter((k) => {
+        if (pickerKabFilter !== 'ALL' && k.kodeKab !== pickerKabFilter) return false;
+        if (pickerKecFilter !== 'ALL' && k.kodeKec !== pickerKecFilter) return false;
+        if (!q) return true;
+        return `${k.kode} ${k.nama} ${k.namaKec} ${k.namaKab}`.toLowerCase().includes(q);
+      })
+      .sort((a, b) => compareKode(a.kode, b.kode));
+    return list.slice(0, 60).map((k) => ({
+      kode: k.kode,
+      nama: k.nama,
+      pulau: k.pulau,
+      kodeProv: k.kodeProv,
+      namaProv: k.namaProv,
+      kodeKab: k.kodeKab,
+      namaKab: k.namaKab,
+      kodeKec: k.kodeKec,
+      namaKec: k.namaKec,
+      namaKel: k.nama,
+      subtitle: `Kec. ${k.namaKec} · ${k.namaKab}`,
+      alreadyTerbentuk: formedSet.has(k.kode),
+    }));
+  }, [
+    editModalOpen,
+    isManualCreate,
+    formJenis,
+    pickerQuery,
+    pickerPulauFilter,
+    pickerProvFilter,
+    pickerKabFilter,
+    pickerKecFilter,
+    summary,
+    kecs,
+    modalKels,
+    dpwList,
+    dpdList,
+    dpcList,
+    dprList,
+  ]);
+
+  const handleSelectPickerTerritory = (item: PickerCandidate) => {
+    setFormKodeWilayah(item.kode);
+    setFormPulau(item.pulau);
+    setFormKodeProvinsi(item.kodeProv);
+    setFormNamaProvinsi(item.namaProv);
+    setFormKodeKabKota(item.kodeKab || '');
+    setFormNamaKabKota(item.namaKab || '');
+    setFormKodeKecamatan(item.kodeKec || '');
+    setFormNamaKecamatan(item.namaKec || '');
+    setFormNamaKelDesa(item.namaKel || '');
+
+    // Pre-populate if territory already exists in sheet so it edits cleanly without losing contacts
+    if (formJenis === 'DPW') {
+      const existing = dpwList.find((d) => d.kodeWilayah === item.kode);
+      setFormId(existing?.id || buildLembagaId('DPW', item.kode));
+      setFormHasSheetRecord(Boolean(existing));
+      setFormNamaLembaga(existing?.namaDpw || `DPW ${item.nama}`);
+      setFormStatus(existing ? normalizeStatus(existing.statusTerbentuk) : 'Sudah Terbentuk');
+      setFormKetuaNama((existing?.ketuaNama || '').toUpperCase());
+      setFormKetuaWa(existing?.ketuaWa || '');
+      setFormSekNama((existing?.sekretarisNama || '').toUpperCase());
+      setFormSekWa(existing?.sekretarisWa || '');
+    } else if (formJenis === 'DPD') {
+      const existing = dpdList.find((d) => d.kodeWilayah === item.kode);
+      setFormId(existing?.id || buildLembagaId('DPD', item.kode));
+      setFormHasSheetRecord(Boolean(existing));
+      setFormNamaLembaga(existing?.namaDpd || `DPD ${item.nama}`);
+      setFormStatus(existing ? normalizeStatus(existing.statusTerbentuk) : 'Sudah Terbentuk');
+      setFormKetuaNama((existing?.ketuaNama || '').toUpperCase());
+      setFormKetuaWa(existing?.ketuaWa || '');
+      setFormSekNama((existing?.sekretarisNama || '').toUpperCase());
+      setFormSekWa(existing?.sekretarisWa || '');
+    } else if (formJenis === 'DPC') {
+      const existing = dpcList.find((d) => d.kodeWilayah === item.kode);
+      setFormId(existing?.id || buildLembagaId('DPC', item.kode));
+      setFormHasSheetRecord(Boolean(existing));
+      setFormNamaLembaga(existing?.namaDpc || `DPC ${item.nama}`);
+      setFormStatus(existing ? normalizeStatus(existing.statusTerbentuk) : 'Sudah Terbentuk');
+      setFormKetuaNama((existing?.ketuaNama || '').toUpperCase());
+      setFormKetuaWa(existing?.ketuaWa || '');
+      setFormSekNama((existing?.sekretarisNama || '').toUpperCase());
+      setFormSekWa(existing?.sekretarisWa || '');
+    } else {
+      const existing = dprList.find((d) => d.kodeWilayah === item.kode);
+      setFormId(existing?.id || buildLembagaId('DPR', item.kode));
+      setFormHasSheetRecord(Boolean(existing));
+      setFormNamaLembaga(existing?.namaDpr || `DPR ${item.nama}`);
+      setFormStatus(existing ? normalizeStatus(existing.statusTerbentuk) : 'Sudah Terbentuk');
+      setFormKetuaNama((existing?.ketuaNama || '').toUpperCase());
+      setFormKetuaWa(existing?.ketuaWa || '');
+      setFormSekNama((existing?.sekretarisNama || '').toUpperCase());
+      setFormSekWa(existing?.sekretarisWa || '');
+    }
+
+    setPickerQuery(item.nama);
+    setPickerDropdownOpen(false);
+    setFormErr('');
+  };
+
+  const handleClearSelectedTerritory = () => {
+    setFormKodeWilayah('');
+    setFormPulau('');
+    setFormKodeProvinsi('');
+    setFormNamaProvinsi('');
+    setFormKodeKabKota('');
+    setFormNamaKabKota('');
+    setFormKodeKecamatan('');
+    setFormNamaKecamatan('');
+    setFormNamaKelDesa('');
+    setFormNamaLembaga('');
+    setFormId(undefined);
+    setFormHasSheetRecord(false);
+    setPickerQuery('');
+    setPickerDropdownOpen(true);
+  };
+
+  const showBackgroundSavedToast = (msg: string) => {
+    setBgSavedNotice(msg);
+    if (bgNoticeTimerRef.current) {
+      window.clearTimeout(bgNoticeTimerRef.current);
+    }
+    bgNoticeTimerRef.current = window.setTimeout(() => {
+      setBgSavedNotice('');
+    }, 4000);
+  };
+
   // Open Edit Modal for existing row
   const openEditModal = (row: KelembagaanUnifiedRow) => {
     setIsManualCreate(false);
     setFormJenis(row.jenis);
-    setFormId(row.id);
+    setFormId(row.id || buildLembagaId(row.jenis, row.kodeWilayah));
     setFormHasSheetRecord(row.hasSheetRecord);
     setFormKodeWilayah(row.kodeWilayah);
     setFormPulau(row.pulau);
@@ -1016,53 +1352,71 @@ export function DpwDpdView({
     setFormNamaKelDesa(row.namaKelDesa || '');
     setFormNamaLembaga(row.namaLembaga);
     setFormStatus(row.statusTerbentuk);
-    setFormKetuaNama(row.ketuaNama);
+    setFormKetuaNama((row.ketuaNama || '').toUpperCase());
     setFormKetuaWa(row.ketuaWa);
-    setFormSekNama(row.sekretarisNama);
+    setFormSekNama((row.sekretarisNama || '').toUpperCase());
     setFormSekWa(row.sekretarisWa);
-    setFormAlamat(row.alamatKantor || '');
-    setFormDrive(row.tautanDrive || '');
     setFormErr('');
     setConfirmDeleteOpen(false);
+    setPickerDropdownOpen(false);
     setEditModalOpen(true);
   };
 
-  // Open Manual Create Modal (Super Admin only)
+  // Open Smart Create Modal (Super Admin only) with Autodropdown Autosearch
   const openManualCreateModal = (jenis: JenisLembaga) => {
-    const prov =
-      provOptions.find((p) => p.kode === filterProvinsi) || provOptions[0];
     setIsManualCreate(true);
     setFormJenis(jenis);
     setFormId(undefined);
     setFormHasSheetRecord(false);
-    setFormKodeWilayah(prov?.kode || '');
-    setFormPulau(prov?.pulau || '');
-    setFormKodeProvinsi(prov?.kode || '');
-    setFormNamaProvinsi(prov?.nama || '');
+    setFormKodeWilayah('');
+    setFormPulau('');
+    setFormKodeProvinsi('');
+    setFormNamaProvinsi('');
     setFormKodeKabKota('');
     setFormNamaKabKota('');
     setFormKodeKecamatan('');
     setFormNamaKecamatan('');
     setFormNamaKelDesa('');
-    setFormNamaLembaga(jenis === 'DPW' && prov ? `DPW ${prov.nama}` : '');
+    setFormNamaLembaga('');
     setFormStatus('Sudah Terbentuk');
     setFormKetuaNama('');
     setFormKetuaWa('');
     setFormSekNama('');
     setFormSekWa('');
-    setFormAlamat('');
-    setFormDrive('');
     setFormErr('');
     setConfirmDeleteOpen(false);
+
+    // Sync narrowing dropdowns with current view filter for convenience
+    setPickerPulauFilter(filterPulau);
+    setPickerProvFilter(filterProvinsi);
+    setPickerKabFilter(filterKabKota);
+    setPickerKecFilter(filterKecamatan);
+    setPickerQuery('');
+    setPickerDropdownOpen(jenis !== 'DPR' || filterProvinsi !== 'ALL');
+
+    if (jenis === 'DPC' || jenis === 'DPR') {
+      void ensureKecamatanLoaded();
+    }
+
     setEditModalOpen(true);
   };
 
-  const handleSubmitForm = async (e: React.FormEvent) => {
+  // Optimistic instant save + background Google Apps Script sync
+  const handleSubmitForm = (e: React.FormEvent) => {
     e.preventDefault();
     setFormErr('');
 
-    if (!formKodeWilayah.trim() || !formNamaLembaga.trim()) {
-      setFormErr('Kode wilayah dan nama lembaga wajib diisi.');
+    const kode = formKodeWilayah.trim();
+    const namaLembaga = formNamaLembaga.trim();
+
+    if (!kode) {
+      setFormErr(
+        `Silakan pilih wilayah ${formJenis} terlebih dahulu dari daftar pencarian otomatis.`,
+      );
+      return;
+    }
+    if (!namaLembaga) {
+      setFormErr(`Nama ${formJenis} wajib diisi.`);
       return;
     }
 
@@ -1078,197 +1432,259 @@ export function DpwDpdView({
       return;
     }
 
-    setFormSaving(true);
-    try {
-      if (formJenis === 'DPW') {
-        const res = await saveDpwRecord(
-          {
-            id: formId,
-            kodeWilayah: formKodeWilayah.trim(),
-            pulau: formPulau.trim(),
-            namaDpw: formNamaLembaga.trim(),
-            namaProvinsi: formNamaProvinsi.trim(),
-            statusTerbentuk: formStatus,
-            ketuaNama: formKetuaNama.trim(),
-            ketuaWa: cleanKetuaWa,
-            sekretarisNama: formSekNama.trim(),
-            sekretarisWa: cleanSekWa,
-            alamatKantor: formAlamat.trim(),
-            tautanDrive: formDrive.trim(),
-          },
-          activePin,
-          webAppUrl,
-        );
-        if (res.ok && res.item) {
-          onSaveDpw(res.item);
-          setEditModalOpen(false);
-          showTempNotice(
-            res.synced
-              ? `"${res.item.namaDpw}" tersimpan ke Spreadsheet #2 (tab DPW).`
-              : `"${res.item.namaDpw}" disimpan di browser lokal.`,
-          );
-        } else {
-          setFormErr(res.error || 'Gagal menyimpan data DPW.');
-        }
+    const jenisSnapshot = formJenis;
+    const detId = buildLembagaId(jenisSnapshot, kode);
+    const ketuaNamaUp = formKetuaNama.trim().toUpperCase();
+    const sekNamaUp = formSekNama.trim().toUpperCase();
+    const nowIso = new Date().toISOString();
+    const segs = kode.split('.');
+
+    // 1. Update UI & cache immediately (optimistic) and close modal so user can keep working
+    if (jenisSnapshot === 'DPW') {
+      const optimistic: DpwItem = {
+        id: detId,
+        kodeWilayah: kode,
+        pulau: formPulau.trim(),
+        namaDpw: namaLembaga,
+        namaProvinsi: formNamaProvinsi.trim(),
+        statusTerbentuk: formStatus,
+        ketuaNama: ketuaNamaUp,
+        ketuaWa: cleanKetuaWa,
+        sekretarisNama: sekNamaUp,
+        sekretarisWa: cleanSekWa,
+        alamatKantor: '',
+        tautanDrive: '',
+        diperbaruiPada: nowIso,
+      };
+      onSaveDpw(optimistic);
+      setEditModalOpen(false);
+
+      if (!webAppUrl.trim()) {
+        showTempNotice(`"${optimistic.namaDpw}" (${detId}) disimpan di browser lokal.`);
         return;
       }
 
-      if (formJenis === 'DPD') {
-        const res = await saveDpdRecord(
-          {
-            id: formId,
-            kodeWilayah: formKodeWilayah.trim(),
-            kodeProvinsi:
-              formKodeProvinsi.trim() || formKodeWilayah.trim().split('.')[0] || '',
-            pulau: formPulau.trim(),
-            namaProvinsi: formNamaProvinsi.trim(),
-            namaKabKota: formNamaKabKota.trim() || formNamaLembaga.trim(),
-            namaDpd: formNamaLembaga.trim(),
-            statusTerbentuk: formStatus,
-            ketuaNama: formKetuaNama.trim(),
-            ketuaWa: cleanKetuaWa,
-            sekretarisNama: formSekNama.trim(),
-            sekretarisWa: cleanSekWa,
-            alamatKantor: formAlamat.trim(),
-            tautanDrive: formDrive.trim(),
-          },
-          activePin,
-          webAppUrl,
-        );
-        if (res.ok && res.item) {
-          onSaveDpd(res.item);
-          setEditModalOpen(false);
-          showTempNotice(
-            res.synced
-              ? `"${res.item.namaDpd}" tersimpan ke Spreadsheet #2 (tab DPD).`
-              : `"${res.item.namaDpd}" disimpan di browser lokal.`,
-          );
-        } else {
-          setFormErr(res.error || 'Gagal menyimpan data DPD.');
+      setBgPendingCount((c) => c + 1);
+      void (async () => {
+        try {
+          const res = await saveDpwRecord(optimistic, activePin, webAppUrl);
+          if (res.ok && res.item) {
+            onSaveDpw(res.item);
+            showBackgroundSavedToast(
+              `"${res.item.namaDpw}" (${res.item.id}) tersimpan ke Spreadsheet #2.`,
+            );
+          } else {
+            setErrorBanner(
+              `Gagal menyimpan "${optimistic.namaDpw}" ke Spreadsheet #2: ${res.error || 'Terjadi kesalahan jaringan.'}`,
+            );
+          }
+        } finally {
+          setBgPendingCount((c) => Math.max(0, c - 1));
         }
-        return;
-      }
-
-      if (formJenis === 'DPC') {
-        const segs = formKodeWilayah.trim().split('.');
-        const res = await saveDpcRecord(
-          {
-            id: formId,
-            kodeWilayah: formKodeWilayah.trim(),
-            kodeKabKota:
-              formKodeKabKota.trim() || (segs.length >= 2 ? segs.slice(0, 2).join('.') : ''),
-            kodeProvinsi: formKodeProvinsi.trim() || segs[0] || '',
-            pulau: formPulau.trim(),
-            namaProvinsi: formNamaProvinsi.trim(),
-            namaKabKota: formNamaKabKota.trim(),
-            namaKecamatan: formNamaKecamatan.trim() || formNamaLembaga.trim(),
-            namaDpc: formNamaLembaga.trim(),
-            statusTerbentuk: formStatus,
-            ketuaNama: formKetuaNama.trim(),
-            ketuaWa: cleanKetuaWa,
-            sekretarisNama: formSekNama.trim(),
-            sekretarisWa: cleanSekWa,
-            alamatKantor: formAlamat.trim(),
-            tautanDrive: formDrive.trim(),
-          },
-          activePin,
-          webAppUrl,
-        );
-        if (res.ok && res.item) {
-          onSaveDpc(res.item);
-          setEditModalOpen(false);
-          showTempNotice(
-            res.synced
-              ? `"${res.item.namaDpc}" tersimpan ke Spreadsheet #2 (tab DPC).`
-              : `"${res.item.namaDpc}" disimpan di browser lokal.`,
-          );
-        } else {
-          setFormErr(res.error || 'Gagal menyimpan data DPC.');
-        }
-        return;
-      }
-
-      // formJenis === 'DPR'
-      const segs = formKodeWilayah.trim().split('.');
-      const res = await saveDprRecord(
-        {
-          id: formId,
-          kodeWilayah: formKodeWilayah.trim(),
-          kodeKecamatan:
-            formKodeKecamatan.trim() || (segs.length >= 3 ? segs.slice(0, 3).join('.') : ''),
-          kodeKabKota:
-            formKodeKabKota.trim() || (segs.length >= 2 ? segs.slice(0, 2).join('.') : ''),
-          kodeProvinsi: formKodeProvinsi.trim() || segs[0] || '',
-          pulau: formPulau.trim(),
-          namaProvinsi: formNamaProvinsi.trim(),
-          namaKabKota: formNamaKabKota.trim(),
-          namaKecamatan: formNamaKecamatan.trim(),
-          namaKelDesa: formNamaKelDesa.trim() || formNamaLembaga.trim(),
-          namaDpr: formNamaLembaga.trim(),
-          statusTerbentuk: formStatus,
-          ketuaNama: formKetuaNama.trim(),
-          ketuaWa: cleanKetuaWa,
-          sekretarisNama: formSekNama.trim(),
-          sekretarisWa: cleanSekWa,
-          alamatKantor: formAlamat.trim(),
-          tautanDrive: formDrive.trim(),
-        },
-        activePin,
-        webAppUrl,
-      );
-      if (res.ok && res.item) {
-        onSaveDpr(res.item);
-        setEditModalOpen(false);
-        showTempNotice(
-          res.synced
-            ? `"${res.item.namaDpr}" tersimpan ke Spreadsheet #2 (tab DPR).`
-            : `"${res.item.namaDpr}" disimpan di browser lokal.`,
-        );
-      } else {
-        setFormErr(res.error || 'Gagal menyimpan data DPR.');
-      }
-    } finally {
-      setFormSaving(false);
+      })();
+      return;
     }
+
+    if (jenisSnapshot === 'DPD') {
+      const optimistic: DpdItem = {
+        id: detId,
+        kodeWilayah: kode,
+        kodeProvinsi: formKodeProvinsi.trim() || segs[0] || '',
+        pulau: formPulau.trim(),
+        namaProvinsi: formNamaProvinsi.trim(),
+        namaKabKota: formNamaKabKota.trim() || namaLembaga,
+        namaDpd: namaLembaga,
+        statusTerbentuk: formStatus,
+        ketuaNama: ketuaNamaUp,
+        ketuaWa: cleanKetuaWa,
+        sekretarisNama: sekNamaUp,
+        sekretarisWa: cleanSekWa,
+        alamatKantor: '',
+        tautanDrive: '',
+        diperbaruiPada: nowIso,
+      };
+      onSaveDpd(optimistic);
+      setEditModalOpen(false);
+
+      if (!webAppUrl.trim()) {
+        showTempNotice(`"${optimistic.namaDpd}" (${detId}) disimpan di browser lokal.`);
+        return;
+      }
+
+      setBgPendingCount((c) => c + 1);
+      void (async () => {
+        try {
+          const res = await saveDpdRecord(optimistic, activePin, webAppUrl);
+          if (res.ok && res.item) {
+            onSaveDpd(res.item);
+            showBackgroundSavedToast(
+              `"${res.item.namaDpd}" (${res.item.id}) tersimpan ke Spreadsheet #2.`,
+            );
+          } else {
+            setErrorBanner(
+              `Gagal menyimpan "${optimistic.namaDpd}" ke Spreadsheet #2: ${res.error || 'Terjadi kesalahan jaringan.'}`,
+            );
+          }
+        } finally {
+          setBgPendingCount((c) => Math.max(0, c - 1));
+        }
+      })();
+      return;
+    }
+
+    if (jenisSnapshot === 'DPC') {
+      const optimistic: DpcItem = {
+        id: detId,
+        kodeWilayah: kode,
+        kodeKabKota:
+          formKodeKabKota.trim() || (segs.length >= 2 ? segs.slice(0, 2).join('.') : ''),
+        kodeProvinsi: formKodeProvinsi.trim() || segs[0] || '',
+        pulau: formPulau.trim(),
+        namaProvinsi: formNamaProvinsi.trim(),
+        namaKabKota: formNamaKabKota.trim(),
+        namaKecamatan: formNamaKecamatan.trim() || namaLembaga,
+        namaDpc: namaLembaga,
+        statusTerbentuk: formStatus,
+        ketuaNama: ketuaNamaUp,
+        ketuaWa: cleanKetuaWa,
+        sekretarisNama: sekNamaUp,
+        sekretarisWa: cleanSekWa,
+        alamatKantor: '',
+        tautanDrive: '',
+        diperbaruiPada: nowIso,
+      };
+      onSaveDpc(optimistic);
+      setEditModalOpen(false);
+
+      if (!webAppUrl.trim()) {
+        showTempNotice(`"${optimistic.namaDpc}" (${detId}) disimpan di browser lokal.`);
+        return;
+      }
+
+      setBgPendingCount((c) => c + 1);
+      void (async () => {
+        try {
+          const res = await saveDpcRecord(optimistic, activePin, webAppUrl);
+          if (res.ok && res.item) {
+            onSaveDpc(res.item);
+            showBackgroundSavedToast(
+              `"${res.item.namaDpc}" (${res.item.id}) tersimpan ke Spreadsheet #2.`,
+            );
+          } else {
+            setErrorBanner(
+              `Gagal menyimpan "${optimistic.namaDpc}" ke Spreadsheet #2: ${res.error || 'Terjadi kesalahan jaringan.'}`,
+            );
+          }
+        } finally {
+          setBgPendingCount((c) => Math.max(0, c - 1));
+        }
+      })();
+      return;
+    }
+
+    // DPR
+    const optimistic: DprItem = {
+      id: detId,
+      kodeWilayah: kode,
+      kodeKecamatan:
+        formKodeKecamatan.trim() || (segs.length >= 3 ? segs.slice(0, 3).join('.') : ''),
+      kodeKabKota:
+        formKodeKabKota.trim() || (segs.length >= 2 ? segs.slice(0, 2).join('.') : ''),
+      kodeProvinsi: formKodeProvinsi.trim() || segs[0] || '',
+      pulau: formPulau.trim(),
+      namaProvinsi: formNamaProvinsi.trim(),
+      namaKabKota: formNamaKabKota.trim(),
+      namaKecamatan: formNamaKecamatan.trim(),
+      namaKelDesa: formNamaKelDesa.trim() || namaLembaga,
+      namaDpr: namaLembaga,
+      statusTerbentuk: formStatus,
+      ketuaNama: ketuaNamaUp,
+      ketuaWa: cleanKetuaWa,
+      sekretarisNama: sekNamaUp,
+      sekretarisWa: cleanSekWa,
+      alamatKantor: '',
+      tautanDrive: '',
+      diperbaruiPada: nowIso,
+    };
+    onSaveDpr(optimistic);
+    setEditModalOpen(false);
+
+    if (!webAppUrl.trim()) {
+      showTempNotice(`"${optimistic.namaDpr}" (${detId}) disimpan di browser lokal.`);
+      return;
+    }
+
+    setBgPendingCount((c) => c + 1);
+    void (async () => {
+      try {
+        const res = await saveDprRecord(optimistic, activePin, webAppUrl);
+        if (res.ok && res.item) {
+          onSaveDpr(res.item);
+          showBackgroundSavedToast(
+            `"${res.item.namaDpr}" (${res.item.id}) tersimpan ke Spreadsheet #2.`,
+          );
+        } else {
+          setErrorBanner(
+            `Gagal menyimpan "${optimistic.namaDpr}" ke Spreadsheet #2: ${res.error || 'Terjadi kesalahan jaringan.'}`,
+          );
+        }
+      } finally {
+        setBgPendingCount((c) => Math.max(0, c - 1));
+      }
+    })();
   };
 
-  const handleDeleteCurrentRecord = async () => {
+  // Optimistic background delete
+  const handleDeleteCurrentRecord = () => {
     if (!formId) return;
-    setFormDeleting(true);
-    setFormErr('');
-    try {
-      const res =
-        formJenis === 'DPW'
-          ? await deleteDpwRecord(formId, activePin, webAppUrl)
-          : formJenis === 'DPD'
-            ? await deleteDpdRecord(formId, activePin, webAppUrl)
-            : formJenis === 'DPC'
-              ? await deleteDpcRecord(formId, activePin, webAppUrl)
-              : await deleteDprRecord(formId, activePin, webAppUrl);
+    const targetId = formId;
+    const targetJenis = formJenis;
+    const targetLabel = formNamaLembaga || targetId;
 
-      if (res.ok) {
-        if (formJenis === 'DPW') onDeleteDpw(formId);
-        else if (formJenis === 'DPD') onDeleteDpd(formId);
-        else if (formJenis === 'DPC') onDeleteDpc(formId);
-        else onDeleteDpr(formId);
+    if (targetJenis === 'DPW') onDeleteDpw(targetId);
+    else if (targetJenis === 'DPD') onDeleteDpd(targetId);
+    else if (targetJenis === 'DPC') onDeleteDpc(targetId);
+    else onDeleteDpr(targetId);
 
-        setEditModalOpen(false);
-        showTempNotice(
-          res.synced
-            ? `Catatan ${formJenis} dihapus dari Spreadsheet #2 (status wilayah kembali Belum Terbentuk).`
-            : `Catatan ${formJenis} dihapus dari penyimpanan lokal.`,
-        );
-      } else {
-        setFormErr(res.error || `Gagal menghapus data ${formJenis}.`);
-      }
-    } finally {
-      setFormDeleting(false);
+    setEditModalOpen(false);
+
+    if (!webAppUrl.trim()) {
+      showTempNotice(`Catatan "${targetLabel}" dihapus dari penyimpanan lokal.`);
+      return;
     }
+
+    setBgPendingCount((c) => c + 1);
+    void (async () => {
+      try {
+        const res =
+          targetJenis === 'DPW'
+            ? await deleteDpwRecord(targetId, activePin, webAppUrl)
+            : targetJenis === 'DPD'
+              ? await deleteDpdRecord(targetId, activePin, webAppUrl)
+              : targetJenis === 'DPC'
+                ? await deleteDpcRecord(targetId, activePin, webAppUrl)
+                : await deleteDprRecord(targetId, activePin, webAppUrl);
+
+        if (res.ok) {
+          showBackgroundSavedToast(
+            `Catatan "${targetLabel}" dihapus dari Spreadsheet #2.`,
+          );
+        } else {
+          setErrorBanner(
+            `Gagal menghapus "${targetLabel}" dari Spreadsheet #2: ${res.error || 'Terjadi kesalahan jaringan.'}`,
+          );
+        }
+      } finally {
+        setBgPendingCount((c) => Math.max(0, c - 1));
+      }
+    })();
   };
 
-  // Export CSV for filtered institutional rows
+  // Export CSV for filtered institutional rows (tanpa Alamat Kantor & Tautan Drive)
   const handleExportCsv = () => {
     const headers = [
+      'No',
+      'ID',
       'Kode Wilayah',
       'Tingkat',
       'Pulau',
@@ -1282,13 +1698,13 @@ export function DpwDpdView({
       'WA Ketua',
       'Sekretaris',
       'WA Sekretaris',
-      'Alamat Kantor',
-      'Tautan Drive',
     ];
     const lines = [
       headers.map(escapeCsvCell).join(','),
-      ...filteredRows.map((d) =>
+      ...filteredRows.map((d, idx) =>
         [
+          String(idx + 1),
+          d.id || buildLembagaId(d.jenis, d.kodeWilayah),
           d.kodeWilayah,
           d.jenis,
           d.pulau,
@@ -1302,8 +1718,6 @@ export function DpwDpdView({
           d.ketuaWa,
           d.sekretarisNama,
           d.sekretarisWa,
-          d.alamatKantor || '',
-          d.tautanDrive || '',
         ]
           .map(escapeCsvCell)
           .join(','),
@@ -1315,7 +1729,7 @@ export function DpwDpdView({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Kelembagaan_${subTab.toUpperCase()}_DUWD_WI.csv`;
+    a.download = `DPW_DPD_${subTab.toUpperCase()}_DUWD_WI.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1347,7 +1761,7 @@ export function DpwDpdView({
             Departemen Urusan Wilayah &amp; Daerah &middot; DPP Wahdah Islamiyah
           </p>
           <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-[#07525E] dark:text-[#E6F4F7] sm:text-3xl">
-            Direktori Kelembagaan Wilayah &amp; Daerah
+            Direktori DPW &amp; DPD
           </h1>
           <p className="mt-1 text-sm text-[#526A70] dark:text-[#9BB5BC]">
             Data kepengurusan DPW, DPD, DPC, dan DPR Wahdah Islamiyah seluruh Indonesia beserta kontak Ketua dan Sekretaris.
@@ -1544,6 +1958,32 @@ export function DpwDpdView({
           </div>
         </button>
       </div>
+
+      {/* Background Sync Non-Blocking Indicator */}
+      {bgPendingCount > 0 && (
+        <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-[#0C7A89]/30 bg-[#EBF7F9] px-4 py-2.5 text-xs font-semibold text-[#07525E] dark:border-[#3EC1D3]/35 dark:bg-[#0D2F38] dark:text-[#BCEAF0]">
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#0C7A89] dark:text-[#3EC1D3]" />
+          <span>
+            Menyimpan {bgPendingCount} perubahan ke Spreadsheet #2 di balik layar... Anda dapat langsung lanjut mengelola data lain.
+          </span>
+        </div>
+      )}
+
+      {bgPendingCount === 0 && bgSavedNotice && (
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-50/90 px-4 py-2.5 text-xs font-semibold text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-950/50 dark:text-emerald-300">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <span>{bgSavedNotice}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setBgSavedNotice('')}
+            className="cursor-pointer text-emerald-700 dark:text-emerald-300"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {notice && (
         <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[#0C7A89]/25 bg-[#ECF6F2] px-4 py-2.5 text-xs font-medium text-[#07525E] dark:border-[#3EC1D3]/30 dark:bg-[#0D2E36] dark:text-[#BCEAF0]">
@@ -1810,9 +2250,10 @@ export function DpwDpdView({
           </div>
         ) : (
           <div className="overflow-x-auto" ref={copyMenuContainerRef}>
-            <table className="duwd-zebra-table w-full min-w-[880px] border-collapse text-left text-xs">
+            <table className="duwd-zebra-table w-full min-w-[920px] border-collapse text-left text-xs">
               <thead>
                 <tr className="border-b border-[#07525E]/10 bg-[#F4FAFB] text-[11px] font-bold tracking-wide text-[#355158] uppercase dark:border-[#3EC1D3]/15 dark:bg-[#0C2730] dark:text-[#9BB5BC]">
+                  <th className="w-12 px-3 py-3.5 text-center">No</th>
                   <th className="px-4 py-3.5">Kode &amp; Tingkat</th>
                   <th className="px-4 py-3.5">Wilayah &amp; Status</th>
                   <th className="px-4 py-3.5">Ketua</th>
@@ -1821,7 +2262,7 @@ export function DpwDpdView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#07525E]/8 dark:divide-[#3EC1D3]/10">
-                {pagedRows.map((row) => {
+                {pagedRows.map((row, idx) => {
                   const rowKey = `${row.jenis}-${row.kodeWilayah}`;
                   const isMenuOpen = openCopyKey === rowKey;
                   const displayName = formatEntityDisplayName(row, false);
@@ -1836,6 +2277,10 @@ export function DpwDpdView({
 
                   return (
                     <tr key={rowKey} className="align-top">
+                      <td className="px-3 py-3.5 text-center font-mono text-[11px] font-semibold text-[#526A70] tabular-nums dark:text-[#8DA8B0]">
+                        {(pageStart + idx + 1).toLocaleString('id-ID')}
+                      </td>
+
                       <td className="px-4 py-3.5">
                         <div className="font-mono font-bold text-[#07525E] tabular-nums dark:text-[#E6F4F7]">
                           {row.kodeWilayah}
@@ -1861,20 +2306,6 @@ export function DpwDpdView({
                           >
                             {row.statusTerbentuk}
                           </span>
-                          {row.tautanDrive && (
-                            <>
-                              <span aria-hidden="true">&middot;</span>
-                              <a
-                                href={row.tautanDrive}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 font-semibold text-[#0C7A89] hover:underline dark:text-[#3EC1D3]"
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                                <span>Drive SK</span>
-                              </a>
-                            </>
-                          )}
                         </div>
                       </td>
 
@@ -2080,35 +2511,67 @@ export function DpwDpdView({
         )}
       </div>
 
-      {/* Pagination Bar */}
-      {activeItemCount > PAGE_SIZE && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#07525E]/10 bg-white/70 px-4 py-2.5 text-xs text-[#355158] dark:border-[#3EC1D3]/15 dark:bg-[#0B2229]/85 dark:text-[#B4CCD3]">
-          <span className="font-medium tabular-nums">
-            Menampilkan {(pageStart + 1).toLocaleString('id-ID')}–
-            {Math.min(pageStart + PAGE_SIZE, activeItemCount).toLocaleString('id-ID')} dari{' '}
-            {activeItemCount.toLocaleString('id-ID')} data (Halaman{' '}
-            {safePage.toLocaleString('id-ID')} / {totalPages.toLocaleString('id-ID')})
-          </span>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              disabled={safePage <= 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#07525E]/15 bg-white px-3 py-1.5 font-semibold text-[#07525E] hover:bg-[#EBF5F8] disabled:cursor-not-allowed disabled:opacity-45 dark:border-[#3EC1D3]/25 dark:bg-[#0D2B33] dark:text-[#E6F4F7] dark:hover:bg-[#13424F]"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-              <span>Sebelumnya</span>
-            </button>
-            <button
-              type="button"
-              disabled={safePage >= totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#07525E]/15 bg-white px-3 py-1.5 font-semibold text-[#07525E] hover:bg-[#EBF5F8] disabled:cursor-not-allowed disabled:opacity-45 dark:border-[#3EC1D3]/25 dark:bg-[#0D2B33] dark:text-[#E6F4F7] dark:hover:bg-[#13424F]"
-            >
-              <span>Berikutnya</span>
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
+      {/* Pagination Bar (Default 10, opsi 5/10/25/50/100/500/Semua) */}
+      {activeItemCount > 0 && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#07525E]/10 bg-white/75 px-4 py-2.5 text-xs text-[#355158] dark:border-[#3EC1D3]/15 dark:bg-[#0B2229]/85 dark:text-[#B4CCD3]">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="inline-flex items-center gap-1.5 font-medium">
+              <span>Tampilkan</span>
+              <select
+                value={String(pageSize)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setPageSize(val === 'ALL' ? 'ALL' : (Number(val) as PageSizeOption));
+                }}
+                aria-label="Jumlah baris per halaman"
+                className="rounded-lg border border-[#07525E]/20 bg-white px-2.5 py-1 text-xs font-bold text-[#07525E] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+              >
+                {PAGE_SIZE_OPTIONS.map((opt) => (
+                  <option key={String(opt)} value={String(opt)}>
+                    {opt === 'ALL' ? 'Semua' : opt}
+                  </option>
+                ))}
+              </select>
+              <span>baris</span>
+            </label>
+
+            <span className="font-medium tabular-nums">
+              Menampilkan {(pageStart + 1).toLocaleString('id-ID')}–
+              {Math.min(pageStart + pagedRows.length, activeItemCount).toLocaleString('id-ID')}{' '}
+              dari {activeItemCount.toLocaleString('id-ID')} data
+              {isAllMode && activeItemCount > MAX_ALL_RENDER_ROWS && (
+                <span className="ml-1.5 text-[11px] text-[#D88B15] dark:text-[#F0B243]">
+                  (dibatasi {MAX_ALL_RENDER_ROWS.toLocaleString('id-ID')} baris agar tetap ringan; gunakan filter Provinsi/Kab)
+                </span>
+              )}
+            </span>
           </div>
+
+          {!isAllMode && totalPages > 1 && (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={safePage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#07525E]/15 bg-white px-3 py-1.5 font-semibold text-[#07525E] hover:bg-[#EBF5F8] disabled:cursor-not-allowed disabled:opacity-45 dark:border-[#3EC1D3]/25 dark:bg-[#0D2B33] dark:text-[#E6F4F7] dark:hover:bg-[#13424F]"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span>Sebelumnya</span>
+              </button>
+              <span className="px-2 font-semibold tabular-nums text-[#07525E] dark:text-[#E6F4F7]">
+                {safePage.toLocaleString('id-ID')} / {totalPages.toLocaleString('id-ID')}
+              </span>
+              <button
+                type="button"
+                disabled={safePage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#07525E]/15 bg-white px-3 py-1.5 font-semibold text-[#07525E] hover:bg-[#EBF5F8] disabled:cursor-not-allowed disabled:opacity-45 dark:border-[#3EC1D3]/25 dark:bg-[#0D2B33] dark:text-[#E6F4F7] dark:hover:bg-[#13424F]"
+              >
+                <span>Berikutnya</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -2153,96 +2616,249 @@ export function DpwDpdView({
             </h2>
             <p className="mt-1 text-xs text-[#526A70] dark:text-[#9BB5BC]">
               {isSuperAdmin
-                ? `Pengaturan status pembentukan, nama lembaga, serta kontak Ketua & Sekretaris ${formJenis} di Spreadsheet #2.`
+                ? `Pilih wilayah secara otomatis (kode, pulau, dan provinsi terisi otomatis). Proses simpan berjalan di balik layar.`
                 : 'Mode Admin: Anda hanya diperkenankan mengubah Nama dan Nomor WhatsApp Ketua & Sekretaris.'}
             </p>
 
             <form onSubmit={handleSubmitForm} className="mt-5 space-y-4">
               {isManualCreate && isSuperAdmin ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
-                      Kode Wilayah *
-                    </label>
+                <div className="space-y-3 rounded-2xl border border-[#0C7A89]/20 bg-[#F4FAFB]/90 p-3.5 dark:border-[#3EC1D3]/25 dark:bg-[#081F26]">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-[#07525E] dark:text-[#E6F4F7]">
+                      Pilih Wilayah {formJenis}{' '}
+                      {formJenis === 'DPW'
+                        ? '(Provinsi)'
+                        : formJenis === 'DPD'
+                          ? '(Kabupaten / Kota)'
+                          : formJenis === 'DPC'
+                            ? '(Kecamatan)'
+                            : '(Kelurahan / Desa)'}
+                    </span>
+                    <span className="text-[11px] text-[#526A70] dark:text-[#8DA8B0]">
+                      Autosearch dari database wilayah
+                    </span>
+                  </div>
+
+                  {/* Filter opsional untuk mempercepat pencarian bertingkat */}
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {formJenis === 'DPW' && (
+                      <select
+                        value={pickerPulauFilter}
+                        onChange={(e) => setPickerPulauFilter(e.target.value)}
+                        aria-label="Filter Pulau"
+                        className="w-full rounded-xl border border-[#07525E]/15 bg-white px-3 py-2 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                      >
+                        <option value="ALL">Semua Pulau (7)</option>
+                        {pulauOptions.map((p) => (
+                          <option key={p} value={p}>
+                            Pulau {p}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    {(formJenis === 'DPD' || formJenis === 'DPC' || formJenis === 'DPR') && (
+                      <select
+                        value={pickerProvFilter}
+                        onChange={(e) => {
+                          setPickerProvFilter(e.target.value);
+                          setPickerKabFilter('ALL');
+                          setPickerKecFilter('ALL');
+                          setPickerDropdownOpen(true);
+                        }}
+                        aria-label="Filter Provinsi"
+                        className="w-full rounded-xl border border-[#07525E]/15 bg-white px-3 py-2 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                      >
+                        <option value="ALL">
+                          {formJenis === 'DPR'
+                            ? '— Pilih Provinsi Terlebih Dahulu —'
+                            : 'Semua Provinsi (38)'}
+                        </option>
+                        {pickerProvOptions.map((p) => (
+                          <option key={p.kode} value={p.kode}>
+                            {p.kode} — {p.nama}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    {(formJenis === 'DPC' || formJenis === 'DPR') && (
+                      <select
+                        value={pickerKabFilter}
+                        onChange={(e) => {
+                          setPickerKabFilter(e.target.value);
+                          setPickerKecFilter('ALL');
+                          setPickerDropdownOpen(true);
+                        }}
+                        aria-label="Filter Kab/Kota"
+                        className="w-full rounded-xl border border-[#07525E]/15 bg-white px-3 py-2 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                      >
+                        <option value="ALL">Semua Kab/Kota</option>
+                        {pickerKabOptions.map((k) => (
+                          <option key={k.kode} value={k.kode}>
+                            {k.kode} — {k.nama}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    {formJenis === 'DPR' && pickerProvFilter !== 'ALL' && (
+                      <select
+                        value={pickerKecFilter}
+                        onChange={(e) => {
+                          setPickerKecFilter(e.target.value);
+                          setPickerDropdownOpen(true);
+                        }}
+                        aria-label="Filter Kecamatan"
+                        className="w-full rounded-xl border border-[#07525E]/15 bg-white px-3 py-2 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none sm:col-span-2 dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                      >
+                        <option value="ALL">Semua Kecamatan</option>
+                        {pickerKecOptions.map((k) => (
+                          <option key={k.kode} value={k.kode}>
+                            {k.kode} — {k.nama}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* Autosearch Autodropdown Input */}
+                  <div className="relative" ref={pickerContainerRef}>
+                    <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-[#6B8187] dark:text-[#8DA8B0]" />
                     <input
                       type="text"
-                      value={formKodeWilayah}
-                      onChange={(e) => setFormKodeWilayah(e.target.value)}
-                      placeholder="Contoh: 73 atau 73.71 atau 73.71.01"
-                      className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                      value={pickerQuery}
+                      onFocus={() => setPickerDropdownOpen(true)}
+                      onChange={(e) => {
+                        setPickerQuery(e.target.value);
+                        setPickerDropdownOpen(true);
+                      }}
+                      disabled={formJenis === 'DPR' && pickerProvFilter === 'ALL'}
+                      placeholder={
+                        formJenis === 'DPW'
+                          ? 'Ketik nama provinsi atau kode (contoh: Aceh, 73)...'
+                          : formJenis === 'DPD'
+                            ? 'Ketik nama kab/kota atau kode (contoh: Bulukumba, Makassar, 73.02)...'
+                            : formJenis === 'DPC'
+                              ? 'Ketik nama kecamatan atau kabupaten...'
+                              : pickerProvFilter === 'ALL'
+                                ? 'Pilih Provinsi di atas dulu untuk memuat Kel/Desa...'
+                                : 'Ketik nama kelurahan/desa atau kecamatan...'
+                      }
+                      className="w-full rounded-xl border border-[#0C7A89]/30 bg-white py-2.5 pr-9 pl-10 text-xs font-medium text-[#0F2429] placeholder:text-[#7D9197] focus:border-[#0C7A89] focus:outline-none disabled:opacity-60 dark:border-[#3EC1D3]/35 dark:bg-[#071A20] dark:text-[#E6F4F7] dark:placeholder:text-[#6D8B94]"
                     />
+                    {pickerQuery && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPickerQuery('');
+                          setPickerDropdownOpen(true);
+                        }}
+                        aria-label="Hapus pencarian wilayah"
+                        className="absolute top-1/2 right-2.5 -translate-y-1/2 cursor-pointer rounded-md p-1 text-[#6B8187] hover:bg-[#EBF5F8] dark:text-[#8DA8B0] dark:hover:bg-[#113540]"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+
+                    {pickerDropdownOpen && (
+                      <div className="absolute top-full right-0 left-0 z-40 mt-1.5 max-h-56 overflow-y-auto rounded-xl border border-[#07525E]/18 bg-white p-1.5 shadow-xl dark:border-[#3EC1D3]/30 dark:bg-[#071A20]">
+                        {(formJenis === 'DPC' && loadingKecs) ||
+                        (formJenis === 'DPR' && loadingModalKels) ? (
+                          <div className="flex items-center justify-center gap-2 py-4 text-xs text-[#526A70] dark:text-[#9BB5BC]">
+                            <Loader2 className="h-4 w-4 animate-spin text-[#0C7A89]" />
+                            <span>Memuat daftar wilayah...</span>
+                          </div>
+                        ) : pickerCandidates.length === 0 ? (
+                          <div className="px-3 py-3 text-center text-xs text-[#526A70] dark:text-[#8DA8B0]">
+                            {formJenis === 'DPR' && pickerProvFilter === 'ALL'
+                              ? 'Silakan pilih Provinsi terlebih dahulu di dropdown atas.'
+                              : 'Tidak ada wilayah yang cocok dengan kata kunci tersebut.'}
+                          </div>
+                        ) : (
+                          pickerCandidates.map((cand) => {
+                            const isSelected = formKodeWilayah === cand.kode;
+                            return (
+                              <button
+                                key={cand.kode}
+                                type="button"
+                                onClick={() => handleSelectPickerTerritory(cand)}
+                                className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
+                                  isSelected
+                                    ? 'bg-[#E3F4F7] dark:bg-[#123B46]'
+                                    : 'hover:bg-[#F2FAFB] dark:hover:bg-[#0E2E37]'
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <div className="truncate text-xs font-bold text-[#07525E] dark:text-[#E6F4F7]">
+                                    {cand.nama}
+                                  </div>
+                                  <div className="truncate text-[11px] text-[#526A70] dark:text-[#8DA8B0]">
+                                    <span className="font-mono font-semibold text-[#0C7A89] dark:text-[#3EC1D3]">
+                                      {cand.kode}
+                                    </span>{' '}
+                                    &middot; {cand.subtitle}
+                                  </div>
+                                </div>
+                                {cand.alreadyTerbentuk && (
+                                  <span className="shrink-0 rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
+                                    Terbentuk
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
-                      Pulau
-                    </label>
-                    <input
-                      type="text"
-                      value={formPulau}
-                      onChange={(e) => setFormPulau(e.target.value)}
-                      placeholder="Contoh: Sulawesi"
-                      className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
-                      Nama Provinsi
-                    </label>
-                    <input
-                      type="text"
-                      value={formNamaProvinsi}
-                      onChange={(e) => setFormNamaProvinsi(e.target.value)}
-                      placeholder="Contoh: Sulawesi Selatan"
-                      className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
-                    />
-                  </div>
-                  {formJenis !== 'DPW' && (
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
-                        Nama Kab/Kota
-                      </label>
-                      <input
-                        type="text"
-                        value={formNamaKabKota}
-                        onChange={(e) => setFormNamaKabKota(e.target.value)}
-                        placeholder="Contoh: Kota Makassar"
-                        className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
-                      />
-                    </div>
-                  )}
-                  {(formJenis === 'DPC' || formJenis === 'DPR') && (
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
-                        Nama Kecamatan
-                      </label>
-                      <input
-                        type="text"
-                        value={formNamaKecamatan}
-                        onChange={(e) => setFormNamaKecamatan(e.target.value)}
-                        className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
-                      />
-                    </div>
-                  )}
-                  {formJenis === 'DPR' && (
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
-                        Nama Kelurahan/Desa
-                      </label>
-                      <input
-                        type="text"
-                        value={formNamaKelDesa}
-                        onChange={(e) => setFormNamaKelDesa(e.target.value)}
-                        className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
-                      />
+
+                  {/* Ringkasan Otomatis Wilayah Terpilih (Kode, ID, Pulau, Provinsi) */}
+                  {formKodeWilayah && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#0C7A89]/25 bg-white px-3.5 py-2.5 text-xs dark:border-[#3EC1D3]/30 dark:bg-[#0D2A33]">
+                      <div className="flex items-start gap-2">
+                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#0C7A89] dark:text-[#3EC1D3]" />
+                        <div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="rounded-md bg-[#E6F4F7] px-1.5 py-0.5 font-mono text-[11px] font-bold text-[#07525E] dark:bg-[#13424F] dark:text-[#3EC1D3]">
+                              ID: {buildLembagaId(formJenis, formKodeWilayah)}
+                            </span>
+                            <span className="font-mono font-bold text-[#07525E] dark:text-[#E6F4F7]">
+                              Kode {formKodeWilayah}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-[#526A70] dark:text-[#9BB5BC]">
+                            {[
+                              formPulau,
+                              formNamaProvinsi,
+                              formNamaKabKota,
+                              formNamaKecamatan,
+                              formNamaKelDesa,
+                            ]
+                              .filter(Boolean)
+                              .join(' / ')}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleClearSelectedTerritory}
+                        className="cursor-pointer rounded-lg px-2 py-1 text-[11px] font-semibold text-[#0C7A89] hover:bg-[#EBF5F8] dark:text-[#3EC1D3] dark:hover:bg-[#13424F]"
+                      >
+                        Ganti
+                      </button>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="rounded-xl border border-[#07525E]/10 bg-[#F4FAFB] px-3.5 py-2.5 text-xs text-[#355158] dark:border-[#3EC1D3]/20 dark:bg-[#0D2A33] dark:text-[#B4CCD3]">
-                  <span className="font-mono font-bold text-[#07525E] dark:text-[#3EC1D3]">
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#07525E]/10 bg-[#F4FAFB] px-3.5 py-2.5 text-xs text-[#355158] dark:border-[#3EC1D3]/20 dark:bg-[#0D2A33] dark:text-[#B4CCD3]">
+                  <span className="rounded-md bg-[#E6F4F7] px-1.5 py-0.5 font-mono text-[11px] font-bold text-[#07525E] dark:bg-[#13424F] dark:text-[#3EC1D3]">
+                    {buildLembagaId(formJenis, formKodeWilayah)}
+                  </span>
+                  <span className="font-mono font-bold text-[#07525E] dark:text-[#E6F4F7]">
                     {formKodeWilayah}
                   </span>
-                  <span className="mx-1.5 text-[#7D9197]">&middot;</span>
+                  <span className="text-[#7D9197]">&middot;</span>
                   <span>
                     {[
                       formPulau,
@@ -2257,35 +2873,48 @@ export function DpwDpdView({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-                <div className="sm:col-span-2">
-                  <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
-                    Nama {formJenis}
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!isSuperAdmin}
-                    value={formNamaLembaga}
-                    onChange={(e) => setFormNamaLembaga(e.target.value)}
-                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none disabled:bg-[#F4FAFB] disabled:text-[#526A70] dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7] dark:disabled:bg-[#0D2A33] dark:disabled:text-[#8DA8B0]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
-                    Status Kelembagaan
-                  </label>
-                  <select
-                    disabled={!isSuperAdmin}
-                    value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value as StatusTerbentuk)}
-                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs font-semibold text-[#07525E] focus:border-[#0C7A89] focus:outline-none disabled:bg-[#F4FAFB] disabled:text-[#526A70] dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7] dark:disabled:bg-[#0D2A33] dark:disabled:text-[#8DA8B0]"
-                  >
-                    {STATUS_TERBENTUK_OPTIONS.map((st) => (
-                      <option key={st} value={st}>
-                        {st}
-                      </option>
-                    ))}
-                  </select>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
+                  Nama {formJenis}
+                </label>
+                <input
+                  type="text"
+                  disabled={!isSuperAdmin}
+                  value={formNamaLembaga}
+                  onChange={(e) => setFormNamaLembaga(e.target.value)}
+                  placeholder={`Otomatis terisi saat memilih wilayah ${formJenis}`}
+                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none disabled:bg-[#F4FAFB] disabled:text-[#526A70] dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7] dark:disabled:bg-[#0D2A33] dark:disabled:text-[#8DA8B0]"
+                />
+              </div>
+
+              {/* Status Kelembagaan: Pilihan Langsung 1-Klik */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
+                  Status Kelembagaan
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {STATUS_TERBENTUK_OPTIONS.map((st) => {
+                    const active = formStatus === st;
+                    const isFormed = st === 'Sudah Terbentuk';
+                    return (
+                      <button
+                        key={st}
+                        type="button"
+                        disabled={!isSuperAdmin}
+                        onClick={() => setFormStatus(st)}
+                        className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-bold transition-all disabled:cursor-not-allowed disabled:opacity-65 ${
+                          active
+                            ? isFormed
+                              ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm dark:border-emerald-500 dark:bg-emerald-600'
+                              : 'border-[#07525E] bg-[#07525E] text-white shadow-sm dark:border-[#3EC1D3] dark:bg-[#154A59]'
+                            : 'border-[#07525E]/18 bg-white text-[#355158] hover:border-[#0C7A89]/50 hover:bg-[#F4FAFB] dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#B4CCD3] dark:hover:bg-[#0D2A33]'
+                        }`}
+                      >
+                        {active && <Check className="h-3.5 w-3.5 shrink-0" />}
+                        <span>{st}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -2297,9 +2926,9 @@ export function DpwDpdView({
                   <input
                     type="text"
                     value={formKetuaNama}
-                    onChange={(e) => setFormKetuaNama(e.target.value)}
-                    placeholder="Nama lengkap Ketua"
-                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                    onChange={(e) => setFormKetuaNama(e.target.value.toUpperCase())}
+                    placeholder="NAMA LENGKAP KETUA"
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm uppercase text-[#0F2429] placeholder:normal-case focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                   />
                 </div>
                 <div>
@@ -2325,9 +2954,9 @@ export function DpwDpdView({
                   <input
                     type="text"
                     value={formSekNama}
-                    onChange={(e) => setFormSekNama(e.target.value)}
-                    placeholder="Nama lengkap Sekretaris"
-                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                    onChange={(e) => setFormSekNama(e.target.value.toUpperCase())}
+                    placeholder="NAMA LENGKAP SEKRETARIS"
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm uppercase text-[#0F2429] placeholder:normal-case focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                   />
                 </div>
                 <div>
@@ -2343,34 +2972,6 @@ export function DpwDpdView({
                     onChange={setFormSekWa}
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
-                  Alamat Kantor / Sekretariat (Opsional)
-                </label>
-                <input
-                  type="text"
-                  disabled={!isSuperAdmin}
-                  value={formAlamat}
-                  onChange={(e) => setFormAlamat(e.target.value)}
-                  placeholder="Jl. ..."
-                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 text-sm text-[#0F2429] focus:border-[#0C7A89] focus:outline-none disabled:bg-[#F4FAFB] disabled:text-[#526A70] dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7] dark:disabled:bg-[#0D2A33] dark:disabled:text-[#8DA8B0]"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
-                  Tautan Google Drive SK / Dokumen (Opsional)
-                </label>
-                <input
-                  type="url"
-                  disabled={!isSuperAdmin}
-                  value={formDrive}
-                  onChange={(e) => setFormDrive(e.target.value)}
-                  placeholder="https://drive.google.com/..."
-                  className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3.5 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none disabled:bg-[#F4FAFB] disabled:text-[#526A70] dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7] dark:disabled:bg-[#0D2A33] dark:disabled:text-[#8DA8B0]"
-                />
               </div>
 
               {formErr && (
@@ -2394,12 +2995,11 @@ export function DpwDpdView({
                     </button>
                     <button
                       type="button"
-                      disabled={formDeleting}
-                      onClick={() => void handleDeleteCurrentRecord()}
-                      className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-red-600 px-3 py-1 font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                      onClick={handleDeleteCurrentRecord}
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-red-600 px-3 py-1 font-semibold text-white hover:bg-red-700"
                     >
                       <Check className="h-3.5 w-3.5" />
-                      <span>{formDeleting ? 'Menghapus...' : 'Ya, Hapus'}</span>
+                      <span>Ya, Hapus</span>
                     </button>
                   </div>
                 </div>
@@ -2429,14 +3029,9 @@ export function DpwDpdView({
                   </button>
                   <button
                     type="submit"
-                    disabled={formSaving}
-                    className="cursor-pointer rounded-xl bg-gradient-to-r from-[#0C7A89] to-[#07525E] px-5 py-2.5 text-xs font-semibold text-white shadow-sm disabled:opacity-60"
+                    className="cursor-pointer rounded-xl bg-gradient-to-r from-[#0C7A89] to-[#07525E] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5"
                   >
-                    {formSaving
-                      ? 'Menyimpan...'
-                      : isSuperAdmin
-                        ? `Simpan ${formJenis}`
-                        : 'Simpan Kontak'}
+                    {isSuperAdmin ? `Simpan ${formJenis}` : 'Simpan Kontak'}
                   </button>
                 </div>
               </div>

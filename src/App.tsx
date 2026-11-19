@@ -333,9 +333,11 @@ export default function App() {
 
   const handleSaveDpw = (saved: DpwItem) => {
     setDpwList((prev) => {
-      const exists = prev.some((d) => d.id === saved.id);
+      const exists = prev.some((d) => d.id === saved.id || d.kodeWilayah === saved.kodeWilayah);
       const next = exists
-        ? prev.map((d) => (d.id === saved.id ? saved : d))
+        ? prev.map((d) =>
+            d.id === saved.id || d.kodeWilayah === saved.kodeWilayah ? saved : d,
+          )
         : [...prev, saved];
       saveLocalDpw(next);
       return next;
@@ -352,9 +354,11 @@ export default function App() {
 
   const handleSaveDpd = (saved: DpdItem) => {
     setDpdList((prev) => {
-      const exists = prev.some((d) => d.id === saved.id);
+      const exists = prev.some((d) => d.id === saved.id || d.kodeWilayah === saved.kodeWilayah);
       const next = exists
-        ? prev.map((d) => (d.id === saved.id ? saved : d))
+        ? prev.map((d) =>
+            d.id === saved.id || d.kodeWilayah === saved.kodeWilayah ? saved : d,
+          )
         : [...prev, saved];
       saveLocalDpd(next);
       return next;

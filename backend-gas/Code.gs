@@ -246,8 +246,6 @@ function setupWilayahDatabase_(wSs) {
         'Ketua_WA',
         'Sekretaris_Nama',
         'Sekretaris_WA',
-        'Alamat_Kantor',
-        'Tautan_Drive',
         'Diperbarui_Pada'
       ]
     },
@@ -266,8 +264,6 @@ function setupWilayahDatabase_(wSs) {
         'Ketua_WA',
         'Sekretaris_Nama',
         'Sekretaris_WA',
-        'Alamat_Kantor',
-        'Tautan_Drive',
         'Diperbarui_Pada'
       ]
     },
@@ -288,8 +284,6 @@ function setupWilayahDatabase_(wSs) {
         'Ketua_WA',
         'Sekretaris_Nama',
         'Sekretaris_WA',
-        'Alamat_Kantor',
-        'Tautan_Drive',
         'Diperbarui_Pada'
       ]
     },
@@ -312,8 +306,6 @@ function setupWilayahDatabase_(wSs) {
         'Ketua_WA',
         'Sekretaris_Nama',
         'Sekretaris_WA',
-        'Alamat_Kantor',
-        'Tautan_Drive',
         'Diperbarui_Pada'
       ]
     }
@@ -1241,11 +1233,12 @@ function doPost(e) {
         return jsonOut_({ ok: false, error: 'Kode wilayah dan nama provinsi wajib diisi.' });
       }
 
-      const existing = findRowInSs_(wSs, WILAYAH_SHEETS.DPW, payload.id ? 'ID_DPW' : 'Kode_Wilayah', payload.id || kodeWilayah)
-        || findRowInSs_(wSs, WILAYAH_SHEETS.DPW, 'Kode_Wilayah', kodeWilayah);
-      const existingId = existing ? String(existing.ID_DPW || '').trim() : '';
-      const idDpw = existingId || (payload.id ? String(payload.id).trim() : generateId_('DPW'));
+      const existing = findRowInSs_(wSs, WILAYAH_SHEETS.DPW, 'Kode_Wilayah', kodeWilayah)
+        || (payload.id ? findRowInSs_(wSs, WILAYAH_SHEETS.DPW, 'ID_DPW', payload.id) : null);
+      const idDpw = buildLembagaId_('dpw', kodeWilayah);
       const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
+      const ketuaNamaUp = String(payload.ketuaNama || '').trim().toUpperCase();
+      const sekNamaUp = String(payload.sekretarisNama || '').trim().toUpperCase();
 
       const rowObj = role === 'admin'
         ? {
@@ -1255,12 +1248,10 @@ function doPost(e) {
             Nama_DPW: existing ? String(existing.Nama_DPW) : namaDpw,
             Nama_Provinsi: existing ? String(existing.Nama_Provinsi) : namaProvinsi,
             Status_Terbentuk: existing ? String(existing.Status_Terbentuk || 'Belum Terbentuk') : 'Belum Terbentuk',
-            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_Nama: ketuaNamaUp,
             Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
-            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_Nama: sekNamaUp,
             Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
-            Alamat_Kantor: existing ? String(existing.Alamat_Kantor || '') : '',
-            Tautan_Drive: existing ? String(existing.Tautan_Drive || '') : '',
             Diperbarui_Pada: nowStr
           }
         : {
@@ -1270,29 +1261,22 @@ function doPost(e) {
             Nama_DPW: namaDpw,
             Nama_Provinsi: namaProvinsi,
             Status_Terbentuk: String(payload.statusTerbentuk || 'Sudah Terbentuk').trim(),
-            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_Nama: ketuaNamaUp,
             Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
-            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_Nama: sekNamaUp,
             Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
-            Alamat_Kantor: String(payload.alamatKantor || '').trim(),
-            Tautan_Drive: String(payload.tautanDrive || '').trim(),
             Diperbarui_Pada: nowStr
           };
 
       const updated = existing
-        ? updateRowByIdInSs_(
-            wSs,
-            WILAYAH_SHEETS.DPW,
-            existingId ? 'ID_DPW' : 'Kode_Wilayah',
-            existingId || kodeWilayah,
-            rowObj
-          )
+        ? (updateRowByIdInSs_(wSs, WILAYAH_SHEETS.DPW, 'Kode_Wilayah', kodeWilayah, rowObj)
+          || (existing.ID_DPW ? updateRowByIdInSs_(wSs, WILAYAH_SHEETS.DPW, 'ID_DPW', String(existing.ID_DPW), rowObj) : false))
         : false;
       if (!updated) {
         appendRowInSs_(wSs, WILAYAH_SHEETS.DPW, rowObj);
       }
 
-      writeLog_(role.toUpperCase(), existing ? 'updateDpw' : 'createDpw', kodeWilayah + ' — ' + rowObj.Nama_DPW);
+      writeLog_(role.toUpperCase(), existing ? 'updateDpw' : 'createDpw', idDpw + ' — ' + rowObj.Nama_DPW);
       return jsonOut_({ ok: true, data: mapDpwRow_(rowObj) });
     }
 
@@ -1311,17 +1295,18 @@ function doPost(e) {
 
       const kodeWilayah = String(payload.kodeWilayah || '').trim();
       const namaKabKota = String(payload.namaKabKota || '').trim();
-      const namaDpd = String(payload.namaDpd || ('DPD Wahdah Islamiyah ' + namaKabKota)).trim();
+      const namaDpd = String(payload.namaDpd || ('DPD ' + namaKabKota)).trim();
       if (!kodeWilayah || !namaKabKota) {
         return jsonOut_({ ok: false, error: 'Kode wilayah dan nama Kab/Kota wajib diisi.' });
       }
 
-      const existing = findRowInSs_(wSs, WILAYAH_SHEETS.DPD, payload.id ? 'ID_DPD' : 'Kode_Wilayah', payload.id || kodeWilayah)
-        || findRowInSs_(wSs, WILAYAH_SHEETS.DPD, 'Kode_Wilayah', kodeWilayah);
-      const existingId = existing ? String(existing.ID_DPD || '').trim() : '';
-      const idDpd = existingId || (payload.id ? String(payload.id).trim() : generateId_('DPD'));
+      const existing = findRowInSs_(wSs, WILAYAH_SHEETS.DPD, 'Kode_Wilayah', kodeWilayah)
+        || (payload.id ? findRowInSs_(wSs, WILAYAH_SHEETS.DPD, 'ID_DPD', payload.id) : null);
+      const idDpd = buildLembagaId_('dpd', kodeWilayah);
       const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
       const kodeProv = String(payload.kodeProvinsi || kodeWilayah.split('.')[0] || '').trim();
+      const ketuaNamaUp = String(payload.ketuaNama || '').trim().toUpperCase();
+      const sekNamaUp = String(payload.sekretarisNama || '').trim().toUpperCase();
 
       const rowObj = role === 'admin'
         ? {
@@ -1333,12 +1318,10 @@ function doPost(e) {
             Nama_DPD: existing ? String(existing.Nama_DPD) : namaDpd,
             Nama_KabKota: existing ? String(existing.Nama_KabKota) : namaKabKota,
             Status_Terbentuk: existing ? String(existing.Status_Terbentuk || 'Belum Terbentuk') : 'Belum Terbentuk',
-            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_Nama: ketuaNamaUp,
             Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
-            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_Nama: sekNamaUp,
             Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
-            Alamat_Kantor: existing ? String(existing.Alamat_Kantor || '') : '',
-            Tautan_Drive: existing ? String(existing.Tautan_Drive || '') : '',
             Diperbarui_Pada: nowStr
           }
         : {
@@ -1350,29 +1333,22 @@ function doPost(e) {
             Nama_DPD: namaDpd,
             Nama_KabKota: namaKabKota,
             Status_Terbentuk: String(payload.statusTerbentuk || 'Sudah Terbentuk').trim(),
-            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_Nama: ketuaNamaUp,
             Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
-            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_Nama: sekNamaUp,
             Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
-            Alamat_Kantor: String(payload.alamatKantor || '').trim(),
-            Tautan_Drive: String(payload.tautanDrive || '').trim(),
             Diperbarui_Pada: nowStr
           };
 
       const updated = existing
-        ? updateRowByIdInSs_(
-            wSs,
-            WILAYAH_SHEETS.DPD,
-            existingId ? 'ID_DPD' : 'Kode_Wilayah',
-            existingId || kodeWilayah,
-            rowObj
-          )
+        ? (updateRowByIdInSs_(wSs, WILAYAH_SHEETS.DPD, 'Kode_Wilayah', kodeWilayah, rowObj)
+          || (existing.ID_DPD ? updateRowByIdInSs_(wSs, WILAYAH_SHEETS.DPD, 'ID_DPD', String(existing.ID_DPD), rowObj) : false))
         : false;
       if (!updated) {
         appendRowInSs_(wSs, WILAYAH_SHEETS.DPD, rowObj);
       }
 
-      writeLog_(role.toUpperCase(), existing ? 'updateDpd' : 'createDpd', kodeWilayah + ' — ' + rowObj.Nama_DPD);
+      writeLog_(role.toUpperCase(), existing ? 'updateDpd' : 'createDpd', idDpd + ' — ' + rowObj.Nama_DPD);
       return jsonOut_({ ok: true, data: mapDpdRow_(rowObj) });
     }
 
@@ -1391,19 +1367,20 @@ function doPost(e) {
 
       const kodeWilayah = String(payload.kodeWilayah || '').trim();
       const namaKecamatan = String(payload.namaKecamatan || '').trim();
-      const namaDpc = String(payload.namaDpc || ('DPC Wahdah Islamiyah ' + namaKecamatan)).trim();
+      const namaDpc = String(payload.namaDpc || ('DPC ' + namaKecamatan)).trim();
       if (!kodeWilayah || !namaKecamatan) {
         return jsonOut_({ ok: false, error: 'Kode wilayah dan nama Kecamatan wajib diisi.' });
       }
 
-      const existing = findRowInSs_(wSs, WILAYAH_SHEETS.DPC, payload.id ? 'ID_DPC' : 'Kode_Wilayah', payload.id || kodeWilayah)
-        || findRowInSs_(wSs, WILAYAH_SHEETS.DPC, 'Kode_Wilayah', kodeWilayah);
-      const existingId = existing ? String(existing.ID_DPC || '').trim() : '';
-      const idDpc = existingId || (payload.id ? String(payload.id).trim() : generateId_('DPC'));
+      const existing = findRowInSs_(wSs, WILAYAH_SHEETS.DPC, 'Kode_Wilayah', kodeWilayah)
+        || (payload.id ? findRowInSs_(wSs, WILAYAH_SHEETS.DPC, 'ID_DPC', payload.id) : null);
+      const idDpc = buildLembagaId_('dpc', kodeWilayah);
       const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
       const segs = kodeWilayah.split('.');
       const kodeKab = String(payload.kodeKabKota || segs.slice(0, 2).join('.') || '').trim();
       const kodeProv = String(payload.kodeProvinsi || segs[0] || '').trim();
+      const ketuaNamaUp = String(payload.ketuaNama || '').trim().toUpperCase();
+      const sekNamaUp = String(payload.sekretarisNama || '').trim().toUpperCase();
 
       const rowObj = role === 'admin'
         ? {
@@ -1417,12 +1394,10 @@ function doPost(e) {
             Nama_Kecamatan: existing ? String(existing.Nama_Kecamatan) : namaKecamatan,
             Nama_DPC: existing ? String(existing.Nama_DPC) : namaDpc,
             Status_Terbentuk: existing ? String(existing.Status_Terbentuk || 'Belum Terbentuk') : 'Belum Terbentuk',
-            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_Nama: ketuaNamaUp,
             Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
-            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_Nama: sekNamaUp,
             Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
-            Alamat_Kantor: existing ? String(existing.Alamat_Kantor || '') : '',
-            Tautan_Drive: existing ? String(existing.Tautan_Drive || '') : '',
             Diperbarui_Pada: nowStr
           }
         : {
@@ -1436,29 +1411,22 @@ function doPost(e) {
             Nama_Kecamatan: namaKecamatan,
             Nama_DPC: namaDpc,
             Status_Terbentuk: String(payload.statusTerbentuk || 'Sudah Terbentuk').trim(),
-            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_Nama: ketuaNamaUp,
             Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
-            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_Nama: sekNamaUp,
             Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
-            Alamat_Kantor: String(payload.alamatKantor || '').trim(),
-            Tautan_Drive: String(payload.tautanDrive || '').trim(),
             Diperbarui_Pada: nowStr
           };
 
       const updated = existing
-        ? updateRowByIdInSs_(
-            wSs,
-            WILAYAH_SHEETS.DPC,
-            existingId ? 'ID_DPC' : 'Kode_Wilayah',
-            existingId || kodeWilayah,
-            rowObj
-          )
+        ? (updateRowByIdInSs_(wSs, WILAYAH_SHEETS.DPC, 'Kode_Wilayah', kodeWilayah, rowObj)
+          || (existing.ID_DPC ? updateRowByIdInSs_(wSs, WILAYAH_SHEETS.DPC, 'ID_DPC', String(existing.ID_DPC), rowObj) : false))
         : false;
       if (!updated) {
         appendRowInSs_(wSs, WILAYAH_SHEETS.DPC, rowObj);
       }
 
-      writeLog_(role.toUpperCase(), existing ? 'updateDpc' : 'createDpc', kodeWilayah + ' — ' + rowObj.Nama_DPC);
+      writeLog_(role.toUpperCase(), existing ? 'updateDpc' : 'createDpc', idDpc + ' — ' + rowObj.Nama_DPC);
       return jsonOut_({ ok: true, data: mapDpcRow_(rowObj) });
     }
 
@@ -1477,20 +1445,21 @@ function doPost(e) {
 
       const kodeWilayah = String(payload.kodeWilayah || '').trim();
       const namaKelDesa = String(payload.namaKelDesa || '').trim();
-      const namaDpr = String(payload.namaDpr || ('DPR Wahdah Islamiyah ' + namaKelDesa)).trim();
+      const namaDpr = String(payload.namaDpr || ('DPR ' + namaKelDesa)).trim();
       if (!kodeWilayah || !namaKelDesa) {
         return jsonOut_({ ok: false, error: 'Kode wilayah dan nama Kelurahan/Desa wajib diisi.' });
       }
 
-      const existing = findRowInSs_(wSs, WILAYAH_SHEETS.DPR, payload.id ? 'ID_DPR' : 'Kode_Wilayah', payload.id || kodeWilayah)
-        || findRowInSs_(wSs, WILAYAH_SHEETS.DPR, 'Kode_Wilayah', kodeWilayah);
-      const existingId = existing ? String(existing.ID_DPR || '').trim() : '';
-      const idDpr = existingId || (payload.id ? String(payload.id).trim() : generateId_('DPR'));
+      const existing = findRowInSs_(wSs, WILAYAH_SHEETS.DPR, 'Kode_Wilayah', kodeWilayah)
+        || (payload.id ? findRowInSs_(wSs, WILAYAH_SHEETS.DPR, 'ID_DPR', payload.id) : null);
+      const idDpr = buildLembagaId_('dpr', kodeWilayah);
       const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
       const segs = kodeWilayah.split('.');
       const kodeKec = String(payload.kodeKecamatan || segs.slice(0, 3).join('.') || '').trim();
       const kodeKab = String(payload.kodeKabKota || segs.slice(0, 2).join('.') || '').trim();
       const kodeProv = String(payload.kodeProvinsi || segs[0] || '').trim();
+      const ketuaNamaUp = String(payload.ketuaNama || '').trim().toUpperCase();
+      const sekNamaUp = String(payload.sekretarisNama || '').trim().toUpperCase();
 
       const rowObj = role === 'admin'
         ? {
@@ -1506,12 +1475,10 @@ function doPost(e) {
             Nama_KelDesa: existing ? String(existing.Nama_KelDesa) : namaKelDesa,
             Nama_DPR: existing ? String(existing.Nama_DPR) : namaDpr,
             Status_Terbentuk: existing ? String(existing.Status_Terbentuk || 'Belum Terbentuk') : 'Belum Terbentuk',
-            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_Nama: ketuaNamaUp,
             Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
-            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_Nama: sekNamaUp,
             Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
-            Alamat_Kantor: existing ? String(existing.Alamat_Kantor || '') : '',
-            Tautan_Drive: existing ? String(existing.Tautan_Drive || '') : '',
             Diperbarui_Pada: nowStr
           }
         : {
@@ -1527,29 +1494,22 @@ function doPost(e) {
             Nama_KelDesa: namaKelDesa,
             Nama_DPR: namaDpr,
             Status_Terbentuk: String(payload.statusTerbentuk || 'Sudah Terbentuk').trim(),
-            Ketua_Nama: String(payload.ketuaNama || '').trim(),
+            Ketua_Nama: ketuaNamaUp,
             Ketua_WA: normalizeWaNumber_(payload.ketuaWa || ''),
-            Sekretaris_Nama: String(payload.sekretarisNama || '').trim(),
+            Sekretaris_Nama: sekNamaUp,
             Sekretaris_WA: normalizeWaNumber_(payload.sekretarisWa || ''),
-            Alamat_Kantor: String(payload.alamatKantor || '').trim(),
-            Tautan_Drive: String(payload.tautanDrive || '').trim(),
             Diperbarui_Pada: nowStr
           };
 
       const updated = existing
-        ? updateRowByIdInSs_(
-            wSs,
-            WILAYAH_SHEETS.DPR,
-            existingId ? 'ID_DPR' : 'Kode_Wilayah',
-            existingId || kodeWilayah,
-            rowObj
-          )
+        ? (updateRowByIdInSs_(wSs, WILAYAH_SHEETS.DPR, 'Kode_Wilayah', kodeWilayah, rowObj)
+          || (existing.ID_DPR ? updateRowByIdInSs_(wSs, WILAYAH_SHEETS.DPR, 'ID_DPR', String(existing.ID_DPR), rowObj) : false))
         : false;
       if (!updated) {
         appendRowInSs_(wSs, WILAYAH_SHEETS.DPR, rowObj);
       }
 
-      writeLog_(role.toUpperCase(), existing ? 'updateDpr' : 'createDpr', kodeWilayah + ' — ' + rowObj.Nama_DPR);
+      writeLog_(role.toUpperCase(), existing ? 'updateDpr' : 'createDpr', idDpr + ' — ' + rowObj.Nama_DPR);
       return jsonOut_({ ok: true, data: mapDprRow_(rowObj) });
     }
 
@@ -1930,6 +1890,12 @@ function writeLog_(role, action, detail) {
       Detail: detail || ''
     });
   } catch (ignore) {}
+}
+
+function buildLembagaId_(prefix, kodeWilayah) {
+  const cleanKode = String(kodeWilayah || '').replace(/[^0-9a-zA-Z]/g, '');
+  if (!cleanKode) return generateId_(String(prefix || 'LMB').toUpperCase());
+  return String(prefix || 'lmb').toLowerCase() + '-' + cleanKode;
 }
 
 function generateId_(prefix) {

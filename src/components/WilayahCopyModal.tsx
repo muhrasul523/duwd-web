@@ -112,8 +112,6 @@ function formatSingleRowLines(
     `   Ketua: ${ketuaText}`,
     `   Sekretaris: ${sekText}`,
   ];
-  if (row.alamatKantor) parts.push(`   Alamat: ${row.alamatKantor}`);
-  if (row.tautanDrive) parts.push(`   Drive SK: ${row.tautanDrive}`);
   return parts.join('\n');
 }
 
@@ -153,8 +151,6 @@ export function formatKelembagaanRowsText(
       'WA Ketua',
       'Sekretaris',
       'WA Sekretaris',
-      'Alamat Kantor',
-      'Tautan Drive',
     ].join('\t');
     const body = rows.map((r) =>
       [
@@ -171,8 +167,6 @@ export function formatKelembagaanRowsText(
         r.ketuaWa,
         r.sekretarisNama,
         r.sekretarisWa,
-        r.alamatKantor || '',
-        r.tautanDrive || '',
       ]
         .map((c) => String(c || '').replace(/[\t\r\n]+/g, ' '))
         .join('\t'),

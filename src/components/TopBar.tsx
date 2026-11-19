@@ -88,7 +88,7 @@ export function TopBar({
     { id: 'proker', label: 'Program Kerja', visible: true },
     { id: 'kalender', label: 'Kalender', visible: true },
     { id: 'musyawarah', label: 'Musyawarah', visible: true },
-    { id: 'dpw_dpd', label: 'Wilayah & Lembaga', visible: true },
+    { id: 'dpw_dpd', label: 'DPW DPD', visible: true },
     { id: 'unit', label: 'Unit', visible: role === 'superadmin' },
     { id: 'pengaturan', label: 'Pengaturan', visible: role === 'superadmin' },
   ];

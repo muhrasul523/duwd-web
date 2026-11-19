@@ -133,27 +133,27 @@
 
 /* Zebra striping for all data tables (distinct subtle odd/even contrast in Light & Dark mode) */
 .duwd-zebra-table tbody tr:nth-child(odd) {
-  background-color: rgba(255, 255, 255, 0.72);
+  background-color: rgba(255, 255, 255, 0.86);
 }
 
 .duwd-zebra-table tbody tr:nth-child(even) {
-  background-color: rgba(231, 244, 248, 0.68);
+  background-color: rgba(224, 241, 247, 0.78);
 }
 
 .duwd-zebra-table tbody tr:hover {
-  background-color: rgba(212, 236, 243, 0.82);
+  background-color: rgba(206, 234, 242, 0.88);
 }
 
 .dark .duwd-zebra-table tbody tr:nth-child(odd) {
-  background-color: rgba(12, 29, 35, 0.62);
+  background-color: rgba(11, 27, 33, 0.72);
 }
 
 .dark .duwd-zebra-table tbody tr:nth-child(even) {
-  background-color: rgba(21, 47, 56, 0.74);
+  background-color: rgba(22, 53, 63, 0.80);
 }
 
 .dark .duwd-zebra-table tbody tr:hover {
-  background-color: rgba(28, 63, 74, 0.88);
+  background-color: rgba(28, 66, 78, 0.92);
 }
 
 .tabular-nums {
