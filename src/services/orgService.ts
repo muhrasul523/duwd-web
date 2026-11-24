@@ -2,6 +2,10 @@ import { STARTER_KODE_WILAYAH } from '../data/kodeWilayahSeed';
 import { RPKA_2027_KEGIATAN, RPKA_2027_PROKER } from '../data/rpka2027Seed';
 import type {
   AppSettings,
+  DokumenFileItem,
+  DokumenKategoriItem,
+  DokumenSubkategoriItem,
+  DokumenTipeItem,
   DpcItem,
   DpdItem,
   DprItem,
@@ -23,6 +27,10 @@ import {
 } from '../utils/scheduleParser';
 import { normalizeWhatsApp } from '../utils/whatsapp';
 
+export const DOKUMEN_DRIVE_ROOT_FOLDER_ID = '10RCn0CcMmFWqraQqJP0k0KYBFwN6_xew';
+export const DOKUMEN_DRIVE_ROOT_URL =
+  'https://drive.google.com/drive/folders/10RCn0CcMmFWqraQqJP0k0KYBFwN6_xew?usp=drive_link';
+
 const STORAGE_KEYS = {
   GAS_URL: 'duwd_gas_webapp_url_v2',
   UNITS: 'duwd_units_cache_v3',
@@ -31,6 +39,9 @@ const STORAGE_KEYS = {
   KEGIATAN: 'duwd_kegiatan_cache_v2',
   MUSYAWARAH: 'duwd_musyawarah_cache_v1',
   PRESENSI: 'duwd_presensi_cache_v1',
+  DOKUMEN_KATEGORI: 'duwd_dokumen_kategori_cache_v1',
+  DOKUMEN_SUBKATEGORI: 'duwd_dokumen_subkategori_cache_v1',
+  DOKUMEN_FILE: 'duwd_dokumen_file_cache_v1',
   KODE_WILAYAH: 'duwd_kode_wilayah_cache_v1',
   DPW: 'duwd_dpw_cache_v1',
   DPD: 'duwd_dpd_cache_v1',
@@ -235,6 +246,63 @@ export function loadLocalPresensi(): PresensiItem[] {
 export function saveLocalPresensi(list: PresensiItem[]): void {
   try {
     window.localStorage.setItem(STORAGE_KEYS.PRESENSI, JSON.stringify(list));
+  } catch {
+    // Ignore
+  }
+}
+
+export function loadLocalDokumenKategori(): DokumenKategoriItem[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.DOKUMEN_KATEGORI);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as DokumenKategoriItem[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalDokumenKategori(list: DokumenKategoriItem[]): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.DOKUMEN_KATEGORI, JSON.stringify(list));
+  } catch {
+    // Ignore
+  }
+}
+
+export function loadLocalDokumenSubkategori(): DokumenSubkategoriItem[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.DOKUMEN_SUBKATEGORI);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as DokumenSubkategoriItem[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalDokumenSubkategori(list: DokumenSubkategoriItem[]): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.DOKUMEN_SUBKATEGORI, JSON.stringify(list));
+  } catch {
+    // Ignore
+  }
+}
+
+export function loadLocalDokumenFile(): DokumenFileItem[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.DOKUMEN_FILE);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as DokumenFileItem[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalDokumenFile(list: DokumenFileItem[]): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.DOKUMEN_FILE, JSON.stringify(list));
   } catch {
     // Ignore
   }
@@ -473,6 +541,9 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
     kegiatan: loadLocalKegiatan(),
     musyawarah: loadLocalMusyawarah(),
     presensi: loadLocalPresensi(),
+    dokumenKategori: loadLocalDokumenKategori(),
+    dokumenSubkategori: loadLocalDokumenSubkategori(),
+    dokumenFile: loadLocalDokumenFile(),
     kodeWilayah: loadLocalKodeWilayah(),
     dpw: loadLocalDpw(),
     dpd: loadLocalDpd(),
@@ -514,6 +585,15 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
           status: normalizePresensiStatus(p.status),
         }))
       : loadLocalPresensi();
+    const dokumenKategori = Array.isArray(res.data.dokumenKategori)
+      ? res.data.dokumenKategori
+      : loadLocalDokumenKategori();
+    const dokumenSubkategori = Array.isArray(res.data.dokumenSubkategori)
+      ? res.data.dokumenSubkategori
+      : loadLocalDokumenSubkategori();
+    const dokumenFile = Array.isArray(res.data.dokumenFile)
+      ? res.data.dokumenFile
+      : loadLocalDokumenFile();
     const kodeWilayah =
       res.data.kodeWilayah?.length > 0 ? res.data.kodeWilayah : STARTER_KODE_WILAYAH;
     const dpw = Array.isArray(res.data.dpw) ? res.data.dpw : [];
@@ -528,6 +608,9 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
     saveLocalKegiatan(kegiatan);
     saveLocalMusyawarah(musyawarah);
     saveLocalPresensi(presensi);
+    saveLocalDokumenKategori(dokumenKategori);
+    saveLocalDokumenSubkategori(dokumenSubkategori);
+    saveLocalDokumenFile(dokumenFile);
     saveLocalKodeWilayah(kodeWilayah);
     saveLocalDpw(dpw);
     saveLocalDpd(dpd);
@@ -551,6 +634,9 @@ export async function fetchAllOrgData(webAppUrl: string): Promise<{
         kegiatan,
         musyawarah,
         presensi,
+        dokumenKategori,
+        dokumenSubkategori,
+        dokumenFile,
         kodeWilayah,
         dpw,
         dpd,
@@ -1324,4 +1410,383 @@ export async function saveAppSettings(
   }
 
   return { ok: true, synced: Boolean(webAppUrl.trim()) };
+}
+
+// ============================================================================
+// PUSAT DOKUMEN — KATEGORI, SUBFOLDER & UPLOAD GOOGLE DRIVE (TERMASUK ZIP)
+// ============================================================================
+
+export async function saveDokumenKategoriRecord(
+  input: {
+    id?: string;
+    namaKategori: string;
+    deskripsi?: string;
+    urutan: number;
+    tanggalUpdate: string;
+    driveFolderId?: string;
+    driveFolderUrl?: string;
+    dibuatPada?: string;
+  },
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; item?: DokumenKategoriItem; synced: boolean; error?: string }> {
+  const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const payload = {
+    ...input,
+    namaKategori: input.namaKategori.trim(),
+    deskripsi: (input.deskripsi || '').trim(),
+    urutan: Number(input.urutan) || 1,
+    tanggalUpdate: input.tanggalUpdate.trim() || nowStr.slice(0, 10),
+  };
+
+  if (webAppUrl.trim()) {
+    const res = await gasPost<DokumenKategoriItem>(
+      webAppUrl.trim(),
+      'saveDokumenKategori',
+      pin,
+      payload,
+    );
+    if (res.ok && res.data) {
+      return { ok: true, item: res.data, synced: true };
+    }
+    return {
+      ok: false,
+      synced: false,
+      error: res.error || 'Gagal menyimpan kategori dokumen ke Spreadsheet & Drive.',
+    };
+  }
+
+  const item: DokumenKategoriItem = {
+    id: input.id || `KAT-${Date.now().toString().slice(-6)}`,
+    namaKategori: payload.namaKategori,
+    deskripsi: payload.deskripsi,
+    urutan: payload.urutan,
+    driveFolderId: input.driveFolderId || '',
+    driveFolderUrl: input.driveFolderUrl || DOKUMEN_DRIVE_ROOT_URL,
+    tanggalUpdate: payload.tanggalUpdate,
+    dibuatPada: input.dibuatPada || nowStr,
+    diperbaruiPada: nowStr,
+  };
+  return { ok: true, item, synced: false };
+}
+
+export async function deleteDokumenKategoriRecord(
+  id: string,
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; synced: boolean; error?: string }> {
+  if (webAppUrl.trim()) {
+    const res = await gasPost(webAppUrl.trim(), 'deleteDokumenKategori', pin, { id });
+    if (!res.ok) {
+      return {
+        ok: false,
+        synced: false,
+        error: res.error || 'Gagal menghapus kategori dokumen.',
+      };
+    }
+    return { ok: true, synced: true };
+  }
+  return { ok: true, synced: false };
+}
+
+export async function uploadDokumenFileToDrive(
+  input: {
+    kategoriId: string;
+    namaKategori: string;
+    subfolder: string;
+    judulDokumen: string;
+    originalFileName: string;
+    mimeType: string;
+    ukuranBytes: number;
+    base64Data: string;
+    extractZip: boolean;
+    tanggalUpdate: string;
+    keterangan?: string;
+    replaceDokumenId?: string;
+  },
+  pin: string,
+  webAppUrl: string,
+): Promise<{
+  ok: boolean;
+  items?: DokumenFileItem[];
+  categoryFolderId?: string;
+  categoryFolderUrl?: string;
+  synced: boolean;
+  error?: string;
+}> {
+  const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const extMatch = input.originalFileName.match(/\.([a-zA-Z0-9]+)$/);
+  const ext = extMatch?.[1] ? extMatch[1].toLowerCase() : 'file';
+
+  if (webAppUrl.trim()) {
+    const res = await gasPost<{
+      items: DokumenFileItem[];
+      categoryFolderId?: string;
+      categoryFolderUrl?: string;
+    }>(webAppUrl.trim(), 'uploadDokumenFile', pin, input);
+    if (res.ok && res.data && Array.isArray(res.data.items)) {
+      return {
+        ok: true,
+        items: res.data.items,
+        categoryFolderId: res.data.categoryFolderId,
+        categoryFolderUrl: res.data.categoryFolderUrl,
+        synced: true,
+      };
+    }
+    return {
+      ok: false,
+      synced: false,
+      error:
+        res.error ||
+        'Gagal mengunggah berkas ke Google Drive. Pastikan fungsi otorisasiGoogleDrive() sudah dijalankan dan Deploy New Version aktif.',
+    };
+  }
+
+  // Fallback pratinjau lokal jika GAS belum terhubung
+  const cleanTitle = input.judulDokumen.trim() || input.originalFileName.replace(/\.[^.]+$/, '');
+  const renamed = input.subfolder.trim()
+    ? `${input.namaKategori} - ${input.subfolder.trim()} - ${cleanTitle}.${ext}`
+    : cleanTitle.toLowerCase() === input.namaKategori.trim().toLowerCase()
+      ? `${cleanTitle}.${ext}`
+      : `${input.namaKategori} - ${cleanTitle}.${ext}`;
+
+  const localItem: DokumenFileItem = {
+    id: input.replaceDokumenId || `DOK-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 90 + 10)}`,
+    kategoriId: input.kategoriId,
+    namaKategori: input.namaKategori,
+    subfolder: input.subfolder.trim(),
+    judulDokumen: cleanTitle,
+    namaFileDrive: renamed,
+    ekstensi: ext,
+    mimeType: input.mimeType,
+    ukuranBytes: input.ukuranBytes,
+    driveFileId: '',
+    driveFileUrl: DOKUMEN_DRIVE_ROOT_URL,
+    driveFolderId: '',
+    driveFolderUrl: DOKUMEN_DRIVE_ROOT_URL,
+    tanggalUpdate: input.tanggalUpdate || nowStr.slice(0, 10),
+    keterangan: (input.keterangan || '').trim(),
+    dibuatPada: nowStr,
+    diperbaruiPada: nowStr,
+  };
+  return { ok: true, items: [localItem], synced: false };
+}
+
+export async function reorderDokumenKategoriRecords(
+  orders: { id: string; urutan: number }[],
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; synced: boolean; error?: string }> {
+  if (webAppUrl.trim()) {
+    const res = await gasPost(webAppUrl.trim(), 'reorderDokumenKategori', pin, { orders });
+    if (!res.ok) {
+      return {
+        ok: false,
+        synced: false,
+        error: res.error || 'Gagal menyimpan urutan kategori dokumen.',
+      };
+    }
+    return { ok: true, synced: true };
+  }
+  return { ok: true, synced: false };
+}
+
+export async function saveDokumenSubkategoriRecord(
+  input: {
+    id?: string;
+    kategoriId: string;
+    namaKategori: string;
+    namaSubkategori: string;
+    urutan: number;
+    tanggalUpdate: string;
+    driveFolderId?: string;
+    driveFolderUrl?: string;
+    dibuatPada?: string;
+  },
+  pin: string,
+  webAppUrl: string,
+): Promise<{
+  ok: boolean;
+  item?: DokumenSubkategoriItem;
+  synced: boolean;
+  error?: string;
+}> {
+  const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const payload = {
+    ...input,
+    namaSubkategori: input.namaSubkategori.trim(),
+    urutan: Number(input.urutan) || 1,
+    tanggalUpdate: input.tanggalUpdate.trim() || nowStr.slice(0, 10),
+  };
+
+  if (webAppUrl.trim()) {
+    const res = await gasPost<DokumenSubkategoriItem>(
+      webAppUrl.trim(),
+      'saveDokumenSubkategori',
+      pin,
+      payload,
+    );
+    if (res.ok && res.data) {
+      return { ok: true, item: res.data, synced: true };
+    }
+    return {
+      ok: false,
+      synced: false,
+      error: res.error || 'Gagal menyimpan subkategori dokumen ke Spreadsheet & Drive.',
+    };
+  }
+
+  const item: DokumenSubkategoriItem = {
+    id: input.id || `SUB-${Date.now().toString().slice(-6)}`,
+    kategoriId: payload.kategoriId,
+    namaKategori: payload.namaKategori,
+    namaSubkategori: payload.namaSubkategori,
+    urutan: payload.urutan,
+    driveFolderId: input.driveFolderId || '',
+    driveFolderUrl: input.driveFolderUrl || DOKUMEN_DRIVE_ROOT_URL,
+    tanggalUpdate: payload.tanggalUpdate,
+    dibuatPada: input.dibuatPada || nowStr,
+    diperbaruiPada: nowStr,
+  };
+  return { ok: true, item, synced: false };
+}
+
+export async function deleteDokumenSubkategoriRecord(
+  id: string,
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; synced: boolean; error?: string }> {
+  if (webAppUrl.trim()) {
+    const res = await gasPost(webAppUrl.trim(), 'deleteDokumenSubkategori', pin, { id });
+    if (!res.ok) {
+      return {
+        ok: false,
+        synced: false,
+        error: res.error || 'Gagal menghapus subkategori dokumen.',
+      };
+    }
+    return { ok: true, synced: true };
+  }
+  return { ok: true, synced: false };
+}
+
+export async function saveDokumenFileRecord(
+  input: {
+    id?: string;
+    kategoriId: string;
+    namaKategori: string;
+    subfolder: string;
+    judulDokumen: string;
+    tipeItem?: DokumenTipeItem;
+    namaFileDrive?: string;
+    ekstensi?: string;
+    mimeType?: string;
+    ukuranBytes?: number;
+    driveFileId?: string;
+    driveFileUrl: string;
+    driveFolderId?: string;
+    driveFolderUrl?: string;
+    tanggalUpdate: string;
+    keterangan?: string;
+    jumlahDilihat?: number;
+    jumlahDiunduh?: number;
+    dibuatPada?: string;
+  },
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; item?: DokumenFileItem; synced: boolean; error?: string }> {
+  const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const tipeItem: DokumenTipeItem = input.tipeItem || (input.driveFileId ? 'file' : 'link');
+  const payload = {
+    ...input,
+    tipeItem,
+    subfolder: (input.subfolder || '').trim(),
+    judulDokumen: input.judulDokumen.trim(),
+    driveFileUrl: input.driveFileUrl.trim(),
+    tanggalUpdate: input.tanggalUpdate.trim() || nowStr.slice(0, 10),
+    keterangan: (input.keterangan || '').trim(),
+  };
+
+  if (webAppUrl.trim()) {
+    const res = await gasPost<DokumenFileItem>(
+      webAppUrl.trim(),
+      'saveDokumenFile',
+      pin,
+      payload,
+    );
+    if (res.ok && res.data) {
+      return { ok: true, item: res.data, synced: true };
+    }
+    return {
+      ok: false,
+      synced: false,
+      error: res.error || 'Gagal memperbarui dokumen di Spreadsheet & Google Drive.',
+    };
+  }
+
+  const item: DokumenFileItem = {
+    id: input.id || `DOK-${Date.now().toString().slice(-6)}`,
+    kategoriId: payload.kategoriId,
+    namaKategori: payload.namaKategori,
+    subfolder: payload.subfolder,
+    judulDokumen: payload.judulDokumen,
+    tipeItem,
+    namaFileDrive: input.namaFileDrive || payload.judulDokumen,
+    ekstensi: input.ekstensi || (tipeItem === 'link' ? 'link' : 'file'),
+    mimeType: input.mimeType || '',
+    ukuranBytes: input.ukuranBytes || 0,
+    driveFileId: input.driveFileId || '',
+    driveFileUrl: payload.driveFileUrl,
+    driveFolderId: input.driveFolderId || '',
+    driveFolderUrl: input.driveFolderUrl || DOKUMEN_DRIVE_ROOT_URL,
+    tanggalUpdate: payload.tanggalUpdate,
+    keterangan: payload.keterangan,
+    jumlahDilihat: Number(input.jumlahDilihat || 0),
+    jumlahDiunduh: Number(input.jumlahDiunduh || 0),
+    dibuatPada: input.dibuatPada || nowStr,
+    diperbaruiPada: nowStr,
+  };
+  return { ok: true, item, synced: false };
+}
+
+export async function deleteDokumenFileRecord(
+  id: string,
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; synced: boolean; error?: string }> {
+  if (webAppUrl.trim()) {
+    const res = await gasPost(webAppUrl.trim(), 'deleteDokumenFile', pin, { id });
+    if (!res.ok) {
+      return {
+        ok: false,
+        synced: false,
+        error: res.error || 'Gagal menghapus file dokumen.',
+      };
+    }
+    return { ok: true, synced: true };
+  }
+  return { ok: true, synced: false };
+}
+
+export async function trackDokumenStatRecord(
+  id: string,
+  metric: 'view' | 'download',
+  webAppUrl: string,
+): Promise<{ ok: boolean; jumlahDilihat?: number; jumlahDiunduh?: number }> {
+  if (!webAppUrl.trim() || !id.trim()) {
+    return { ok: false };
+  }
+  const res = await gasPost<{
+    id: string;
+    jumlahDilihat: number;
+    jumlahDiunduh: number;
+  }>(webAppUrl.trim(), 'trackDokumenStat', '', { id, metric });
+  if (res.ok && res.data) {
+    return {
+      ok: true,
+      jumlahDilihat: Number(res.data.jumlahDilihat || 0),
+      jumlahDiunduh: Number(res.data.jumlahDiunduh || 0),
+    };
+  }
+  return { ok: false };
 }

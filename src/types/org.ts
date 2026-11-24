@@ -228,6 +228,56 @@ export interface KelembagaanUnifiedRow {
   hasSheetRecord: boolean;
 }
 
+export interface DokumenKategoriItem {
+  id: string;
+  namaKategori: string;
+  deskripsi?: string;
+  urutan: number;
+  driveFolderId?: string;
+  driveFolderUrl?: string;
+  tanggalUpdate: string; // YYYY-MM-DD
+  dibuatPada?: string;
+  diperbaruiPada?: string;
+}
+
+export interface DokumenSubkategoriItem {
+  id: string;
+  kategoriId: string;
+  namaKategori: string;
+  namaSubkategori: string;
+  urutan: number;
+  driveFolderId?: string;
+  driveFolderUrl?: string;
+  tanggalUpdate: string; // YYYY-MM-DD
+  dibuatPada?: string;
+  diperbaruiPada?: string;
+}
+
+export type DokumenTipeItem = 'file' | 'link';
+
+export interface DokumenFileItem {
+  id: string;
+  kategoriId: string;
+  namaKategori: string;
+  subfolder: string; // Kosong jika file langsung di dalam kategori; berisi nama subkategori jika dalam subkategori
+  judulDokumen: string;
+  tipeItem?: DokumenTipeItem;
+  namaFileDrive: string;
+  ekstensi: string;
+  mimeType?: string;
+  ukuranBytes?: number;
+  driveFileId?: string;
+  driveFileUrl: string;
+  driveFolderId?: string;
+  driveFolderUrl?: string;
+  tanggalUpdate: string; // YYYY-MM-DD
+  keterangan?: string;
+  jumlahDilihat?: number;
+  jumlahDiunduh?: number;
+  dibuatPada?: string;
+  diperbaruiPada?: string;
+}
+
 export interface AppSettings {
   namaAplikasi: string;
   logoDataUrl: string;
@@ -243,6 +293,9 @@ export interface OrgDataset {
   kegiatan: KegiatanRpkaItem[];
   musyawarah: MusyawarahItem[];
   presensi: PresensiItem[];
+  dokumenKategori: DokumenKategoriItem[];
+  dokumenSubkategori: DokumenSubkategoriItem[];
+  dokumenFile: DokumenFileItem[];
   kodeWilayah: KodeWilayahItem[];
   dpw: DpwItem[];
   dpd: DpdItem[];

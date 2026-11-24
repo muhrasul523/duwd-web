@@ -21,6 +21,7 @@ export type ActiveView =
   | 'kalender'
   | 'musyawarah'
   | 'dpw_dpd'
+  | 'dokumen'
   | 'unit'
   | 'pengaturan';
 
@@ -89,6 +90,7 @@ export function TopBar({
     { id: 'kalender', label: 'Kalender', visible: true },
     { id: 'musyawarah', label: 'Musyawarah', visible: true },
     { id: 'dpw_dpd', label: 'DPW DPD', visible: true },
+    { id: 'dokumen', label: 'Dokumen', visible: true },
     { id: 'unit', label: 'Unit', visible: role === 'superadmin' },
     { id: 'pengaturan', label: 'Pengaturan', visible: role === 'superadmin' },
   ];

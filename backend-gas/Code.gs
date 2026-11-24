@@ -23,6 +23,9 @@ const SHEETS = {
   KEGIATAN_RPKA: 'KEGIATAN_RPKA',
   MUSYAWARAH: 'MUSYAWARAH',
   PRESENSI_MUSYAWARAH: 'PRESENSI_MUSYAWARAH',
+  DOKUMEN_KATEGORI: 'DOKUMEN_KATEGORI',
+  DOKUMEN_SUBKATEGORI: 'DOKUMEN_SUBKATEGORI',
+  DOKUMEN_FILE: 'DOKUMEN_FILE',
   PENGATURAN: 'PENGATURAN',
   LOGS: 'SYSTEM_LOGS'
 };
@@ -35,6 +38,7 @@ const WILAYAH_SHEETS = {
 };
 
 const DEFAULT_MUSYAWARAH_DRIVE_FOLDER_ID = '1Ua_AgStLPfpH5xfFIfqXZkOVwJgCLG98';
+const DEFAULT_DOKUMEN_DRIVE_FOLDER_ID = '10RCn0CcMmFWqraQqJP0k0KYBFwN6_xew';
 
 /**
  * Menambahkan menu khusus di Google Spreadsheet Induk.
@@ -43,7 +47,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('DUWD DPP WI')
     .addItem('Setup Database Induk', 'setupDatabase')
-    .addItem('Otorisasi Drive & Docs (Upload Musyawarah)', 'otorisasiGoogleDrive')
+    .addItem('Otorisasi Drive & Docs (Musyawarah & Dokumen)', 'otorisasiGoogleDrive')
     .addItem('Sinkronkan Unit 0-5 & Proker 1-5', 'sinkronUnitDanProkerRPKA')
     .addItem('Setup Spreadsheet Wilayah (#2)', 'setupWilayahSpreadsheetManual')
     .addToUi();
@@ -125,6 +129,60 @@ function setupDatabase() {
       headers: ['ID_Presensi', 'ID_Musyawarah', 'ID_Pengurus', 'Nama_Lengkap', 'Unit_Kode', 'Amanah', 'Sumber_Peserta', 'Status_Kehadiran', 'Keterangan', 'Diperbarui_Pada']
     },
     {
+      name: SHEETS.DOKUMEN_KATEGORI,
+      headers: [
+        'ID_Kategori',
+        'Nama_Kategori',
+        'Deskripsi',
+        'Urutan',
+        'Drive_Folder_ID',
+        'Drive_Folder_URL',
+        'Tanggal_Update',
+        'Dibuat_Pada',
+        'Diperbarui_Pada'
+      ]
+    },
+    {
+      name: SHEETS.DOKUMEN_SUBKATEGORI,
+      headers: [
+        'ID_Subkategori',
+        'ID_Kategori',
+        'Nama_Kategori',
+        'Nama_Subkategori',
+        'Urutan',
+        'Drive_Folder_ID',
+        'Drive_Folder_URL',
+        'Tanggal_Update',
+        'Dibuat_Pada',
+        'Diperbarui_Pada'
+      ]
+    },
+    {
+      name: SHEETS.DOKUMEN_FILE,
+      headers: [
+        'ID_Dokumen',
+        'ID_Kategori',
+        'Nama_Kategori',
+        'Subfolder',
+        'Judul_Dokumen',
+        'Tipe_Item',
+        'Nama_File_Drive',
+        'Ekstensi',
+        'Mime_Type',
+        'Ukuran_Bytes',
+        'Drive_File_ID',
+        'Drive_File_URL',
+        'Drive_Folder_ID',
+        'Drive_Folder_URL',
+        'Tanggal_Update',
+        'Keterangan',
+        'Jumlah_Dilihat',
+        'Jumlah_Diunduh',
+        'Dibuat_Pada',
+        'Diperbarui_Pada'
+      ]
+    },
+    {
       name: SHEETS.PENGATURAN,
       headers: ['Kunci', 'Nilai', 'Keterangan']
     },
@@ -177,12 +235,14 @@ function setupDatabase() {
       ['LOGO_DATA_URL', '', 'URL atau Data URL logo Wahdah Islamiyah'],
       ['RPKA_DRIVE_URL', '', 'Link Google Drive file PDF asli RPKA DUWD 2027'],
       ['WILAYAH_SPREADSHEET_ID', '', 'ID atau URL Google Spreadsheet #2 (DPW, DPD, DPC, DPR)'],
-      ['MUSYAWARAH_DRIVE_FOLDER_ID', DEFAULT_MUSYAWARAH_DRIVE_FOLDER_ID, 'ID Folder Google Drive penyimpanan Notula & Dokumentasi Musyawarah']
+      ['MUSYAWARAH_DRIVE_FOLDER_ID', DEFAULT_MUSYAWARAH_DRIVE_FOLDER_ID, 'ID Folder Google Drive penyimpanan Notula & Dokumentasi Musyawarah'],
+      ['DOKUMEN_DRIVE_FOLDER_ID', DEFAULT_DOKUMEN_DRIVE_FOLDER_ID, 'ID Folder Google Drive penyimpanan Pusat Dokumen DUWD']
     ];
     settingsSheet.getRange(2, 1, defaultSettings.length, 3).setValues(defaultSettings);
   } else {
     ensureSettingKey_('WILAYAH_SPREADSHEET_ID', '', 'ID atau URL Google Spreadsheet #2 (DPW, DPD, DPC, DPR)');
     ensureSettingKey_('MUSYAWARAH_DRIVE_FOLDER_ID', DEFAULT_MUSYAWARAH_DRIVE_FOLDER_ID, 'ID Folder Google Drive penyimpanan Notula & Dokumentasi Musyawarah');
+    ensureSettingKey_('DOKUMEN_DRIVE_FOLDER_ID', DEFAULT_DOKUMEN_DRIVE_FOLDER_ID, 'ID Folder Google Drive penyimpanan Pusat Dokumen DUWD');
   }
 
   // Jika ID Spreadsheet #2 sudah diisi di PENGATURAN, siapkan sheet-nya juga
@@ -200,16 +260,17 @@ function setupDatabase() {
 
 /**
  * Jalankan 1x dari editor Apps Script atau menu Spreadsheet "DUWD DPP WI > Otorisasi Drive & Docs"
- * agar izin Google Drive (upload notula/foto) dan Google Docs (konversi teks notula -> PDF) aktif.
+ * agar izin Google Drive (Musyawarah & Pusat Dokumen) dan Google Docs (konversi teks notula -> PDF) aktif.
  */
 function otorisasiGoogleDrive() {
-  const folder = getMusyawarahDriveFolder_();
+  const msyFolder = getMusyawarahDriveFolder_();
+  const dokFolder = getDokumenDriveFolder_();
   const testDoc = DocumentApp.create('DUWD_Test_Otorisasi_Sementara');
   const testId = testDoc.getId();
   testDoc.saveAndClose();
   const testFile = DriveApp.getFileById(testId);
   testFile.setTrashed(true);
-  const msg = 'Otorisasi Google Drive & Google Docs BERHASIL untuk folder: "' + folder.getName() + '" (ID: ' + folder.getId() + ').';
+  const msg = 'Otorisasi Google Drive & Docs BERHASIL untuk folder Musyawarah ("' + msyFolder.getName() + '") dan folder Dokumen ("' + dokFolder.getName() + '").';
   writeLog_('SUPERADMIN', 'otorisasiGoogleDrive', msg);
   try {
     SpreadsheetApp.getUi().alert('Otorisasi Berhasil', msg, SpreadsheetApp.getUi().ButtonSet.OK);
@@ -542,6 +603,20 @@ function doGet(e) {
         };
       });
 
+      const dokumenKategori = readRowsOptional_(SHEETS.DOKUMEN_KATEGORI)
+        .map(mapDokumenKategoriRow_)
+        .sort(function (a, b) {
+          return (a.urutan || 0) - (b.urutan || 0);
+        });
+
+      const dokumenSubkategori = readRowsOptional_(SHEETS.DOKUMEN_SUBKATEGORI)
+        .map(mapDokumenSubkategoriRow_)
+        .sort(function (a, b) {
+          return (a.urutan || 0) - (b.urutan || 0);
+        });
+
+      const dokumenFile = readRowsOptional_(SHEETS.DOKUMEN_FILE).map(mapDokumenFileRow_);
+
       const settingsMap = getSettingsMap_();
       const wilayahId = extractSpreadsheetId_(settingsMap.WILAYAH_SPREADSHEET_ID || '');
 
@@ -590,6 +665,9 @@ function doGet(e) {
           kegiatan: kegiatan,
           musyawarah: musyawarah,
           presensi: presensi,
+          dokumenKategori: dokumenKategori,
+          dokumenSubkategori: dokumenSubkategori,
+          dokumenFile: dokumenFile,
           kodeWilayah: kodeWilayah,
           dpw: dpw,
           dpd: dpd,
@@ -642,6 +720,22 @@ function doPost(e) {
   };
 
   try {
+    // Aksi publik tanpa PIN: mencatat statistik jumlah lihat & download dokumen
+    if (action === 'trackDokumenStat') {
+      const docId = String(payload.id || '').trim();
+      const metric = String(payload.metric || '').trim().toLowerCase();
+      if (!docId || (metric !== 'view' && metric !== 'download')) {
+        return jsonOut_({ ok: false, error: 'Parameter statistik dokumen tidak valid.' });
+      }
+      const ss = getSpreadsheet_();
+      ensureDokumenSheets_(ss);
+      const result = incrementDokumenStatInSs_(ss, docId, metric);
+      if (!result) {
+        return jsonOut_({ ok: false, error: 'Dokumen tidak ditemukan.' });
+      }
+      return jsonOut_({ ok: true, data: result });
+    }
+
     const role = resolveRoleByPin_(pin);
     if (!role) {
       return jsonOut_({ ok: false, error: 'Akses ditolak. PIN tidak valid.' });
@@ -1150,6 +1244,580 @@ function doPost(e) {
 
       writeLog_(role.toUpperCase(), 'savePresensiBatch', musyawarahId + ' (' + savedList.length + ' peserta)');
       return jsonOut_({ ok: true, data: savedList });
+    }
+
+    // =========================================================================
+    // PUSAT DOKUMEN — KATEGORI, SUBFOLDER & UPLOAD GOOGLE DRIVE (TERMASUK ZIP)
+    // =========================================================================
+    if (action === 'saveDokumenKategori') {
+      const namaKategori = String(payload.namaKategori || '').trim();
+      if (!namaKategori) {
+        return jsonOut_({ ok: false, error: 'Nama kategori dokumen wajib diisi.' });
+      }
+      const ss = getSpreadsheet_();
+      ensureDokumenSheets_(ss);
+
+      const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
+      const todayStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd');
+      const isEdit = Boolean(payload.id);
+      const idKat = isEdit ? String(payload.id).trim() : generateId_('KAT');
+      const existing = isEdit ? findRowInSs_(ss, SHEETS.DOKUMEN_KATEGORI, 'ID_Kategori', idKat) : null;
+      const cleanFolderName = sanitizeDriveFileName_(namaKategori);
+
+      let driveFolderId = String(payload.driveFolderId || (existing ? existing.Drive_Folder_ID : '') || '').trim();
+      let driveFolderUrl = String(payload.driveFolderUrl || (existing ? existing.Drive_Folder_URL : '') || '').trim();
+
+      try {
+        const rootFolder = getDokumenDriveFolder_();
+        let catFolder = null;
+        if (driveFolderId) {
+          try {
+            catFolder = DriveApp.getFolderById(driveFolderId);
+            if (catFolder.getName() !== cleanFolderName) {
+              catFolder.setName(cleanFolderName);
+            }
+          } catch (ignore) {
+            catFolder = null;
+          }
+        }
+        if (!catFolder) {
+          catFolder = getOrCreateSubfolder_(rootFolder, cleanFolderName);
+        }
+        setDriveFilePublicViewSafe_(catFolder);
+        driveFolderId = catFolder.getId();
+        driveFolderUrl = catFolder.getUrl();
+      } catch (driveErr) {
+        return jsonOut_({
+          ok: false,
+          error: 'Gagal menyiapkan folder kategori di Google Drive: ' + driveErr.message
+        });
+      }
+
+      const existingRows = readRowsOptional_(SHEETS.DOKUMEN_KATEGORI);
+      const urutan = Number(payload.urutan || (existing ? existing.Urutan : existingRows.length + 1) || 1);
+      const tanggalUpdate = String(payload.tanggalUpdate || todayStr).trim();
+
+      const rowObj = {
+        ID_Kategori: idKat,
+        Nama_Kategori: namaKategori,
+        Deskripsi: String(payload.deskripsi || '').trim(),
+        Urutan: urutan,
+        Drive_Folder_ID: driveFolderId,
+        Drive_Folder_URL: driveFolderUrl,
+        Tanggal_Update: tanggalUpdate,
+        Dibuat_Pada: isEdit ? String(payload.dibuatPada || (existing ? existing.Dibuat_Pada : nowStr)) : nowStr,
+        Diperbarui_Pada: nowStr
+      };
+
+      const updated = isEdit
+        ? updateRowByIdInSs_(ss, SHEETS.DOKUMEN_KATEGORI, 'ID_Kategori', idKat, rowObj)
+        : false;
+      if (!updated) {
+        appendRowInSs_(ss, SHEETS.DOKUMEN_KATEGORI, rowObj);
+      } else {
+        cascadeKategoriNameToFiles_(ss, idKat, namaKategori);
+        cascadeKategoriNameToSubkategori_(ss, idKat, namaKategori);
+      }
+
+      writeLog_('SUPERADMIN', isEdit ? 'updateDokumenKategori' : 'createDokumenKategori', idKat + ' — ' + namaKategori);
+      return jsonOut_({ ok: true, data: mapDokumenKategoriRow_(rowObj) });
+    }
+
+    if (action === 'reorderDokumenKategori') {
+      const orders = Array.isArray(payload.orders) ? payload.orders : [];
+      if (orders.length === 0) {
+        return jsonOut_({ ok: false, error: 'Daftar urutan kategori kosong.' });
+      }
+      const ss = getSpreadsheet_();
+      ensureDokumenSheets_(ss);
+      const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
+      orders.forEach(function (entry) {
+        if (entry && entry.id) {
+          updateRowByIdInSs_(ss, SHEETS.DOKUMEN_KATEGORI, 'ID_Kategori', String(entry.id).trim(), {
+            Urutan: Number(entry.urutan || 1),
+            Diperbarui_Pada: nowStr
+          });
+        }
+      });
+      writeLog_('SUPERADMIN', 'reorderDokumenKategori', orders.length + ' kategori');
+      return jsonOut_({ ok: true });
+    }
+
+    if (action === 'deleteDokumenKategori') {
+      const id = String(payload.id || '').trim();
+      if (!id) return jsonOut_({ ok: false, error: 'ID kategori dokumen wajib diisi.' });
+      const ss = getSpreadsheet_();
+      ensureDokumenSheets_(ss);
+      const existing = findRowInSs_(ss, SHEETS.DOKUMEN_KATEGORI, 'ID_Kategori', id);
+      if (existing && existing.Drive_Folder_ID) {
+        try {
+          DriveApp.getFolderById(String(existing.Drive_Folder_ID).trim()).setTrashed(true);
+        } catch (ignore) {}
+      }
+      const deleted = deleteRowByIdInSs_(ss, SHEETS.DOKUMEN_KATEGORI, 'ID_Kategori', id);
+      deleteRowsByColumnInSs_(ss, SHEETS.DOKUMEN_SUBKATEGORI, 'ID_Kategori', id);
+      deleteRowsByColumnInSs_(ss, SHEETS.DOKUMEN_FILE, 'ID_Kategori', id);
+      writeLog_('SUPERADMIN', 'deleteDokumenKategori', id + ' (deleted=' + deleted + ')');
+      return jsonOut_({ ok: deleted, error: deleted ? undefined : 'Kategori dokumen tidak ditemukan.' });
+    }
+
+    if (action === 'saveDokumenSubkategori') {
+      const kategoriId = String(payload.kategoriId || '').trim();
+      const namaSubkategori = String(payload.namaSubkategori || '').trim();
+      if (!kategoriId || !namaSubkategori) {
+        return jsonOut_({ ok: false, error: 'Kategori dan nama subkategori wajib diisi.' });
+      }
+      const ss = getSpreadsheet_();
+      ensureDokumenSheets_(ss);
+
+      const katRow = findRowInSs_(ss, SHEETS.DOKUMEN_KATEGORI, 'ID_Kategori', kategoriId);
+      const namaKategori = String(payload.namaKategori || (katRow ? katRow.Nama_Kategori : '') || 'Dokumen').trim();
+      const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
+      const todayStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd');
+      const isEdit = Boolean(payload.id);
+      const idSub = isEdit ? String(payload.id).trim() : generateId_('SUB');
+      const existing = isEdit ? findRowInSs_(ss, SHEETS.DOKUMEN_SUBKATEGORI, 'ID_Subkategori', idSub) : null;
+      const oldSubName = existing ? String(existing.Nama_Subkategori || '').trim() : '';
+      const cleanSubName = sanitizeDriveFileName_(namaSubkategori);
+
+      let driveFolderId = String(payload.driveFolderId || (existing ? existing.Drive_Folder_ID : '') || '').trim();
+      let driveFolderUrl = String(payload.driveFolderUrl || (existing ? existing.Drive_Folder_URL : '') || '').trim();
+
+      try {
+        const rootFolder = getDokumenDriveFolder_();
+        let catFolder = null;
+        if (katRow && katRow.Drive_Folder_ID) {
+          try {
+            catFolder = DriveApp.getFolderById(String(katRow.Drive_Folder_ID).trim());
+          } catch (ignore) {
+            catFolder = null;
+          }
+        }
+        if (!catFolder) {
+          catFolder = getOrCreateSubfolder_(rootFolder, sanitizeDriveFileName_(namaKategori));
+          setDriveFilePublicViewSafe_(catFolder);
+        }
+
+        let subFolder = null;
+        if (driveFolderId) {
+          try {
+            subFolder = DriveApp.getFolderById(driveFolderId);
+            if (subFolder.getName() !== cleanSubName) {
+              subFolder.setName(cleanSubName);
+            }
+          } catch (ignore) {
+            subFolder = null;
+          }
+        }
+        if (!subFolder) {
+          subFolder = getOrCreateSubfolder_(catFolder, cleanSubName);
+        }
+        setDriveFilePublicViewSafe_(subFolder);
+        driveFolderId = subFolder.getId();
+        driveFolderUrl = subFolder.getUrl();
+      } catch (driveErr) {
+        return jsonOut_({
+          ok: false,
+          error: 'Gagal menyiapkan folder subkategori di Google Drive: ' + driveErr.message
+        });
+      }
+
+      const existingSubs = readRowsOptional_(SHEETS.DOKUMEN_SUBKATEGORI).filter(function (r) {
+        return String(r.ID_Kategori || '') === kategoriId;
+      });
+      const urutan = Number(payload.urutan || (existing ? existing.Urutan : existingSubs.length + 1) || 1);
+      const tanggalUpdate = String(payload.tanggalUpdate || todayStr).trim();
+
+      const rowObj = {
+        ID_Subkategori: idSub,
+        ID_Kategori: kategoriId,
+        Nama_Kategori: namaKategori,
+        Nama_Subkategori: namaSubkategori,
+        Urutan: urutan,
+        Drive_Folder_ID: driveFolderId,
+        Drive_Folder_URL: driveFolderUrl,
+        Tanggal_Update: tanggalUpdate,
+        Dibuat_Pada: isEdit ? String(payload.dibuatPada || (existing ? existing.Dibuat_Pada : nowStr)) : nowStr,
+        Diperbarui_Pada: nowStr
+      };
+
+      const updated = isEdit
+        ? updateRowByIdInSs_(ss, SHEETS.DOKUMEN_SUBKATEGORI, 'ID_Subkategori', idSub, rowObj)
+        : false;
+      if (!updated) {
+        appendRowInSs_(ss, SHEETS.DOKUMEN_SUBKATEGORI, rowObj);
+      } else if (oldSubName && oldSubName !== namaSubkategori) {
+        cascadeSubkategoriNameToFiles_(ss, kategoriId, oldSubName, namaSubkategori);
+      }
+
+      updateKategoriTanggalUpdate_(ss, kategoriId, tanggalUpdate, nowStr);
+      writeLog_('SUPERADMIN', isEdit ? 'updateDokumenSubkategori' : 'createDokumenSubkategori', idSub + ' — ' + namaSubkategori);
+      return jsonOut_({ ok: true, data: mapDokumenSubkategoriRow_(rowObj) });
+    }
+
+    if (action === 'deleteDokumenSubkategori') {
+      const id = String(payload.id || '').trim();
+      if (!id) return jsonOut_({ ok: false, error: 'ID subkategori wajib diisi.' });
+      const ss = getSpreadsheet_();
+      ensureDokumenSheets_(ss);
+      const existing = findRowInSs_(ss, SHEETS.DOKUMEN_SUBKATEGORI, 'ID_Subkategori', id);
+      if (existing && existing.Drive_Folder_ID) {
+        try {
+          DriveApp.getFolderById(String(existing.Drive_Folder_ID).trim()).setTrashed(true);
+        } catch (ignore) {}
+      }
+      const deleted = deleteRowByIdInSs_(ss, SHEETS.DOKUMEN_SUBKATEGORI, 'ID_Subkategori', id);
+      if (existing) {
+        deleteDokumenFilesBySubfolder_(ss, String(existing.ID_Kategori || ''), String(existing.Nama_Subkategori || ''));
+      }
+      writeLog_('SUPERADMIN', 'deleteDokumenSubkategori', id + ' (deleted=' + deleted + ')');
+      return jsonOut_({ ok: deleted, error: deleted ? undefined : 'Subkategori tidak ditemukan.' });
+    }
+
+    if (action === 'uploadDokumenFile') {
+      const kategoriId = String(payload.kategoriId || '').trim();
+      const base64Data = String(payload.base64Data || '').trim();
+      const originalFileName = String(payload.originalFileName || 'Dokumen').trim();
+      const mimeType = String(payload.mimeType || 'application/octet-stream').trim();
+      const extractZip = payload.extractZip !== false;
+      const replaceDokumenId = String(payload.replaceDokumenId || '').trim();
+
+      if (!kategoriId) {
+        return jsonOut_({ ok: false, error: 'Kategori dokumen wajib dipilih terlebih dahulu.' });
+      }
+      if (!base64Data) {
+        return jsonOut_({ ok: false, error: 'Data berkas unggahan kosong.' });
+      }
+
+      const ss = getSpreadsheet_();
+      ensureDokumenSheets_(ss);
+
+      const katRow = findRowInSs_(ss, SHEETS.DOKUMEN_KATEGORI, 'ID_Kategori', kategoriId);
+      const namaKategori = String(payload.namaKategori || (katRow ? katRow.Nama_Kategori : '') || 'Dokumen').trim();
+      const cleanKatName = sanitizeDriveFileName_(namaKategori);
+      const rootFolder = getDokumenDriveFolder_();
+
+      let catFolder = null;
+      if (katRow && katRow.Drive_Folder_ID) {
+        try {
+          catFolder = DriveApp.getFolderById(String(katRow.Drive_Folder_ID).trim());
+        } catch (ignore) {
+          catFolder = null;
+        }
+      }
+      if (!catFolder) {
+        catFolder = getOrCreateSubfolder_(rootFolder, cleanKatName);
+        setDriveFilePublicViewSafe_(catFolder);
+        if (katRow) {
+          updateRowByIdInSs_(ss, SHEETS.DOKUMEN_KATEGORI, 'ID_Kategori', kategoriId, {
+            Drive_Folder_ID: catFolder.getId(),
+            Drive_Folder_URL: catFolder.getUrl()
+          });
+        }
+      }
+
+      const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
+      const todayStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd');
+      const tanggalUpdate = String(payload.tanggalUpdate || todayStr).trim();
+      const keterangan = String(payload.keterangan || '').trim();
+      const userSubfolder = sanitizeDriveFileName_(payload.subfolder || '');
+      const bytes = Utilities.base64Decode(base64Data);
+      const origExt = extractExtFromName_(originalFileName);
+      const createdItems = [];
+
+      if (extractZip && origExt === 'zip') {
+        const zipBlob = Utilities.newBlob(bytes, 'application/zip', originalFileName);
+        let unzipped = [];
+        try {
+          unzipped = Utilities.unzip(zipBlob);
+        } catch (zipErr) {
+          return jsonOut_({
+            ok: false,
+            error: 'Gagal mengekstrak arsip ZIP: ' + zipErr.message + '. Pastikan file ZIP tidak dipassword dan berformat standar.'
+          });
+        }
+
+        const zipBaseSubfolder = sanitizeDriveFileName_(originalFileName.replace(/\.zip$/i, '')) || 'Paket Dokumen';
+        const subfolderCache = {};
+
+        for (let i = 0; i < unzipped.length; i++) {
+          const entryBlob = unzipped[i];
+          const rawEntryName = String(entryBlob.getName() || '').replace(/\\/g, '/');
+          if (!rawEntryName || rawEntryName.endsWith('/')) continue;
+          if (rawEntryName.indexOf('__MACOSX/') !== -1) continue;
+          const parts = rawEntryName.split('/').filter(Boolean);
+          const leafName = parts[parts.length - 1] || '';
+          if (!leafName || leafName.indexOf('.') === 0 || leafName.toLowerCase() === 'thumbs.db') continue;
+
+          // Tentukan subfolder: prioritas input user > folder di dalam ZIP > nama file ZIP
+          let targetSubName = userSubfolder;
+          if (!targetSubName) {
+            if (parts.length >= 2) {
+              targetSubName = sanitizeDriveFileName_(parts[parts.length - 2]);
+            } else {
+              targetSubName = zipBaseSubfolder;
+            }
+          }
+
+          let targetFolder = catFolder;
+          if (targetSubName) {
+            if (!subfolderCache[targetSubName]) {
+              const sub = getOrCreateSubfolder_(catFolder, targetSubName);
+              setDriveFilePublicViewSafe_(sub);
+              subfolderCache[targetSubName] = sub;
+            }
+            targetFolder = subfolderCache[targetSubName];
+          }
+
+          const entryExt = extractExtFromName_(leafName) || 'file';
+          const entryTitle = sanitizeDriveFileName_(leafName.replace(/\.[^.]+$/, '')) || leafName;
+          const driveFileName = buildDokumenDriveFileName_(namaKategori, targetSubName, entryTitle, entryExt);
+
+          trashExistingFileByName_(targetFolder, driveFileName);
+          const entryBytes = entryBlob.getBytes();
+          const finalBlob = Utilities.newBlob(
+            entryBytes,
+            entryBlob.getContentType() || 'application/octet-stream',
+            driveFileName
+          );
+          const savedFile = targetFolder.createFile(finalBlob);
+          setDriveFilePublicViewSafe_(savedFile);
+
+          const docId = generateId_('DOK');
+          const rowObj = {
+            ID_Dokumen: docId,
+            ID_Kategori: kategoriId,
+            Nama_Kategori: namaKategori,
+            Subfolder: targetSubName,
+            Judul_Dokumen: entryTitle,
+            Tipe_Item: 'file',
+            Nama_File_Drive: savedFile.getName(),
+            Ekstensi: entryExt,
+            Mime_Type: savedFile.getMimeType() || entryBlob.getContentType() || '',
+            Ukuran_Bytes: savedFile.getSize() || entryBytes.length,
+            Drive_File_ID: savedFile.getId(),
+            Drive_File_URL: savedFile.getUrl(),
+            Drive_Folder_ID: targetFolder.getId(),
+            Drive_Folder_URL: targetFolder.getUrl(),
+            Tanggal_Update: tanggalUpdate,
+            Keterangan: keterangan,
+            Jumlah_Dilihat: 0,
+            Jumlah_Diunduh: 0,
+            Dibuat_Pada: nowStr,
+            Diperbarui_Pada: nowStr
+          };
+          if (targetSubName) {
+            ensureSubkategoriRowExists_(ss, kategoriId, namaKategori, targetSubName, targetFolder.getId(), targetFolder.getUrl(), tanggalUpdate, nowStr);
+          }
+          appendRowInSs_(ss, SHEETS.DOKUMEN_FILE, rowObj);
+          createdItems.push(mapDokumenFileRow_(rowObj));
+        }
+
+        if (createdItems.length === 0) {
+          return jsonOut_({
+            ok: false,
+            error: 'Arsip ZIP tidak berisi file dokumen yang valid untuk diekstrak.'
+          });
+        }
+      } else {
+        let targetFolder = catFolder;
+        if (userSubfolder) {
+          targetFolder = getOrCreateSubfolder_(catFolder, userSubfolder);
+          setDriveFilePublicViewSafe_(targetFolder);
+          ensureSubkategoriRowExists_(ss, kategoriId, namaKategori, userSubfolder, targetFolder.getId(), targetFolder.getUrl(), tanggalUpdate, nowStr);
+        }
+
+        const ext = origExt || 'file';
+        const judulDokumen = String(payload.judulDokumen || '').trim() ||
+          sanitizeDriveFileName_(originalFileName.replace(/\.[^.]+$/, '')) ||
+          'Dokumen';
+        const driveFileName = buildDokumenDriveFileName_(namaKategori, userSubfolder, judulDokumen, ext);
+
+        let prevViews = 0;
+        let prevDownloads = 0;
+        if (replaceDokumenId) {
+          const prevDoc = findRowInSs_(ss, SHEETS.DOKUMEN_FILE, 'ID_Dokumen', replaceDokumenId);
+          if (prevDoc) {
+            prevViews = Number(prevDoc.Jumlah_Dilihat || 0);
+            prevDownloads = Number(prevDoc.Jumlah_Diunduh || 0);
+            if (prevDoc.Drive_File_ID) {
+              try {
+                DriveApp.getFileById(String(prevDoc.Drive_File_ID).trim()).setTrashed(true);
+              } catch (ignore) {}
+            }
+          }
+        }
+
+        trashExistingFileByName_(targetFolder, driveFileName);
+        const blob = Utilities.newBlob(bytes, mimeType, driveFileName);
+        const savedFile = targetFolder.createFile(blob);
+        setDriveFilePublicViewSafe_(savedFile);
+
+        const docId = replaceDokumenId || generateId_('DOK');
+        const rowObj = {
+          ID_Dokumen: docId,
+          ID_Kategori: kategoriId,
+          Nama_Kategori: namaKategori,
+          Subfolder: userSubfolder,
+          Judul_Dokumen: judulDokumen,
+          Tipe_Item: 'file',
+          Nama_File_Drive: savedFile.getName(),
+          Ekstensi: ext,
+          Mime_Type: savedFile.getMimeType() || mimeType,
+          Ukuran_Bytes: savedFile.getSize() || bytes.length,
+          Drive_File_ID: savedFile.getId(),
+          Drive_File_URL: savedFile.getUrl(),
+          Drive_Folder_ID: targetFolder.getId(),
+          Drive_Folder_URL: targetFolder.getUrl(),
+          Tanggal_Update: tanggalUpdate,
+          Keterangan: keterangan,
+          Jumlah_Dilihat: prevViews,
+          Jumlah_Diunduh: prevDownloads,
+          Dibuat_Pada: nowStr,
+          Diperbarui_Pada: nowStr
+        };
+
+        const updated = replaceDokumenId
+          ? updateRowByIdInSs_(ss, SHEETS.DOKUMEN_FILE, 'ID_Dokumen', docId, rowObj)
+          : false;
+        if (!updated) {
+          appendRowInSs_(ss, SHEETS.DOKUMEN_FILE, rowObj);
+        }
+        createdItems.push(mapDokumenFileRow_(rowObj));
+      }
+
+      updateKategoriTanggalUpdate_(ss, kategoriId, tanggalUpdate, nowStr);
+      writeLog_('SUPERADMIN', 'uploadDokumenFile', namaKategori + ' (' + createdItems.length + ' file)');
+
+      return jsonOut_({
+        ok: true,
+        data: {
+          items: createdItems,
+          extractedCount: createdItems.length,
+          categoryFolderId: catFolder.getId(),
+          categoryFolderUrl: catFolder.getUrl()
+        }
+      });
+    }
+
+    if (action === 'saveDokumenFile') {
+      const kategoriId = String(payload.kategoriId || '').trim();
+      const judulDokumen = String(payload.judulDokumen || '').trim();
+      if (!kategoriId || !judulDokumen) {
+        return jsonOut_({ ok: false, error: 'Kategori dan judul dokumen wajib diisi.' });
+      }
+
+      const ss = getSpreadsheet_();
+      ensureDokumenSheets_(ss);
+
+      const katRow = findRowInSs_(ss, SHEETS.DOKUMEN_KATEGORI, 'ID_Kategori', kategoriId);
+      const namaKategori = String(payload.namaKategori || (katRow ? katRow.Nama_Kategori : '') || 'Dokumen').trim();
+      const subfolder = sanitizeDriveFileName_(payload.subfolder || '');
+      const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
+      const todayStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd');
+      const tanggalUpdate = String(payload.tanggalUpdate || todayStr).trim();
+      const isEdit = Boolean(payload.id);
+      const docId = isEdit ? String(payload.id).trim() : generateId_('DOK');
+      const existing = isEdit ? findRowInSs_(ss, SHEETS.DOKUMEN_FILE, 'ID_Dokumen', docId) : null;
+
+      let driveFileId = String(payload.driveFileId || (existing ? existing.Drive_File_ID : '') || '').trim();
+      let driveFileUrl = String(payload.driveFileUrl || (existing ? existing.Drive_File_URL : '') || '').trim();
+      let driveFolderId = String(payload.driveFolderId || (existing ? existing.Drive_Folder_ID : '') || '').trim();
+      let driveFolderUrl = String(payload.driveFolderUrl || (existing ? existing.Drive_Folder_URL : '') || '').trim();
+      const ext = String(payload.ekstensi || (existing ? existing.Ekstensi : '') || 'link').trim().toLowerCase();
+      let namaFileDrive = String(payload.namaFileDrive || (existing ? existing.Nama_File_Drive : '') || judulDokumen).trim();
+
+      // Jika file berada di Drive, otomatis rename & pindahkan folder bila kategori/subfolder/judul berubah
+      if (driveFileId) {
+        try {
+          const driveFile = DriveApp.getFileById(driveFileId);
+          const rootFolder = getDokumenDriveFolder_();
+          let catFolder = null;
+          if (katRow && katRow.Drive_Folder_ID) {
+            try {
+              catFolder = DriveApp.getFolderById(String(katRow.Drive_Folder_ID).trim());
+            } catch (ignore) {
+              catFolder = null;
+            }
+          }
+          if (!catFolder) {
+            catFolder = getOrCreateSubfolder_(rootFolder, sanitizeDriveFileName_(namaKategori));
+            setDriveFilePublicViewSafe_(catFolder);
+          }
+          const targetFolder = subfolder ? getOrCreateSubfolder_(catFolder, subfolder) : catFolder;
+          setDriveFilePublicViewSafe_(targetFolder);
+
+          const formattedName = buildDokumenDriveFileName_(namaKategori, subfolder, judulDokumen, ext);
+          if (driveFile.getName() !== formattedName) {
+            driveFile.setName(formattedName);
+          }
+          if (driveFolderId !== targetFolder.getId()) {
+            driveFile.moveTo(targetFolder);
+          }
+          namaFileDrive = driveFile.getName();
+          driveFileUrl = driveFile.getUrl();
+          driveFolderId = targetFolder.getId();
+          driveFolderUrl = targetFolder.getUrl();
+        } catch (ignore) {}
+      } else if (!driveFileUrl) {
+        return jsonOut_({ ok: false, error: 'Tautan Google Drive atau file unggahan wajib diisi.' });
+      }
+
+      const tipeItem = String(payload.tipeItem || (existing ? existing.Tipe_Item : '') || (driveFileId ? 'file' : 'link')).trim().toLowerCase() === 'link' ? 'link' : 'file';
+
+      const rowObj = {
+        ID_Dokumen: docId,
+        ID_Kategori: kategoriId,
+        Nama_Kategori: namaKategori,
+        Subfolder: subfolder,
+        Judul_Dokumen: judulDokumen,
+        Tipe_Item: tipeItem,
+        Nama_File_Drive: namaFileDrive,
+        Ekstensi: ext,
+        Mime_Type: String(payload.mimeType || (existing ? existing.Mime_Type : '') || ''),
+        Ukuran_Bytes: Number(payload.ukuranBytes || (existing ? existing.Ukuran_Bytes : 0) || 0),
+        Drive_File_ID: driveFileId,
+        Drive_File_URL: driveFileUrl,
+        Drive_Folder_ID: driveFolderId,
+        Drive_Folder_URL: driveFolderUrl,
+        Tanggal_Update: tanggalUpdate,
+        Keterangan: String(payload.keterangan || '').trim(),
+        Jumlah_Dilihat: Number(existing ? existing.Jumlah_Dilihat : (payload.jumlahDilihat || 0)) || 0,
+        Jumlah_Diunduh: Number(existing ? existing.Jumlah_Diunduh : (payload.jumlahDiunduh || 0)) || 0,
+        Dibuat_Pada: isEdit ? String(payload.dibuatPada || (existing ? existing.Dibuat_Pada : nowStr)) : nowStr,
+        Diperbarui_Pada: nowStr
+      };
+
+      if (subfolder) {
+        ensureSubkategoriRowExists_(ss, kategoriId, namaKategori, subfolder, driveFolderId, driveFolderUrl, tanggalUpdate, nowStr);
+      }
+
+      const updated = isEdit
+        ? updateRowByIdInSs_(ss, SHEETS.DOKUMEN_FILE, 'ID_Dokumen', docId, rowObj)
+        : false;
+      if (!updated) {
+        appendRowInSs_(ss, SHEETS.DOKUMEN_FILE, rowObj);
+      }
+
+      updateKategoriTanggalUpdate_(ss, kategoriId, tanggalUpdate, nowStr);
+      writeLog_('SUPERADMIN', isEdit ? 'updateDokumenFile' : 'createDokumenFile', docId + ' — ' + judulDokumen);
+      return jsonOut_({ ok: true, data: mapDokumenFileRow_(rowObj) });
+    }
+
+    if (action === 'deleteDokumenFile') {
+      const id = String(payload.id || '').trim();
+      if (!id) return jsonOut_({ ok: false, error: 'ID dokumen wajib diisi.' });
+      const ss = getSpreadsheet_();
+      ensureDokumenSheets_(ss);
+      const existing = findRowInSs_(ss, SHEETS.DOKUMEN_FILE, 'ID_Dokumen', id);
+      if (existing && existing.Drive_File_ID) {
+        try {
+          DriveApp.getFileById(String(existing.Drive_File_ID).trim()).setTrashed(true);
+        } catch (ignore) {}
+      }
+      const deleted = deleteRowByIdInSs_(ss, SHEETS.DOKUMEN_FILE, 'ID_Dokumen', id);
+      writeLog_('SUPERADMIN', 'deleteDokumenFile', id + ' (deleted=' + deleted + ')');
+      return jsonOut_({ ok: deleted, error: deleted ? undefined : 'Dokumen tidak ditemukan.' });
     }
 
     if (action === 'saveUnit') {
@@ -2141,4 +2809,327 @@ function deleteRowsByColumnInSs_(ss, sheetName, colName, targetVal) {
     lock.releaseLock();
   }
 }
+
+function ensureDokumenSheets_(ss) {
+  const defs = [
+    {
+      name: SHEETS.DOKUMEN_KATEGORI,
+      headers: [
+        'ID_Kategori',
+        'Nama_Kategori',
+        'Deskripsi',
+        'Urutan',
+        'Drive_Folder_ID',
+        'Drive_Folder_URL',
+        'Tanggal_Update',
+        'Dibuat_Pada',
+        'Diperbarui_Pada'
+      ]
+    },
+    {
+      name: SHEETS.DOKUMEN_SUBKATEGORI,
+      headers: [
+        'ID_Subkategori',
+        'ID_Kategori',
+        'Nama_Kategori',
+        'Nama_Subkategori',
+        'Urutan',
+        'Drive_Folder_ID',
+        'Drive_Folder_URL',
+        'Tanggal_Update',
+        'Dibuat_Pada',
+        'Diperbarui_Pada'
+      ]
+    },
+    {
+      name: SHEETS.DOKUMEN_FILE,
+      headers: [
+        'ID_Dokumen',
+        'ID_Kategori',
+        'Nama_Kategori',
+        'Subfolder',
+        'Judul_Dokumen',
+        'Tipe_Item',
+        'Nama_File_Drive',
+        'Ekstensi',
+        'Mime_Type',
+        'Ukuran_Bytes',
+        'Drive_File_ID',
+        'Drive_File_URL',
+        'Drive_Folder_ID',
+        'Drive_Folder_URL',
+        'Tanggal_Update',
+        'Keterangan',
+        'Jumlah_Dilihat',
+        'Jumlah_Diunduh',
+        'Dibuat_Pada',
+        'Diperbarui_Pada'
+      ]
+    }
+  ];
+
+  defs.forEach(function (def) {
+    let sheet = ss.getSheetByName(def.name);
+    if (!sheet) {
+      sheet = ss.insertSheet(def.name);
+    }
+    if (sheet.getLastRow() === 0) {
+      sheet.getRange(1, 1, 1, def.headers.length).setValues([def.headers]);
+      sheet.getRange(1, 1, 1, def.headers.length)
+        .setFontWeight('bold')
+        .setBackground('#07525E')
+        .setFontColor('#FFFFFF');
+      sheet.setFrozenRows(1);
+    } else {
+      ensureHeaderColumns_(sheet, def.headers);
+    }
+  });
+}
+
+function getDokumenDriveFolder_() {
+  const settingsMap = getSettingsMap_();
+  const raw = String(settingsMap.DOKUMEN_DRIVE_FOLDER_ID || DEFAULT_DOKUMEN_DRIVE_FOLDER_ID).trim();
+  const folderMatch = raw.match(/\/folders\/([a-zA-Z0-9-_]+)/);
+  const folderId = (folderMatch && folderMatch[1]) ? folderMatch[1] : (raw || DEFAULT_DOKUMEN_DRIVE_FOLDER_ID);
+  try {
+    return DriveApp.getFolderById(folderId);
+  } catch (err) {
+    throw new Error('Tidak dapat mengakses folder Google Drive Dokumen (ID: ' + folderId + '). Pastikan akun pemilik Apps Script memiliki akses Editor ke folder tersebut dan sudah menjalankan otorisasiGoogleDrive(). Detail: ' + err.message);
+  }
+}
+
+function getOrCreateSubfolder_(parentFolder, folderName) {
+  const clean = sanitizeDriveFileName_(folderName || 'Dokumen');
+  const iter = parentFolder.getFoldersByName(clean);
+  if (iter.hasNext()) {
+    return iter.next();
+  }
+  return parentFolder.createFolder(clean);
+}
+
+function extractExtFromName_(fileName) {
+  const match = String(fileName || '').match(/\.([a-zA-Z0-9]{1,10})$/);
+  return match && match[1] ? match[1].toLowerCase() : '';
+}
+
+function buildDokumenDriveFileName_(namaKategori, subfolder, judulDokumen, ext) {
+  const cleanKat = sanitizeDriveFileName_(namaKategori || '');
+  const cleanSub = sanitizeDriveFileName_(subfolder || '');
+  const cleanTitle = sanitizeDriveFileName_(judulDokumen || 'Dokumen');
+  const cleanExt = String(ext || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+
+  let base = cleanTitle;
+  if (cleanSub) {
+    base = cleanKat ? (cleanKat + ' - ' + cleanSub + ' - ' + cleanTitle) : (cleanSub + ' - ' + cleanTitle);
+  } else if (cleanKat && cleanTitle.toLowerCase() !== cleanKat.toLowerCase()) {
+    base = cleanKat + ' - ' + cleanTitle;
+  }
+
+  return cleanExt && cleanExt !== 'link' ? (base + '.' + cleanExt) : base;
+}
+
+function mapDokumenKategoriRow_(r) {
+  return {
+    id: String(r.ID_Kategori || ''),
+    namaKategori: String(r.Nama_Kategori || ''),
+    deskripsi: String(r.Deskripsi || ''),
+    urutan: Number(r.Urutan || 1),
+    driveFolderId: String(r.Drive_Folder_ID || ''),
+    driveFolderUrl: String(r.Drive_Folder_URL || ''),
+    tanggalUpdate: formatDateCell_(r.Tanggal_Update),
+    dibuatPada: String(r.Dibuat_Pada || ''),
+    diperbaruiPada: String(r.Diperbarui_Pada || '')
+  };
+}
+
+function mapDokumenSubkategoriRow_(r) {
+  return {
+    id: String(r.ID_Subkategori || ''),
+    kategoriId: String(r.ID_Kategori || ''),
+    namaKategori: String(r.Nama_Kategori || ''),
+    namaSubkategori: String(r.Nama_Subkategori || ''),
+    urutan: Number(r.Urutan || 1),
+    driveFolderId: String(r.Drive_Folder_ID || ''),
+    driveFolderUrl: String(r.Drive_Folder_URL || ''),
+    tanggalUpdate: formatDateCell_(r.Tanggal_Update),
+    dibuatPada: String(r.Dibuat_Pada || ''),
+    diperbaruiPada: String(r.Diperbarui_Pada || '')
+  };
+}
+
+function mapDokumenFileRow_(r) {
+  const driveFileId = String(r.Drive_File_ID || '');
+  const rawTipe = String(r.Tipe_Item || '').trim().toLowerCase();
+  const tipeItem = rawTipe === 'link' || (!rawTipe && !driveFileId && String(r.Ekstensi || '').toLowerCase() === 'link') ? 'link' : 'file';
+  return {
+    id: String(r.ID_Dokumen || ''),
+    kategoriId: String(r.ID_Kategori || ''),
+    namaKategori: String(r.Nama_Kategori || ''),
+    subfolder: String(r.Subfolder || ''),
+    judulDokumen: String(r.Judul_Dokumen || ''),
+    tipeItem: tipeItem,
+    namaFileDrive: String(r.Nama_File_Drive || ''),
+    ekstensi: String(r.Ekstensi || '').toLowerCase(),
+    mimeType: String(r.Mime_Type || ''),
+    ukuranBytes: Number(r.Ukuran_Bytes || 0),
+    driveFileId: driveFileId,
+    driveFileUrl: String(r.Drive_File_URL || ''),
+    driveFolderId: String(r.Drive_Folder_ID || ''),
+    driveFolderUrl: String(r.Drive_Folder_URL || ''),
+    tanggalUpdate: formatDateCell_(r.Tanggal_Update),
+    keterangan: String(r.Keterangan || ''),
+    jumlahDilihat: Number(r.Jumlah_Dilihat || 0),
+    jumlahDiunduh: Number(r.Jumlah_Diunduh || 0),
+    dibuatPada: String(r.Dibuat_Pada || ''),
+    diperbaruiPada: String(r.Diperbarui_Pada || '')
+  };
+}
+
+function ensureSubkategoriRowExists_(ss, kategoriId, namaKategori, namaSubkategori, driveFolderId, driveFolderUrl, tanggalUpdate, nowStr) {
+  const cleanSub = String(namaSubkategori || '').trim();
+  if (!cleanSub) return;
+  const existingSubs = readRowsOptional_(SHEETS.DOKUMEN_SUBKATEGORI);
+  const found = existingSubs.some(function (r) {
+    return String(r.ID_Kategori || '').trim() === String(kategoriId).trim() &&
+      String(r.Nama_Subkategori || '').trim().toLowerCase() === cleanSub.toLowerCase();
+  });
+  if (found) return;
+  const countInKat = existingSubs.filter(function (r) {
+    return String(r.ID_Kategori || '').trim() === String(kategoriId).trim();
+  }).length;
+  appendRowInSs_(ss, SHEETS.DOKUMEN_SUBKATEGORI, {
+    ID_Subkategori: generateId_('SUB'),
+    ID_Kategori: kategoriId,
+    Nama_Kategori: namaKategori,
+    Nama_Subkategori: cleanSub,
+    Urutan: countInKat + 1,
+    Drive_Folder_ID: driveFolderId || '',
+    Drive_Folder_URL: driveFolderUrl || '',
+    Tanggal_Update: tanggalUpdate,
+    Dibuat_Pada: nowStr,
+    Diperbarui_Pada: nowStr
+  });
+}
+
+function cascadeKategoriNameToFiles_(ss, kategoriId, newNamaKategori) {
+  const sheet = ss.getSheetByName(SHEETS.DOKUMEN_FILE);
+  if (!sheet || sheet.getLastRow() <= 1) return;
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(function (h) { return String(h).trim(); });
+  const idIdx = headers.indexOf('ID_Kategori');
+  const namaIdx = headers.indexOf('Nama_Kategori');
+  if (idIdx === -1 || namaIdx === -1) return;
+  for (let r = 1; r < data.length; r++) {
+    if (String(data[r][idIdx]).trim() === String(kategoriId).trim()) {
+      sheet.getRange(r + 1, namaIdx + 1).setValue(newNamaKategori);
+    }
+  }
+}
+
+function cascadeKategoriNameToSubkategori_(ss, kategoriId, newNamaKategori) {
+  const sheet = ss.getSheetByName(SHEETS.DOKUMEN_SUBKATEGORI);
+  if (!sheet || sheet.getLastRow() <= 1) return;
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(function (h) { return String(h).trim(); });
+  const idIdx = headers.indexOf('ID_Kategori');
+  const namaIdx = headers.indexOf('Nama_Kategori');
+  if (idIdx === -1 || namaIdx === -1) return;
+  for (let r = 1; r < data.length; r++) {
+    if (String(data[r][idIdx]).trim() === String(kategoriId).trim()) {
+      sheet.getRange(r + 1, namaIdx + 1).setValue(newNamaKategori);
+    }
+  }
+}
+
+function cascadeSubkategoriNameToFiles_(ss, kategoriId, oldSubName, newSubName) {
+  const sheet = ss.getSheetByName(SHEETS.DOKUMEN_FILE);
+  if (!sheet || sheet.getLastRow() <= 1) return;
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(function (h) { return String(h).trim(); });
+  const idIdx = headers.indexOf('ID_Kategori');
+  const subIdx = headers.indexOf('Subfolder');
+  if (idIdx === -1 || subIdx === -1) return;
+  for (let r = 1; r < data.length; r++) {
+    if (
+      String(data[r][idIdx]).trim() === String(kategoriId).trim() &&
+      String(data[r][subIdx]).trim().toLowerCase() === String(oldSubName).trim().toLowerCase()
+    ) {
+      sheet.getRange(r + 1, subIdx + 1).setValue(newSubName);
+    }
+  }
+}
+
+function deleteDokumenFilesBySubfolder_(ss, kategoriId, subName) {
+  const sheet = ss.getSheetByName(SHEETS.DOKUMEN_FILE);
+  if (!sheet || sheet.getLastRow() <= 1) return 0;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map(function (h) { return String(h).trim(); });
+    const idIdx = headers.indexOf('ID_Kategori');
+    const subIdx = headers.indexOf('Subfolder');
+    if (idIdx === -1 || subIdx === -1) return 0;
+    let count = 0;
+    for (let r = data.length - 1; r >= 1; r--) {
+      if (
+        String(data[r][idIdx]).trim() === String(kategoriId).trim() &&
+        String(data[r][subIdx]).trim().toLowerCase() === String(subName).trim().toLowerCase()
+      ) {
+        sheet.deleteRow(r + 1);
+        count++;
+      }
+    }
+    return count;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function incrementDokumenStatInSs_(ss, docId, metric) {
+  const sheet = ss.getSheetByName(SHEETS.DOKUMEN_FILE);
+  if (!sheet || sheet.getLastRow() <= 1) return null;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map(function (h) { return String(h).trim(); });
+    const idIdx = headers.indexOf('ID_Dokumen');
+    const viewIdx = headers.indexOf('Jumlah_Dilihat');
+    const dlIdx = headers.indexOf('Jumlah_Diunduh');
+    if (idIdx === -1 || viewIdx === -1 || dlIdx === -1) return null;
+
+    for (let r = 1; r < data.length; r++) {
+      if (String(data[r][idIdx]).trim() === String(docId).trim()) {
+        let views = Number(data[r][viewIdx] || 0);
+        let downloads = Number(data[r][dlIdx] || 0);
+        if (metric === 'view') {
+          views += 1;
+          sheet.getRange(r + 1, viewIdx + 1).setValue(views);
+        } else {
+          downloads += 1;
+          sheet.getRange(r + 1, dlIdx + 1).setValue(downloads);
+        }
+        return {
+          id: docId,
+          jumlahDilihat: views,
+          jumlahDiunduh: downloads
+        };
+      }
+    }
+    return null;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function updateKategoriTanggalUpdate_(ss, kategoriId, tanggalUpdate, nowStr) {
+  try {
+    updateRowByIdInSs_(ss, SHEETS.DOKUMEN_KATEGORI, 'ID_Kategori', kategoriId, {
+      Tanggal_Update: tanggalUpdate,
+      Diperbarui_Pada: nowStr
+    });
+  } catch (ignore) {}
+}
+
 

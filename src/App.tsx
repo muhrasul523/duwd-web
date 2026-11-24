@@ -1,5 +1,6 @@
 import { AlertTriangle, X } from 'lucide-react';
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { DokumenView } from './components/DokumenView';
 import { DpwDpdView } from './components/DpwDpdView';
 import { KalenderKegiatanView } from './components/KalenderKegiatanView';
 import { LoginModal } from './components/LoginModal';
@@ -11,6 +12,9 @@ import { TopBar, type ActiveView } from './components/TopBar';
 import { UnitManager } from './components/UnitManager';
 import {
   fetchAllOrgData,
+  loadLocalDokumenFile,
+  loadLocalDokumenKategori,
+  loadLocalDokumenSubkategori,
   loadLocalDpc,
   loadLocalDpd,
   loadLocalDpr,
@@ -23,6 +27,9 @@ import {
   loadLocalProker,
   loadLocalSettings,
   loadLocalUnits,
+  saveLocalDokumenFile,
+  saveLocalDokumenKategori,
+  saveLocalDokumenSubkategori,
   saveLocalDpc,
   saveLocalDpd,
   saveLocalDpr,
@@ -35,6 +42,9 @@ import {
   saveLocalUnits,
 } from './services/orgService';
 import type {
+  DokumenFileItem,
+  DokumenKategoriItem,
+  DokumenSubkategoriItem,
   DpcItem,
   DpdItem,
   DprItem,
@@ -124,6 +134,15 @@ export default function App() {
   const [dpdList, setDpdList] = useState<DpdItem[]>(() => loadLocalDpd());
   const [dpcList, setDpcList] = useState<DpcItem[]>(() => loadLocalDpc());
   const [dprList, setDprList] = useState<DprItem[]>(() => loadLocalDpr());
+  const [dokumenKategoriList, setDokumenKategoriList] = useState<DokumenKategoriItem[]>(() =>
+    loadLocalDokumenKategori(),
+  );
+  const [dokumenSubkategoriList, setDokumenSubkategoriList] = useState<DokumenSubkategoriItem[]>(
+    () => loadLocalDokumenSubkategori(),
+  );
+  const [dokumenFileList, setDokumenFileList] = useState<DokumenFileItem[]>(() =>
+    loadLocalDokumenFile(),
+  );
   const [syncing, setSyncing] = useState(false);
 
   // Apply Dark / Light / System preference to <html>
@@ -194,6 +213,9 @@ export default function App() {
         setDpdList(dataset.dpd);
         setDpcList(dataset.dpc);
         setDprList(dataset.dpr);
+        setDokumenKategoriList(dataset.dokumenKategori);
+        setDokumenSubkategoriList(dataset.dokumenSubkategori);
+        setDokumenFileList(dataset.dokumenFile);
         setWilayahConnected(dataset.wilayahConnected);
 
         if (dataset.settings.namaAplikasi) {
@@ -420,6 +442,201 @@ export default function App() {
     saveLocalKodeWilayah(rows);
   };
 
+  const handleSaveDokumenKategori = (saved: DokumenKategoriItem) => {
+    setDokumenKategoriList((prev) => {
+      const exists = prev.some((k) => k.id === saved.id);
+      const next = exists
+        ? prev.map((k) => (k.id === saved.id ? saved : k))
+        : [...prev, saved];
+      saveLocalDokumenKategori(next);
+      return next;
+    });
+    setDokumenSubkategoriList((prev) => {
+      const next = prev.map((s) =>
+        s.kategoriId === saved.id ? { ...s, namaKategori: saved.namaKategori } : s,
+      );
+      saveLocalDokumenSubkategori(next);
+      return next;
+    });
+    setDokumenFileList((prev) => {
+      const next = prev.map((f) =>
+        f.kategoriId === saved.id ? { ...f, namaKategori: saved.namaKategori } : f,
+      );
+      saveLocalDokumenFile(next);
+      return next;
+    });
+  };
+
+  const handleReorderDokumenKategori = (reordered: DokumenKategoriItem[]) => {
+    setDokumenKategoriList(reordered);
+    saveLocalDokumenKategori(reordered);
+  };
+
+  const handleDeleteDokumenKategori = (id: string) => {
+    setDokumenKategoriList((prev) => {
+      const next = prev.filter((k) => k.id !== id);
+      saveLocalDokumenKategori(next);
+      return next;
+    });
+    setDokumenSubkategoriList((prev) => {
+      const next = prev.filter((s) => s.kategoriId !== id);
+      saveLocalDokumenSubkategori(next);
+      return next;
+    });
+    setDokumenFileList((prev) => {
+      const next = prev.filter((f) => f.kategoriId !== id);
+      saveLocalDokumenFile(next);
+      return next;
+    });
+  };
+
+  const handleSaveDokumenSubkategori = (saved: DokumenSubkategoriItem, oldName?: string) => {
+    setDokumenSubkategoriList((prev) => {
+      const exists = prev.some((s) => s.id === saved.id);
+      const next = exists
+        ? prev.map((s) => (s.id === saved.id ? saved : s))
+        : [...prev, saved];
+      saveLocalDokumenSubkategori(next);
+      return next;
+    });
+    if (oldName && oldName !== saved.namaSubkategori) {
+      setDokumenFileList((prev) => {
+        const next = prev.map((f) =>
+          f.kategoriId === saved.kategoriId &&
+          f.subfolder.trim().toLowerCase() === oldName.trim().toLowerCase()
+            ? { ...f, subfolder: saved.namaSubkategori }
+            : f,
+        );
+        saveLocalDokumenFile(next);
+        return next;
+      });
+    }
+  };
+
+  const handleDeleteDokumenSubkategori = (sub: DokumenSubkategoriItem) => {
+    setDokumenSubkategoriList((prev) => {
+      const next = prev.filter((s) => s.id !== sub.id);
+      saveLocalDokumenSubkategori(next);
+      return next;
+    });
+    setDokumenFileList((prev) => {
+      const next = prev.filter(
+        (f) =>
+          !(
+            f.kategoriId === sub.kategoriId &&
+            f.subfolder.trim().toLowerCase() === sub.namaSubkategori.trim().toLowerCase()
+          ),
+      );
+      saveLocalDokumenFile(next);
+      return next;
+    });
+  };
+
+  const handleSaveDokumenFiles = (
+    items: DokumenFileItem[],
+    updatedCategoryFolder?: {
+      kategoriId: string;
+      folderId?: string;
+      folderUrl?: string;
+      tanggalUpdate?: string;
+    },
+  ) => {
+    setDokumenFileList((prev) => {
+      const byId = new Map(prev.map((f) => [f.id, f]));
+      items.forEach((item) => {
+        byId.set(item.id, item);
+      });
+      const next = Array.from(byId.values());
+      saveLocalDokumenFile(next);
+      return next;
+    });
+
+    // Pastikan subfolder baru (misal dari ekstrak ZIP) terdaftar di daftar subkategori lokal
+    setDokumenSubkategoriList((prev) => {
+      const next = [...prev];
+      let changed = false;
+      items.forEach((item) => {
+        const cleanSub = (item.subfolder || '').trim();
+        if (!cleanSub) return;
+        const exists = next.some(
+          (s) =>
+            s.kategoriId === item.kategoriId &&
+            s.namaSubkategori.trim().toLowerCase() === cleanSub.toLowerCase(),
+        );
+        if (!exists) {
+          const countInKat = next.filter((s) => s.kategoriId === item.kategoriId).length;
+          next.push({
+            id: `SUB-${Date.now().toString().slice(-5)}-${Math.floor(Math.random() * 90 + 10)}`,
+            kategoriId: item.kategoriId,
+            namaKategori: item.namaKategori,
+            namaSubkategori: cleanSub,
+            urutan: countInKat + 1,
+            driveFolderId: item.driveFolderId || '',
+            driveFolderUrl: item.driveFolderUrl || '',
+            tanggalUpdate: item.tanggalUpdate,
+          });
+          changed = true;
+        }
+      });
+      if (changed) {
+        saveLocalDokumenSubkategori(next);
+        return next;
+      }
+      return prev;
+    });
+
+    if (updatedCategoryFolder) {
+      setDokumenKategoriList((prev) => {
+        const next = prev.map((k) => {
+          if (k.id !== updatedCategoryFolder.kategoriId) return k;
+          return {
+            ...k,
+            driveFolderId: updatedCategoryFolder.folderId || k.driveFolderId,
+            driveFolderUrl: updatedCategoryFolder.folderUrl || k.driveFolderUrl,
+            tanggalUpdate: updatedCategoryFolder.tanggalUpdate || k.tanggalUpdate,
+          };
+        });
+        saveLocalDokumenKategori(next);
+        return next;
+      });
+    }
+  };
+
+  const handleDeleteDokumenFile = (id: string) => {
+    setDokumenFileList((prev) => {
+      const next = prev.filter((f) => f.id !== id);
+      saveLocalDokumenFile(next);
+      return next;
+    });
+  };
+
+  const handleTrackDokumenStat = (
+    id: string,
+    metric: 'view' | 'download',
+    syncedCounts?: { jumlahDilihat?: number; jumlahDiunduh?: number },
+  ) => {
+    setDokumenFileList((prev) => {
+      const next = prev.map((f) => {
+        if (f.id !== id) return f;
+        if (syncedCounts) {
+          return {
+            ...f,
+            jumlahDilihat: syncedCounts.jumlahDilihat ?? f.jumlahDilihat ?? 0,
+            jumlahDiunduh: syncedCounts.jumlahDiunduh ?? f.jumlahDiunduh ?? 0,
+          };
+        }
+        return {
+          ...f,
+          jumlahDilihat: metric === 'view' ? (f.jumlahDilihat || 0) + 1 : (f.jumlahDilihat || 0),
+          jumlahDiunduh:
+            metric === 'download' ? (f.jumlahDiunduh || 0) + 1 : (f.jumlahDiunduh || 0),
+        };
+      });
+      saveLocalDokumenFile(next);
+      return next;
+    });
+  };
+
   return (
     <div
       id="top"
@@ -544,6 +761,27 @@ export default function App() {
               onSaveDpr={handleSaveDpr}
               onDeleteDpr={handleDeleteDpr}
               onImportedKodeWilayah={handleImportedKodeWilayah}
+            />
+          )}
+
+          {activeView === 'dokumen' && (
+            <DokumenView
+              role={role}
+              activePin={activePin}
+              webAppUrl={webAppUrl}
+              syncing={syncing}
+              onRefresh={syncFromSheet}
+              kategoriList={dokumenKategoriList}
+              subkategoriList={dokumenSubkategoriList}
+              fileList={dokumenFileList}
+              onSaveKategori={handleSaveDokumenKategori}
+              onReorderKategori={handleReorderDokumenKategori}
+              onDeleteKategori={handleDeleteDokumenKategori}
+              onSaveSubkategori={handleSaveDokumenSubkategori}
+              onDeleteSubkategori={handleDeleteDokumenSubkategori}
+              onSaveFiles={handleSaveDokumenFiles}
+              onDeleteFile={handleDeleteDokumenFile}
+              onTrackStat={handleTrackDokumenStat}
             />
           )}
 
