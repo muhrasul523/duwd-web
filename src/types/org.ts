@@ -20,6 +20,12 @@ export interface PengurusItem {
   unitId: string;
   namaUnit: string;
   amanah: string;
+  email?: string;
+  namaBank?: string;
+  nomorRekening?: string;
+  namaPemilikRekening?: string;
+  pendataanDiperbaruiPada?: string;
+  sudahPendataan?: boolean;
   dibuatPada: string;
   diperbaruiPada: string;
 }
@@ -276,6 +282,79 @@ export interface DokumenFileItem {
   jumlahDiunduh?: number;
   dibuatPada?: string;
   diperbaruiPada?: string;
+}
+
+export interface WaGroupItem {
+  id: string;
+  namaGrup: string;
+  groupId: string; // format xxxx@g.us
+  keterangan?: string;
+  dibuatPada?: string;
+  diperbaruiPada?: string;
+}
+
+export type BroadcastChannel = 'wa' | 'email' | 'both';
+
+export type BroadcastModeKirim = 'segera' | 'terjadwal';
+
+export type BroadcastStatus =
+  | 'Terjadwal'
+  | 'Diproses'
+  | 'Terkirim'
+  | 'Sebagian Gagal'
+  | 'Gagal'
+  | 'Dibatalkan';
+
+export interface BroadcastItem {
+  id: string;
+  judul: string;
+  channel: BroadcastChannel;
+  targetSummary: string;
+  targetPengurusIds: string[];
+  targetGroupIds: string[];
+  pesanWa: string;
+  emailSubject: string;
+  emailBody: string;
+  imageDriveFileId?: string;
+  imageUrl?: string;
+  imageName?: string;
+  modeKirim: BroadcastModeKirim;
+  jadwalKirim?: string; // YYYY-MM-DD HH:mm (WITA)
+  delayDetik?: number; // Jeda antar pesan dalam detik (0 - 300)
+  status: BroadcastStatus;
+  totalTarget: number;
+  totalTerkirim: number;
+  totalGagal: number;
+  logHasil?: string;
+  dibuatOleh: string;
+  dibuatPada: string;
+  dikirimPada?: string;
+}
+
+export interface BroadcastConfigStatus {
+  rechatConfigured: boolean;
+  rechatKeyMasked: string;
+  rechatApiUrl: string;
+  emailAlias: string;
+  emailSenderName: string;
+  triggerActive: boolean;
+  availableEmailAliases?: string[];
+}
+
+export interface PendataanLookupResult {
+  id: string;
+  namaLengkap: string;
+  namaPanggilan: string;
+  whatsapp: string;
+  unitId: string;
+  namaUnit: string;
+  kodeUnit?: string;
+  amanah: string;
+  email?: string;
+  namaBank?: string;
+  nomorRekening?: string;
+  namaPemilikRekening?: string;
+  pendataanDiperbaruiPada?: string;
 }
 
 export interface AppSettings {

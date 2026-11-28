@@ -1,4 +1,7 @@
 import {
+  Check,
+  Copy,
+  ExternalLink,
   MessageCircle,
   Pencil,
   Plus,
@@ -32,6 +35,7 @@ interface PengurusDirectoryProps {
   onRefresh: () => void;
   onSaveSuccess: (item: PengurusItem) => void;
   onDeleteSuccess: (id: string) => void;
+  onOpenPendataanPage: () => void;
 }
 
 const PI_AMANAH_PRESETS = [
@@ -72,8 +76,10 @@ export function PengurusDirectory({
   onRefresh,
   onSaveSuccess,
   onDeleteSuccess,
+  onOpenPendataanPage,
 }: PengurusDirectoryProps) {
   const canEdit = role === 'superadmin';
+  const canViewPrivate = role === 'admin' || role === 'superadmin';
   const activeUnits = useMemo(
     () => units.filter((u) => u.aktif).sort((a, b) => a.urutan - b.urutan),
     [units],
@@ -86,6 +92,7 @@ export function PengurusDirectory({
 
   const [selectedUnitId, setSelectedUnitId] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [copiedPendataanLink, setCopiedPendataanLink] = useState(false);
 
   // Modal Form Tambah / Edit Pengurus
   const [formOpen, setFormOpen] = useState(false);
@@ -96,10 +103,33 @@ export function PengurusDirectory({
   const [unitId, setUnitId] = useState('');
   const [amanahSelect, setAmanahSelect] = useState('Ketua');
   const [amanahCustom, setAmanahCustom] = useState('');
+  const [emailInput, setEmailInput] = useState('');
+  const [bankInput, setBankInput] = useState('');
+  const [noRekInput, setNoRekInput] = useState('');
+  const [pemilikRekInput, setPemilikRekInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const pendataanDoneCount = useMemo(
+    () =>
+      pengurusList.filter((p) =>
+        Boolean(p.sudahPendataan || (p.email && p.nomorRekening)),
+      ).length,
+    [pengurusList],
+  );
+
+  const handleCopyPendataanLink = async () => {
+    const link = 'https://duwd.web.id/data-pengurus';
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedPendataanLink(true);
+      window.setTimeout(() => setCopiedPendataanLink(false), 1800);
+    } catch {
+      setCopiedPendataanLink(false);
+    }
+  };
 
   const normalizedWaPreview = useMemo(() => normalizeWhatsApp(waRaw), [waRaw]);
 
@@ -151,6 +181,10 @@ export function PengurusDirectory({
     setUnitId(defaultUnit?.id || '');
     setAmanahSelect(presets[0]);
     setAmanahCustom('');
+    setEmailInput('');
+    setBankInput('');
+    setNoRekInput('');
+    setPemilikRekInput('');
     setFormError('');
     setFormOpen(true);
   };
@@ -176,6 +210,10 @@ export function PengurusDirectory({
       setAmanahSelect(presets[0]);
       setAmanahCustom('');
     }
+    setEmailInput(item.email || '');
+    setBankInput(item.namaBank || '');
+    setNoRekInput((item.nomorRekening || '').replace(/\D/g, ''));
+    setPemilikRekInput((item.namaPemilikRekening || '').toUpperCase());
     setFormError('');
     setFormOpen(true);
   };
@@ -229,6 +267,10 @@ export function PengurusDirectory({
           unitId: chosenUnit.id,
           namaUnit: chosenUnit.namaUnit,
           amanah: finalAmanah,
+          email: emailInput.trim() || undefined,
+          namaBank: bankInput.trim() || undefined,
+          nomorRekening: noRekInput.replace(/\D/g, '') || undefined,
+          namaPemilikRekening: pemilikRekInput.trim().toUpperCase() || undefined,
           dibuatPada: editingItem?.dibuatPada,
         },
         activePin,
@@ -281,6 +323,14 @@ export function PengurusDirectory({
             <span>{pengurusList.length} Pengurus Terdata</span>
             <span aria-hidden="true" className="mx-2">·</span>
             <span>{activeUnits.length} Unit Aktif</span>
+            {canViewPrivate && (
+              <>
+                <span aria-hidden="true" className="mx-2">·</span>
+                <span className="font-semibold text-[#0C7A89] dark:text-[#3EC1D3]">
+                  Pendataan Email/Rekening: {pendataanDoneCount}/{pengurusList.length}
+                </span>
+              </>
+            )}
             <span aria-hidden="true" className="mx-2">·</span>
             <span>
               Mode Akses:{' '}
@@ -294,6 +344,38 @@ export function PengurusDirectory({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2.5">
+          {canViewPrivate && (
+            <>
+              <button
+                type="button"
+                onClick={handleCopyPendataanLink}
+                title="Salin link duwd.web.id/data-pengurus untuk dibagikan ke pengurus"
+                className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#0C7A89]/25 bg-[#EBF5F8] px-3.5 py-2 text-xs font-semibold text-[#07525E] hover:bg-[#DCEEF4] dark:border-[#3EC1D3]/30 dark:bg-[#113540] dark:text-[#E6F4F7]"
+              >
+                {copiedPendataanLink ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
+                    <span>Link Tersalin</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5 text-[#0C7A89] dark:text-[#3EC1D3]" />
+                    <span>Link Pendataan</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={onOpenPendataanPage}
+                title="Buka halaman formulir pendataan pengurus"
+                className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#07525E]/15 bg-white/85 px-3 py-2 text-xs font-semibold text-[#07525E] hover:bg-white dark:border-[#3EC1D3]/25 dark:bg-[#0D2B33] dark:text-[#E6F4F7]"
+              >
+                <ExternalLink className="h-3.5 w-3.5 text-[#0C7A89] dark:text-[#3EC1D3]" />
+                <span>Form Pendataan</span>
+              </button>
+            </>
+          )}
+
           {webAppUrl && (
             <button
               type="button"
@@ -417,6 +499,8 @@ export function PengurusDirectory({
                   <th className="px-4 py-3.5">Unit</th>
                   <th className="px-4 py-3.5">Amanah</th>
                   <th className="px-4 py-3.5">WhatsApp</th>
+                  {canViewPrivate && <th className="px-4 py-3.5">Email</th>}
+                  {canViewPrivate && <th className="px-4 py-3.5">Rekening</th>}
                   {canEdit && <th className="px-6 py-3.5 text-right">Kelola</th>}
                 </tr>
               </thead>
@@ -452,6 +536,38 @@ export function PengurusDirectory({
                         <span>{item.whatsapp}</span>
                       </a>
                     </td>
+                    {canViewPrivate && (
+                      <td className="px-4 py-4 font-mono text-xs text-[#355158] dark:text-[#B4CCD3]">
+                        {item.email ? (
+                          <span>{item.email}</span>
+                        ) : (
+                          <span className="font-sans text-[11px] italic text-[#738A90] dark:text-[#6D8B94]">
+                            Belum diisi
+                          </span>
+                        )}
+                      </td>
+                    )}
+                    {canViewPrivate && (
+                      <td className="px-4 py-4 text-xs text-[#355158] dark:text-[#B4CCD3]">
+                        {item.nomorRekening ? (
+                          <div>
+                            <div className="font-semibold text-[#07525E] dark:text-[#E6F4F7]">
+                              {item.namaBank || 'Bank'} &middot;{' '}
+                              <span className="font-mono">{item.nomorRekening}</span>
+                            </div>
+                            {item.namaPemilikRekening && (
+                              <div className="text-[11px] uppercase text-[#526A70] dark:text-[#8DA8B0]">
+                                a.n. {item.namaPemilikRekening}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[11px] italic text-[#738A90] dark:text-[#6D8B94]">
+                            Belum diisi
+                          </span>
+                        )}
+                      </td>
+                    )}
                     {canEdit && (
                       <td className="px-6 py-4 text-right whitespace-nowrap">
                         {confirmDeleteId === item.id ? (
@@ -661,6 +777,64 @@ export function PengurusDirectory({
                   />
                 </div>
               )}
+
+              {/* Opsional: Email & Rekening (Admin/Super Admin) */}
+              <div className="space-y-3 border-t border-[#07525E]/10 pt-3.5 dark:border-[#3EC1D3]/15">
+                <div className="text-[11px] font-bold text-[#07525E] dark:text-[#3EC1D3]">
+                  Data Pendataan Email &amp; Rekening (Opsional — Hanya Admin)
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      placeholder="nama@gmail.com"
+                      className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
+                      Nama Bank
+                    </label>
+                    <input
+                      type="text"
+                      value={bankInput}
+                      onChange={(e) => setBankInput(e.target.value)}
+                      placeholder="BSI / BNI / BRI / BCA..."
+                      className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
+                      Nomor Rekening
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={noRekInput}
+                      onChange={(e) => setNoRekInput(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Nomor rekening"
+                      className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
+                      Nama Pemilik Rekening
+                    </label>
+                    <input
+                      type="text"
+                      value={pemilikRekInput}
+                      onChange={(e) => setPemilikRekInput(e.target.value.toUpperCase())}
+                      placeholder="NAMA PEMILIK"
+                      className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs font-semibold uppercase text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                    />
+                  </div>
+                </div>
+              </div>
 
               <div className="flex items-center justify-end gap-2 border-t border-[#07525E]/10 pt-4 dark:border-[#3EC1D3]/15">
                 <button

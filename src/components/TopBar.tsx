@@ -22,6 +22,7 @@ export type ActiveView =
   | 'musyawarah'
   | 'dpw_dpd'
   | 'dokumen'
+  | 'broadcast'
   | 'unit'
   | 'pengaturan';
 
@@ -91,6 +92,7 @@ export function TopBar({
     { id: 'musyawarah', label: 'Musyawarah', visible: true },
     { id: 'dpw_dpd', label: 'DPW DPD', visible: true },
     { id: 'dokumen', label: 'Dokumen', visible: true },
+    { id: 'broadcast', label: 'Broadcast', visible: role === 'admin' || role === 'superadmin' },
     { id: 'unit', label: 'Unit', visible: role === 'superadmin' },
     { id: 'pengaturan', label: 'Pengaturan', visible: role === 'superadmin' },
   ];

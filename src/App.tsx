@@ -1,17 +1,22 @@
 import { AlertTriangle, X } from 'lucide-react';
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { BroadcastView } from './components/BroadcastView';
 import { DokumenView } from './components/DokumenView';
 import { DpwDpdView } from './components/DpwDpdView';
 import { KalenderKegiatanView } from './components/KalenderKegiatanView';
 import { LoginModal } from './components/LoginModal';
 import { MusyawarahView } from './components/MusyawarahView';
+import { PendataanPengurusView } from './components/PendataanPengurusView';
 import { PengurusDirectory } from './components/PengurusDirectory';
 import { ProkerRpkaView } from './components/ProkerRpkaView';
 import { SuperAdminSettings } from './components/SuperAdminSettings';
 import { TopBar, type ActiveView } from './components/TopBar';
 import { UnitManager } from './components/UnitManager';
 import {
+  DEFAULT_BROADCAST_CONFIG,
   fetchAllOrgData,
+  fetchPrivatePengurusAndBroadcast,
+  loadLocalBroadcastQueue,
   loadLocalDokumenFile,
   loadLocalDokumenKategori,
   loadLocalDokumenSubkategori,
@@ -27,6 +32,8 @@ import {
   loadLocalProker,
   loadLocalSettings,
   loadLocalUnits,
+  loadLocalWaGroups,
+  saveLocalBroadcastQueue,
   saveLocalDokumenFile,
   saveLocalDokumenKategori,
   saveLocalDokumenSubkategori,
@@ -40,8 +47,11 @@ import {
   saveLocalPengurus,
   saveLocalPresensi,
   saveLocalUnits,
+  saveLocalWaGroups,
 } from './services/orgService';
 import type {
+  BroadcastConfigStatus,
+  BroadcastItem,
   DokumenFileItem,
   DokumenKategoriItem,
   DokumenSubkategoriItem,
@@ -59,6 +69,7 @@ import type {
   UnitItem,
   UserRole,
   ViewportMode,
+  WaGroupItem,
 } from './types/org';
 import { applyBrowserFavicon } from './utils/whatsapp';
 
@@ -96,9 +107,17 @@ function loadInitialScreenWidthPct(): number {
   return 95;
 }
 
+function isPendataanLocation(): boolean {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname.replace(/\/+$/, '').toLowerCase();
+  const hash = window.location.hash.replace(/^#/, '').replace(/\/+$/, '').toLowerCase();
+  return path.endsWith('/data-pengurus') || hash === '/data-pengurus' || hash === 'data-pengurus';
+}
+
 export default function App() {
   const initialSettings = loadLocalSettings();
 
+  const [isPendataanRoute, setIsPendataanRoute] = useState<boolean>(() => isPendataanLocation());
   const [role, setRole] = useState<UserRole>('publik');
   const [activePin, setActivePin] = useState('');
   const [activeView, setActiveView] = useState<ActiveView>('direktori');
@@ -143,7 +162,44 @@ export default function App() {
   const [dokumenFileList, setDokumenFileList] = useState<DokumenFileItem[]>(() =>
     loadLocalDokumenFile(),
   );
+  const [waGroups, setWaGroups] = useState<WaGroupItem[]>(() => loadLocalWaGroups());
+  const [broadcastQueue, setBroadcastQueue] = useState<BroadcastItem[]>(() =>
+    loadLocalBroadcastQueue(),
+  );
+  const [broadcastConfig, setBroadcastConfig] = useState<BroadcastConfigStatus>(
+    DEFAULT_BROADCAST_CONFIG,
+  );
+  const [loadingBroadcastData, setLoadingBroadcastData] = useState(false);
   const [syncing, setSyncing] = useState(false);
+
+  // Deteksi perubahan URL browser (/data-pengurus)
+  useEffect(() => {
+    const syncRoute = () => setIsPendataanRoute(isPendataanLocation());
+    window.addEventListener('popstate', syncRoute);
+    window.addEventListener('hashchange', syncRoute);
+    return () => {
+      window.removeEventListener('popstate', syncRoute);
+      window.removeEventListener('hashchange', syncRoute);
+    };
+  }, []);
+
+  const navigateToPendataan = () => {
+    try {
+      window.history.pushState({}, '', '/data-pengurus');
+    } catch {
+      window.location.hash = '#/data-pengurus';
+    }
+    setIsPendataanRoute(true);
+  };
+
+  const navigateBackToPortal = () => {
+    try {
+      window.history.pushState({}, '', '/');
+    } catch {
+      window.location.hash = '';
+    }
+    setIsPendataanRoute(false);
+  };
 
   // Apply Dark / Light / System preference to <html>
   useEffect(() => {
@@ -238,9 +294,37 @@ export default function App() {
     }
   }, [webAppUrl]);
 
+  const syncPrivateAndBroadcast = useCallback(
+    async (pinOverride?: string) => {
+      const effectivePin = (pinOverride ?? activePin).trim();
+      if (!effectivePin) return;
+      setLoadingBroadcastData(true);
+      try {
+        const res = await fetchPrivatePengurusAndBroadcast(effectivePin, webAppUrl);
+        if (res.ok) {
+          if (res.pengurus && res.pengurus.length > 0) {
+            setPengurusList(res.pengurus);
+          }
+          setWaGroups(res.waGroups);
+          setBroadcastQueue(res.broadcastQueue);
+          setBroadcastConfig(res.broadcastConfig);
+        }
+      } finally {
+        setLoadingBroadcastData(false);
+      }
+    },
+    [activePin, webAppUrl],
+  );
+
   useEffect(() => {
     void syncFromSheet();
   }, [syncFromSheet]);
+
+  useEffect(() => {
+    if ((role === 'admin' || role === 'superadmin') && activePin) {
+      void syncPrivateAndBroadcast(activePin);
+    }
+  }, [role, activePin, syncPrivateAndBroadcast]);
 
   const handleLoginSuccess = (nextRole: UserRole, pin: string) => {
     setRole(nextRole);
@@ -251,7 +335,17 @@ export default function App() {
   const handleLogout = () => {
     setRole('publik');
     setActivePin('');
-    if (activeView === 'unit' || activeView === 'pengaturan') {
+    // Hapus data privat email & rekening dari state publik saat keluar
+    setPengurusList((prev) =>
+      prev.map((p) => ({
+        ...p,
+        email: undefined,
+        namaBank: undefined,
+        nomorRekening: undefined,
+        namaPemilikRekening: undefined,
+      })),
+    );
+    if (activeView === 'unit' || activeView === 'pengaturan' || activeView === 'broadcast') {
       setActiveView('direktori');
     }
   };
@@ -637,6 +731,19 @@ export default function App() {
     });
   };
 
+  if (isPendataanRoute) {
+    return (
+      <PendataanPengurusView
+        namaAplikasi={namaAplikasi}
+        logoUrl={logoDataUrl}
+        webAppUrl={webAppUrl}
+        themePref={themePref}
+        onChangeThemePref={setThemePref}
+        onBackToPortal={navigateBackToPortal}
+      />
+    );
+  }
+
   return (
     <div
       id="top"
@@ -690,9 +797,15 @@ export default function App() {
               units={units}
               pengurusList={pengurusList}
               syncing={syncing}
-              onRefresh={syncFromSheet}
+              onRefresh={async () => {
+                await syncFromSheet();
+                if ((role === 'admin' || role === 'superadmin') && activePin) {
+                  await syncPrivateAndBroadcast(activePin);
+                }
+              }}
               onSaveSuccess={handleSavePengurus}
               onDeleteSuccess={handleDeletePengurus}
+              onOpenPendataanPage={navigateToPendataan}
             />
           )}
 
@@ -785,6 +898,30 @@ export default function App() {
             />
           )}
 
+          {activeView === 'broadcast' && (role === 'admin' || role === 'superadmin') && (
+            <BroadcastView
+              role={role}
+              activePin={activePin}
+              webAppUrl={webAppUrl}
+              units={units}
+              pengurusList={pengurusList}
+              waGroups={waGroups}
+              broadcastQueue={broadcastQueue}
+              broadcastConfig={broadcastConfig}
+              loadingData={loadingBroadcastData}
+              onRefreshBroadcastData={() => syncPrivateAndBroadcast()}
+              onUpdateWaGroups={(next) => {
+                setWaGroups(next);
+                saveLocalWaGroups(next);
+              }}
+              onUpdateBroadcastQueue={(next) => {
+                setBroadcastQueue(next);
+                saveLocalBroadcastQueue(next);
+              }}
+              onUpdateBroadcastConfig={setBroadcastConfig}
+            />
+          )}
+
           {activeView === 'unit' && role === 'superadmin' && (
             <UnitManager
               activePin={activePin}
@@ -803,6 +940,8 @@ export default function App() {
               rpkaDriveUrl={rpkaDriveUrl}
               wilayahSpreadsheetId={wilayahSpreadsheetId}
               webAppUrl={webAppUrl}
+              broadcastConfig={broadcastConfig}
+              onUpdateBroadcastConfig={setBroadcastConfig}
               onUpdateSettingsState={(next) => {
                 setNamaAplikasi(next.namaAplikasi);
                 setLogoDataUrl(next.logoDataUrl);
@@ -810,7 +949,10 @@ export default function App() {
                 setWilayahSpreadsheetId(next.wilayahSpreadsheetId);
                 setWebAppUrl(next.webAppUrl);
               }}
-              onSyncFromSheet={syncFromSheet}
+              onSyncFromSheet={async () => {
+                await syncFromSheet();
+                await syncPrivateAndBroadcast();
+              }}
             />
           )}
         </main>

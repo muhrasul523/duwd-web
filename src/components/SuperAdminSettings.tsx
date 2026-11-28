@@ -7,19 +7,22 @@ import {
   Database,
   Download,
   ImagePlus,
+  KeyRound,
   RefreshCw,
   RotateCcw,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import gasCodeRaw from '../../backend-gas/Code.gs?raw';
 import defaultLogoWi from '../assets/logo-wi.png';
 import {
   extractSpreadsheetId,
   saveAppSettings,
+  saveBroadcastConfigRecord,
   saveGasWebAppUrl,
   setupWilayahSpreadsheetRemote,
   testGasConnection,
 } from '../services/orgService';
+import type { BroadcastConfigStatus } from '../types/org';
 import { processLogoFileToDataUrl } from '../utils/whatsapp';
 
 interface SuperAdminSettingsProps {
@@ -29,6 +32,8 @@ interface SuperAdminSettingsProps {
   rpkaDriveUrl: string;
   wilayahSpreadsheetId: string;
   webAppUrl: string;
+  broadcastConfig: BroadcastConfigStatus;
+  onUpdateBroadcastConfig: (config: BroadcastConfigStatus) => void;
   onUpdateSettingsState: (next: {
     namaAplikasi: string;
     logoDataUrl: string;
@@ -46,6 +51,8 @@ export function SuperAdminSettings({
   rpkaDriveUrl: initialRpkaDriveUrl,
   wilayahSpreadsheetId: initialWilayahId,
   webAppUrl: initialGasUrl,
+  broadcastConfig,
+  onUpdateBroadcastConfig,
   onUpdateSettingsState,
   onSyncFromSheet,
 }: SuperAdminSettingsProps) {
@@ -56,6 +63,24 @@ export function SuperAdminSettings({
   const [webAppUrl, setWebAppUrl] = useState(initialGasUrl);
   const [adminPin, setAdminPin] = useState('');
   const [superAdminPin, setSuperAdminPin] = useState('');
+
+  // Pengaturan Broadcast (ReChat API Key disimpan aman di GAS Script Properties)
+  const [rechatApiKey, setRechatApiKey] = useState('');
+  const [rechatApiUrl, setRechatApiUrl] = useState(
+    broadcastConfig.rechatApiUrl || 'https://www.rechat.id/api/v1/messages',
+  );
+  const [emailAlias, setEmailAlias] = useState(
+    broadcastConfig.emailAlias || 'dppwiduwd@gmail.com',
+  );
+  const [emailSenderName, setEmailSenderName] = useState(
+    broadcastConfig.emailSenderName || 'DUWD DPP Wahdah Islamiyah',
+  );
+
+  useEffect(() => {
+    setRechatApiUrl(broadcastConfig.rechatApiUrl || 'https://www.rechat.id/api/v1/messages');
+    setEmailAlias(broadcastConfig.emailAlias || 'dppwiduwd@gmail.com');
+    setEmailSenderName(broadcastConfig.emailSenderName || 'DUWD DPP Wahdah Islamiyah');
+  }, [broadcastConfig]);
 
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingUpWilayah, setSettingUpWilayah] = useState(false);
@@ -122,6 +147,23 @@ export function SuperAdminSettings({
         return;
       }
 
+      if (webAppUrl.trim()) {
+        const bcRes = await saveBroadcastConfigRecord(
+          {
+            rechatApiKey: rechatApiKey.trim() || undefined,
+            rechatApiUrl: rechatApiUrl.trim(),
+            emailAlias: emailAlias.trim(),
+            emailSenderName: emailSenderName.trim(),
+          },
+          activePin,
+          webAppUrl,
+        );
+        if (bcRes.ok && bcRes.broadcastConfig) {
+          onUpdateBroadcastConfig(bcRes.broadcastConfig);
+          setRechatApiKey('');
+        }
+      }
+
       onUpdateSettingsState({
         namaAplikasi: namaAplikasi.trim() || 'DUWD DPP WI',
         logoDataUrl,
@@ -134,7 +176,7 @@ export function SuperAdminSettings({
       setSettingsMsg({
         ok: true,
         text: res.synced
-          ? 'Pengaturan, logo, link Drive RPKA, ID Spreadsheet #2, dan PIN tersimpan ke sheet PENGATURAN.'
+          ? 'Pengaturan aplikasi, logo, Spreadsheet #2, PIN, serta konfigurasi Broadcast ReChat & Email berhasil disimpan.'
           : 'Pengaturan disimpan di browser lokal (isi URL Web App GAS agar tersimpan permanen ke Spreadsheet).',
       });
       if (res.synced) {
@@ -429,6 +471,59 @@ export function SuperAdminSettings({
                     placeholder="Opsional (min 4)"
                     className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                   />
+                </div>
+              </div>
+
+              {/* Konfigurasi Broadcast ReChat & Email Alias */}
+              <div className="space-y-3 border-t border-[#07525E]/10 pt-4 dark:border-[#3EC1D3]/15">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-[#07525E] dark:text-[#3EC1D3]">
+                  <KeyRound className="h-3.5 w-3.5" />
+                  <span>Gateway Broadcast (ReChat WA &amp; Alias Email)</span>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
+                    ReChat / MiPOS API Key {broadcastConfig.rechatConfigured ? `(Aktif: ${broadcastConfig.rechatKeyMasked})` : ''}
+                  </label>
+                  <input
+                    type="password"
+                    value={rechatApiKey}
+                    onChange={(e) => setRechatApiKey(e.target.value)}
+                    placeholder={
+                      broadcastConfig.rechatConfigured
+                        ? 'Kosongkan jika tidak ingin mengganti API Key'
+                        : 'Tempel API Key ReChat perangkat DUWD'
+                    }
+                    className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                  />
+                  <p className="mt-1 text-[11px] text-[#526A70] dark:text-[#8DA8B0]">
+                    Disimpan aman di Script Properties Apps Script (tidak pernah disimpan di kode publik).
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
+                      Alias Email Pengirim
+                    </label>
+                    <input
+                      type="email"
+                      value={emailAlias}
+                      onChange={(e) => setEmailAlias(e.target.value)}
+                      placeholder="dppwiduwd@gmail.com"
+                      className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 font-mono text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[#355158] dark:text-[#B4CCD3]">
+                      Nama Pengirim Email
+                    </label>
+                    <input
+                      type="text"
+                      value={emailSenderName}
+                      onChange={(e) => setEmailSenderName(e.target.value)}
+                      placeholder="DUWD DPP Wahdah Islamiyah"
+                      className="w-full rounded-xl border border-[#07525E]/18 bg-white px-3 py-2 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

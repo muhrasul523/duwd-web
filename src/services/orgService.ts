@@ -2,6 +2,10 @@ import { STARTER_KODE_WILAYAH } from '../data/kodeWilayahSeed';
 import { RPKA_2027_KEGIATAN, RPKA_2027_PROKER } from '../data/rpka2027Seed';
 import type {
   AppSettings,
+  BroadcastChannel,
+  BroadcastConfigStatus,
+  BroadcastItem,
+  BroadcastModeKirim,
   DokumenFileItem,
   DokumenKategoriItem,
   DokumenSubkategoriItem,
@@ -14,11 +18,13 @@ import type {
   KodeWilayahItem,
   MusyawarahItem,
   OrgDataset,
+  PendataanLookupResult,
   PengurusItem,
   PresensiItem,
   ProgramKerjaItem,
   UnitItem,
   UserRole,
+  WaGroupItem,
 } from '../types/org';
 import {
   normalizePresensiStatus,
@@ -49,6 +55,8 @@ const STORAGE_KEYS = {
   DPR: 'duwd_dpr_cache_v1',
   SETTINGS: 'duwd_settings_cache_v2',
   PINS: 'duwd_local_pins_v2',
+  WA_GROUPS: 'duwd_wa_groups_local_v1',
+  BROADCAST_QUEUE: 'duwd_broadcast_queue_local_v1',
 };
 
 export const STARTER_UNITS: UnitItem[] = [
@@ -703,6 +711,10 @@ export async function savePengurusRecord(
     unitId: string;
     namaUnit: string;
     amanah: string;
+    email?: string;
+    namaBank?: string;
+    nomorRekening?: string;
+    namaPemilikRekening?: string;
     dibuatPada?: string;
   },
   pin: string,
@@ -710,11 +722,23 @@ export async function savePengurusRecord(
 ): Promise<{ ok: boolean; item?: PengurusItem; synced: boolean; error?: string }> {
   const normalizedWa = normalizeWhatsApp(input.whatsapp);
   const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const cleanEmail = input.email !== undefined ? input.email.trim().toLowerCase() : undefined;
+  const cleanBank = input.namaBank !== undefined ? input.namaBank.trim() : undefined;
+  const cleanRek =
+    input.nomorRekening !== undefined ? input.nomorRekening.replace(/\D/g, '') : undefined;
+  const cleanPemilik =
+    input.namaPemilikRekening !== undefined
+      ? input.namaPemilikRekening.trim().toUpperCase()
+      : undefined;
 
   if (webAppUrl.trim()) {
     const res = await gasPost<PengurusItem>(webAppUrl.trim(), 'savePengurus', pin, {
       ...input,
       whatsapp: normalizedWa,
+      email: cleanEmail,
+      namaBank: cleanBank,
+      nomorRekening: cleanRek,
+      namaPemilikRekening: cleanPemilik,
     });
     if (res.ok && res.data) {
       return { ok: true, item: res.data, synced: true };
@@ -730,6 +754,11 @@ export async function savePengurusRecord(
     unitId: input.unitId,
     namaUnit: input.namaUnit,
     amanah: input.amanah.trim(),
+    email: cleanEmail,
+    namaBank: cleanBank,
+    nomorRekening: cleanRek,
+    namaPemilikRekening: cleanPemilik,
+    sudahPendataan: Boolean(cleanEmail && cleanRek),
     dibuatPada: input.dibuatPada || nowStr,
     diperbaruiPada: nowStr,
   };
@@ -1789,4 +1818,525 @@ export async function trackDokumenStatRecord(
     };
   }
   return { ok: false };
+}
+
+// ============================================================================
+// PENDATAAN EMAIL & NOMOR REKENING PENGURUS (/data-pengurus)
+// ============================================================================
+
+export async function lookupPengurusByWa(
+  whatsapp: string,
+  webAppUrl: string,
+): Promise<{
+  ok: boolean;
+  found: boolean;
+  pengurus?: PendataanLookupResult;
+  error?: string;
+}> {
+  const normalized = normalizeWhatsApp(whatsapp);
+  if (!normalized || normalized.length < 9) {
+    return {
+      ok: false,
+      found: false,
+      error: 'Masukkan nomor WhatsApp yang valid.',
+    };
+  }
+
+  if (webAppUrl.trim()) {
+    const res = await gasPost<{
+      found: boolean;
+      pengurus?: PendataanLookupResult;
+    }>(webAppUrl.trim(), 'lookupPengurusByWa', '', { whatsapp: normalized });
+    if (res.ok && res.data) {
+      return {
+        ok: true,
+        found: Boolean(res.data.found),
+        pengurus: res.data.pengurus,
+      };
+    }
+    return {
+      ok: false,
+      found: false,
+      error: res.error || 'Gagal memeriksa nomor WhatsApp ke server.',
+    };
+  }
+
+  // Fallback lokal bila GAS belum dihubungkan
+  const localList = loadLocalPengurus();
+  const units = loadLocalUnits();
+  const matched = localList.find((p) => normalizeWhatsApp(p.whatsapp) === normalized);
+  if (!matched) {
+    return { ok: true, found: false };
+  }
+  const unitObj = units.find((u) => u.id === matched.unitId);
+  return {
+    ok: true,
+    found: true,
+    pengurus: {
+      id: matched.id,
+      namaLengkap: matched.namaLengkap,
+      namaPanggilan: matched.namaPanggilan,
+      whatsapp: matched.whatsapp,
+      unitId: matched.unitId,
+      namaUnit: matched.namaUnit,
+      kodeUnit: unitObj?.kodeUnit || '',
+      amanah: matched.amanah,
+      email: matched.email || '',
+      namaBank: matched.namaBank || '',
+      nomorRekening: matched.nomorRekening || '',
+      namaPemilikRekening: matched.namaPemilikRekening || '',
+      pendataanDiperbaruiPada: matched.pendataanDiperbaruiPada || '',
+    },
+  };
+}
+
+export async function submitPendataanPengurus(
+  payload: {
+    id: string;
+    whatsapp: string;
+    email: string;
+    namaBank: string;
+    nomorRekening: string;
+    namaPemilikRekening: string;
+  },
+  webAppUrl: string,
+): Promise<{
+  ok: boolean;
+  pengurus?: PendataanLookupResult;
+  synced: boolean;
+  error?: string;
+}> {
+  const cleanPayload = {
+    id: payload.id.trim(),
+    whatsapp: normalizeWhatsApp(payload.whatsapp),
+    email: payload.email.trim().toLowerCase(),
+    namaBank: payload.namaBank.trim(),
+    nomorRekening: payload.nomorRekening.replace(/\D/g, ''),
+    namaPemilikRekening: payload.namaPemilikRekening.trim().toUpperCase(),
+  };
+
+  if (webAppUrl.trim()) {
+    const res = await gasPost<PendataanLookupResult>(
+      webAppUrl.trim(),
+      'submitPendataanPengurus',
+      '',
+      cleanPayload,
+    );
+    if (res.ok && res.data) {
+      return { ok: true, pengurus: res.data, synced: true };
+    }
+    return {
+      ok: false,
+      synced: false,
+      error: res.error || 'Gagal menyimpan data pendataan pengurus.',
+    };
+  }
+
+  // Fallback lokal
+  const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const list = loadLocalPengurus();
+  let updatedItem: PengurusItem | undefined;
+  const next = list.map((p) => {
+    if (p.id !== cleanPayload.id) return p;
+    updatedItem = {
+      ...p,
+      email: cleanPayload.email,
+      namaBank: cleanPayload.namaBank,
+      nomorRekening: cleanPayload.nomorRekening,
+      namaPemilikRekening: cleanPayload.namaPemilikRekening,
+      pendataanDiperbaruiPada: nowStr,
+      sudahPendataan: true,
+      diperbaruiPada: nowStr,
+    };
+    return updatedItem;
+  });
+  if (!updatedItem) {
+    return { ok: false, synced: false, error: 'Data pengurus tidak ditemukan.' };
+  }
+  saveLocalPengurus(next);
+  return {
+    ok: true,
+    synced: false,
+    pengurus: {
+      id: updatedItem.id,
+      namaLengkap: updatedItem.namaLengkap,
+      namaPanggilan: updatedItem.namaPanggilan,
+      whatsapp: updatedItem.whatsapp,
+      unitId: updatedItem.unitId,
+      namaUnit: updatedItem.namaUnit,
+      amanah: updatedItem.amanah,
+      email: updatedItem.email,
+      namaBank: updatedItem.namaBank,
+      nomorRekening: updatedItem.nomorRekening,
+      namaPemilikRekening: updatedItem.namaPemilikRekening,
+      pendataanDiperbaruiPada: updatedItem.pendataanDiperbaruiPada,
+    },
+  };
+}
+
+// ============================================================================
+// BROADCAST (WHATSAPP RECHAT & EMAIL ALIAS) + DATA PRIVAT PENGURUS (ADMIN)
+// ============================================================================
+
+export function loadLocalWaGroups(): WaGroupItem[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.WA_GROUPS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as WaGroupItem[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalWaGroups(list: WaGroupItem[]): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.WA_GROUPS, JSON.stringify(list));
+  } catch {
+    // Ignore
+  }
+}
+
+export function loadLocalBroadcastQueue(): BroadcastItem[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.BROADCAST_QUEUE);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as BroadcastItem[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalBroadcastQueue(list: BroadcastItem[]): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.BROADCAST_QUEUE, JSON.stringify(list));
+  } catch {
+    // Ignore
+  }
+}
+
+export const DEFAULT_BROADCAST_CONFIG: BroadcastConfigStatus = {
+  rechatConfigured: false,
+  rechatKeyMasked: '',
+  rechatApiUrl: 'https://www.rechat.id/api/v1/messages',
+  emailAlias: 'dppwiduwd@gmail.com',
+  emailSenderName: 'DUWD DPP Wahdah Islamiyah',
+  triggerActive: false,
+  availableEmailAliases: [],
+};
+
+export async function fetchPrivatePengurusAndBroadcast(
+  pin: string,
+  webAppUrl: string,
+): Promise<{
+  ok: boolean;
+  pengurus?: PengurusItem[];
+  waGroups: WaGroupItem[];
+  broadcastQueue: BroadcastItem[];
+  broadcastConfig: BroadcastConfigStatus;
+  error?: string;
+}> {
+  if (!webAppUrl.trim() || !pin.trim()) {
+    return {
+      ok: true,
+      waGroups: loadLocalWaGroups(),
+      broadcastQueue: loadLocalBroadcastQueue(),
+      broadcastConfig: DEFAULT_BROADCAST_CONFIG,
+    };
+  }
+
+  const res = await gasPost<{
+    pengurus: PengurusItem[];
+    waGroups: WaGroupItem[];
+    broadcastQueue: BroadcastItem[];
+    broadcastConfig: BroadcastConfigStatus;
+  }>(webAppUrl.trim(), 'getPrivatePengurusAndBroadcast', pin, {});
+
+  if (res.ok && res.data) {
+    const waGroups = Array.isArray(res.data.waGroups) ? res.data.waGroups : [];
+    const broadcastQueue = Array.isArray(res.data.broadcastQueue) ? res.data.broadcastQueue : [];
+    const broadcastConfig = res.data.broadcastConfig || DEFAULT_BROADCAST_CONFIG;
+    saveLocalWaGroups(waGroups);
+    saveLocalBroadcastQueue(broadcastQueue);
+    return {
+      ok: true,
+      pengurus: Array.isArray(res.data.pengurus) ? res.data.pengurus : undefined,
+      waGroups,
+      broadcastQueue,
+      broadcastConfig,
+    };
+  }
+
+  return {
+    ok: false,
+    waGroups: loadLocalWaGroups(),
+    broadcastQueue: loadLocalBroadcastQueue(),
+    broadcastConfig: DEFAULT_BROADCAST_CONFIG,
+    error: res.error || 'Gagal memuat data broadcast & pendataan pengurus.',
+  };
+}
+
+export async function saveBroadcastConfigRecord(
+  input: {
+    rechatApiKey?: string;
+    clearRechatApiKey?: boolean;
+    rechatApiUrl?: string;
+    emailAlias?: string;
+    emailSenderName?: string;
+  },
+  pin: string,
+  webAppUrl: string,
+): Promise<{
+  ok: boolean;
+  broadcastConfig?: BroadcastConfigStatus;
+  message?: string;
+  error?: string;
+}> {
+  if (!webAppUrl.trim()) {
+    return {
+      ok: false,
+      error: 'URL Web App Google Apps Script belum dihubungkan di menu Pengaturan.',
+    };
+  }
+  const res = await gasPost<BroadcastConfigStatus>(
+    webAppUrl.trim(),
+    'saveBroadcastConfig',
+    pin,
+    input,
+  );
+  if (res.ok) {
+    return {
+      ok: true,
+      broadcastConfig: res.data,
+      message: res.message || 'Konfigurasi Broadcast tersimpan aman di Google Apps Script.',
+    };
+  }
+  return {
+    ok: false,
+    error: res.error || 'Gagal menyimpan konfigurasi Broadcast.',
+  };
+}
+
+export async function installBroadcastTriggerRemote(
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; triggerActive?: boolean; message?: string; error?: string }> {
+  if (!webAppUrl.trim()) {
+    return { ok: false, error: 'URL Web App GAS belum terhubung.' };
+  }
+  const res = await gasPost<{ triggerActive: boolean }>(
+    webAppUrl.trim(),
+    'installBroadcastTrigger',
+    pin,
+    {},
+  );
+  if (res.ok) {
+    return {
+      ok: true,
+      triggerActive: Boolean(res.data?.triggerActive ?? true),
+      message: res.message || 'Jadwal otomatis Broadcast (setiap 5 menit) aktif.',
+    };
+  }
+  return { ok: false, error: res.error || 'Gagal mengaktifkan trigger otomatis Broadcast.' };
+}
+
+export async function saveWaGroupRecord(
+  input: {
+    id?: string;
+    namaGrup: string;
+    groupId: string;
+    keterangan?: string;
+    dibuatPada?: string;
+  },
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; item?: WaGroupItem; synced: boolean; error?: string }> {
+  const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const cleanGroupId = input.groupId.trim();
+  const payload = {
+    ...input,
+    namaGrup: input.namaGrup.trim(),
+    groupId: cleanGroupId,
+    keterangan: (input.keterangan || '').trim(),
+  };
+
+  if (webAppUrl.trim()) {
+    const res = await gasPost<WaGroupItem>(webAppUrl.trim(), 'saveWaGroup', pin, payload);
+    if (res.ok && res.data) {
+      return { ok: true, item: res.data, synced: true };
+    }
+    return { ok: false, synced: false, error: res.error || 'Gagal menyimpan grup WhatsApp.' };
+  }
+
+  const item: WaGroupItem = {
+    id: input.id || `GRP-${Date.now().toString().slice(-6)}`,
+    namaGrup: payload.namaGrup,
+    groupId: payload.groupId,
+    keterangan: payload.keterangan,
+    dibuatPada: input.dibuatPada || nowStr,
+    diperbaruiPada: nowStr,
+  };
+  return { ok: true, item, synced: false };
+}
+
+export async function deleteWaGroupRecord(
+  id: string,
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; synced: boolean; error?: string }> {
+  if (webAppUrl.trim()) {
+    const res = await gasPost(webAppUrl.trim(), 'deleteWaGroup', pin, { id });
+    if (!res.ok) {
+      return { ok: false, synced: false, error: res.error || 'Gagal menghapus grup WhatsApp.' };
+    }
+    return { ok: true, synced: true };
+  }
+  return { ok: true, synced: false };
+}
+
+export async function uploadBroadcastImageToDrive(
+  input: {
+    fileName: string;
+    mimeType: string;
+    base64Data: string;
+  },
+  pin: string,
+  webAppUrl: string,
+): Promise<{
+  ok: boolean;
+  fileId?: string;
+  fileName?: string;
+  imageUrl?: string;
+  driveUrl?: string;
+  error?: string;
+}> {
+  if (!webAppUrl.trim()) {
+    return {
+      ok: false,
+      error: 'URL Web App Google Apps Script belum terhubung untuk unggah foto broadcast.',
+    };
+  }
+  const res = await gasPost<{
+    fileId: string;
+    fileName: string;
+    imageUrl: string;
+    driveUrl: string;
+  }>(webAppUrl.trim(), 'uploadBroadcastImage', pin, input);
+  if (res.ok && res.data) {
+    return {
+      ok: true,
+      fileId: res.data.fileId,
+      fileName: res.data.fileName,
+      imageUrl: res.data.imageUrl,
+      driveUrl: res.data.driveUrl,
+    };
+  }
+  return {
+    ok: false,
+    error: res.error || 'Gagal mengunggah foto broadcast ke Google Drive.',
+  };
+}
+
+export async function sendOrScheduleBroadcastRecord(
+  input: {
+    judul: string;
+    channel: BroadcastChannel;
+    targetPengurusIds: string[];
+    targetGroupIds: string[];
+    targetSummary: string;
+    pesanWa: string;
+    emailSubject: string;
+    emailBody: string;
+    imageBase64?: string;
+    imageMimeType?: string;
+    imageName?: string;
+    modeKirim: BroadcastModeKirim;
+    jadwalKirim?: string; // YYYY-MM-DD HH:mm (WITA)
+    delayDetik?: number; // Jeda antar pesan dalam detik (0 - 300)
+  },
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; item?: BroadcastItem; message?: string; error?: string }> {
+  if (!webAppUrl.trim()) {
+    return {
+      ok: false,
+      error: 'URL Web App Google Apps Script belum terhubung. Hubungkan GAS terlebih dahulu untuk mengirim Broadcast.',
+    };
+  }
+  const res = await gasPost<BroadcastItem>(
+    webAppUrl.trim(),
+    'sendOrScheduleBroadcast',
+    pin,
+    input,
+  );
+  if (res.ok && res.data) {
+    return {
+      ok: true,
+      item: res.data,
+      message: res.message,
+    };
+  }
+  return {
+    ok: false,
+    error: res.error || 'Gagal memproses Broadcast.',
+  };
+}
+
+export async function cancelScheduledBroadcastRecord(
+  id: string,
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; item?: BroadcastItem; error?: string }> {
+  if (!webAppUrl.trim()) {
+    return { ok: false, error: 'URL Web App GAS belum terhubung.' };
+  }
+  const res = await gasPost<BroadcastItem>(
+    webAppUrl.trim(),
+    'cancelScheduledBroadcast',
+    pin,
+    { id },
+  );
+  if (res.ok) {
+    return { ok: true, item: res.data };
+  }
+  return { ok: false, error: res.error || 'Gagal membatalkan jadwal Broadcast.' };
+}
+
+export async function deleteBroadcastItemRecord(
+  id: string,
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!webAppUrl.trim()) {
+    return { ok: true };
+  }
+  const res = await gasPost(webAppUrl.trim(), 'deleteBroadcastItem', pin, { id });
+  if (!res.ok) {
+    return { ok: false, error: res.error || 'Gagal menghapus riwayat Broadcast.' };
+  }
+  return { ok: true };
+}
+
+export async function runDueBroadcastsNowRecord(
+  pin: string,
+  webAppUrl: string,
+): Promise<{ ok: boolean; processed?: number; message?: string; error?: string }> {
+  if (!webAppUrl.trim()) {
+    return { ok: false, error: 'URL Web App GAS belum terhubung.' };
+  }
+  const res = await gasPost<{ processed: number }>(
+    webAppUrl.trim(),
+    'runDueBroadcastsNow',
+    pin,
+    {},
+  );
+  if (res.ok) {
+    return {
+      ok: true,
+      processed: Number(res.data?.processed || 0),
+      message: res.message,
+    };
+  }
+  return { ok: false, error: res.error || 'Gagal menjalankan antrean jadwal Broadcast.' };
 }
