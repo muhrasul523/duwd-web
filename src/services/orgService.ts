@@ -6,6 +6,7 @@ import type {
   BroadcastConfigStatus,
   BroadcastItem,
   BroadcastModeKirim,
+  BroadcastRecipientLogItem,
   DokumenFileItem,
   DokumenKategoriItem,
   DokumenSubkategoriItem,
@@ -2240,6 +2241,7 @@ export async function uploadBroadcastImageToDrive(
 
 export async function sendOrScheduleBroadcastRecord(
   input: {
+    clientRequestId: string;
     judul: string;
     channel: BroadcastChannel;
     targetPengurusIds: string[];
@@ -2253,7 +2255,7 @@ export async function sendOrScheduleBroadcastRecord(
     imageName?: string;
     modeKirim: BroadcastModeKirim;
     jadwalKirim?: string; // YYYY-MM-DD HH:mm (WITA)
-    delayDetik?: number; // Jeda antar pesan dalam detik (0 - 300)
+    delayDetik?: number; // Jeda antar pesan dalam detik (0 - 3600)
   },
   pin: string,
   webAppUrl: string,
@@ -2280,6 +2282,72 @@ export async function sendOrScheduleBroadcastRecord(
   return {
     ok: false,
     error: res.error || 'Gagal memproses Broadcast.',
+  };
+}
+
+export async function fetchBroadcastDetailRecord(
+  broadcastId: string,
+  pin: string,
+  webAppUrl: string,
+): Promise<{
+  ok: boolean;
+  broadcast?: BroadcastItem;
+  recipients: BroadcastRecipientLogItem[];
+  error?: string;
+}> {
+  if (!webAppUrl.trim()) {
+    return { ok: false, recipients: [], error: 'URL Web App GAS belum terhubung.' };
+  }
+  const res = await gasPost<{
+    broadcast?: BroadcastItem;
+    recipients: BroadcastRecipientLogItem[];
+  }>(webAppUrl.trim(), 'getBroadcastDetail', pin, { broadcastId });
+  if (res.ok && res.data) {
+    return {
+      ok: true,
+      broadcast: res.data.broadcast,
+      recipients: Array.isArray(res.data.recipients) ? res.data.recipients : [],
+    };
+  }
+  return {
+    ok: false,
+    recipients: [],
+    error: res.error || 'Gagal memuat detail penerima broadcast.',
+  };
+}
+
+export async function syncBroadcastStatusesRecord(
+  broadcastId: string,
+  pin: string,
+  webAppUrl: string,
+): Promise<{
+  ok: boolean;
+  updatedCount?: number;
+  broadcast?: BroadcastItem;
+  recipients?: BroadcastRecipientLogItem[];
+  message?: string;
+  error?: string;
+}> {
+  if (!webAppUrl.trim()) {
+    return { ok: false, error: 'URL Web App GAS belum terhubung.' };
+  }
+  const res = await gasPost<{
+    updatedCount: number;
+    broadcast?: BroadcastItem;
+    recipients: BroadcastRecipientLogItem[];
+  }>(webAppUrl.trim(), 'syncBroadcastStatuses', pin, { broadcastId });
+  if (res.ok && res.data) {
+    return {
+      ok: true,
+      updatedCount: Number(res.data.updatedCount || 0),
+      broadcast: res.data.broadcast,
+      recipients: Array.isArray(res.data.recipients) ? res.data.recipients : [],
+      message: res.message,
+    };
+  }
+  return {
+    ok: false,
+    error: res.error || 'Gagal menyinkronkan status baca/kirim dari ReChat.',
   };
 }
 

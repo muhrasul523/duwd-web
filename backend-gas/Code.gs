@@ -28,6 +28,7 @@ const SHEETS = {
   DOKUMEN_FILE: 'DOKUMEN_FILE',
   GRUP_WA: 'GRUP_WA',
   BROADCAST_QUEUE: 'BROADCAST_QUEUE',
+  BROADCAST_LOG: 'BROADCAST_LOG',
   PENGATURAN: 'PENGATURAN',
   LOGS: 'SYSTEM_LOGS'
 };
@@ -775,10 +776,26 @@ function doPost(e) {
     return jsonOut_({ ok: false, error: 'Format JSON tidak valid: ' + err.message });
   }
 
+  // Webhook status pengiriman/baca ReChat (dilindungi token rahasia di parameter URL ?webhookToken=...)
+  if (body && body.event === 'message.status' && body.data && body.data.id) {
+    try {
+      const providedToken = String((e && e.parameter && e.parameter.webhookToken) || '').trim();
+      const expectedToken = getOrCreateWebhookToken_();
+      if (!providedToken || providedToken !== expectedToken) {
+        return jsonOut_({ ok: false, error: 'Unauthorized webhook token.' });
+      }
+      const updated = applyRechatWebhookStatus_(body.data);
+      return jsonOut_({ ok: true, updated: updated });
+    } catch (whErr) {
+      return jsonOut_({ ok: false, error: whErr.message });
+    }
+  }
+
   const action = String(body.action || '').trim();
   const pin = String(body.pin || '').trim();
   const payload = body.payload || {};
 
+  // Pengaturan sensitif (tambah/edit/hapus Grup WA & ID grup, API Key ReChat, endpoint, trigger) KHUSUS Super Admin
   const ADMIN_ALLOWED_ACTIONS = {
     saveDpw: true,
     saveDpd: true,
@@ -791,14 +808,11 @@ function doPost(e) {
     uploadMusyawarahFile: true,
     uploadMusyawarahNotulaText: true,
     getPrivatePengurusAndBroadcast: true,
-    saveWaGroup: true,
-    deleteWaGroup: true,
-    uploadBroadcastImage: true,
     sendOrScheduleBroadcast: true,
+    getBroadcastDetail: true,
+    syncBroadcastStatuses: true,
     cancelScheduledBroadcast: true,
-    deleteBroadcastItem: true,
-    runDueBroadcastsNow: true,
-    installBroadcastTrigger: true
+    runDueBroadcastsNow: true
   };
 
   try {
@@ -2482,12 +2496,22 @@ function doPost(e) {
         };
       });
 
-      const waGroups = readRowsOptional_(SHEETS.GRUP_WA).map(mapWaGroupRow_);
+      const isSuper = role === 'superadmin';
+      const waGroups = readRowsOptional_(SHEETS.GRUP_WA).map(function (r) {
+        const mapped = mapWaGroupRow_(r);
+        // Lindungi ID grup WA (@g.us) agar hanya terlihat oleh Super Admin
+        if (!isSuper) {
+          mapped.groupId = '';
+        }
+        return mapped;
+      });
       const broadcastQueue = readRowsOptional_(SHEETS.BROADCAST_QUEUE)
         .map(mapBroadcastRow_)
         .sort(function (a, b) {
           return String(b.dibuatPada || '').localeCompare(String(a.dibuatPada || ''));
         });
+
+      const cfg = getBroadcastConfigStatus_(isSuper);
 
       return jsonOut_({
         ok: true,
@@ -2495,7 +2519,7 @@ function doPost(e) {
           pengurus: pengurusFull,
           waGroups: waGroups,
           broadcastQueue: broadcastQueue,
-          broadcastConfig: getBroadcastConfigStatus_()
+          broadcastConfig: cfg
         }
       });
     }
@@ -2529,7 +2553,7 @@ function doPost(e) {
       return jsonOut_({
         ok: true,
         message: 'Konfigurasi Broadcast tersimpan aman di Google Apps Script.',
-        data: getBroadcastConfigStatus_()
+        data: getBroadcastConfigStatus_(true)
       });
     }
 
@@ -2605,17 +2629,32 @@ function doPost(e) {
     }
 
     if (action === 'sendOrScheduleBroadcast') {
+      const clientRequestId = String(payload.clientRequestId || '').trim();
+      const cache = CacheService.getScriptCache();
+      if (clientRequestId) {
+        const existingId = cache.get('brc_req_' + clientRequestId);
+        if (existingId) {
+          const ssDup = getSpreadsheet_();
+          const existingRow = findRowInSs_(ssDup, SHEETS.BROADCAST_QUEUE, 'ID_Broadcast', existingId);
+          if (existingRow) {
+            return jsonOut_({
+              ok: true,
+              message: 'Permintaan broadcast ini sudah diproses sebelumnya (pencegahan duplikasi otomatis).',
+              data: mapBroadcastRow_(existingRow)
+            });
+          }
+        }
+      }
+
       const judul = String(payload.judul || '').trim() || 'Broadcast DUWD DPP WI';
       const channel = String(payload.channel || 'wa').trim().toLowerCase();
       if (channel !== 'wa' && channel !== 'email' && channel !== 'both') {
         return jsonOut_({ ok: false, error: 'Kanal broadcast tidak valid.' });
       }
-      const targetPengurusIds = Array.isArray(payload.targetPengurusIds)
-        ? payload.targetPengurusIds.map(function (x) { return String(x).trim(); }).filter(Boolean)
-        : [];
-      const targetGroupIds = Array.isArray(payload.targetGroupIds)
-        ? payload.targetGroupIds.map(function (x) { return String(x).trim(); }).filter(Boolean)
-        : [];
+      // Deduplikasi ID target sejak awal
+      const targetPengurusIds = uniqueStrings_(Array.isArray(payload.targetPengurusIds) ? payload.targetPengurusIds : []);
+      const targetGroupIds = uniqueStrings_(Array.isArray(payload.targetGroupIds) ? payload.targetGroupIds : []);
+
       const pesanWa = String(payload.pesanWa || '').trim();
       const emailSubject = String(payload.emailSubject || judul).trim();
       const emailBody = String(payload.emailBody || pesanWa).trim();
@@ -2627,7 +2666,7 @@ function doPost(e) {
       const modeKirim = String(payload.modeKirim || 'segera').trim().toLowerCase() === 'terjadwal' ? 'terjadwal' : 'segera';
       const jadwalKirim = String(payload.jadwalKirim || '').trim();
       const rawDelay = Number(payload.delayDetik);
-      const delayDetik = isNaN(rawDelay) ? 5 : Math.min(300, Math.max(0, Math.round(rawDelay)));
+      const delayDetik = isNaN(rawDelay) ? 5 : Math.min(3600, Math.max(0, Math.round(rawDelay)));
       const hasPhoto = Boolean(imageBase64 || imageUrl || imageDriveFileId);
 
       if (targetPengurusIds.length === 0 && targetGroupIds.length === 0) {
@@ -2647,7 +2686,6 @@ function doPost(e) {
       ensurePengurusPendataanColumns_(ss);
       ensureBroadcastSheets_(ss);
 
-      // Hitung perkiraan jumlah pesan untuk menentukan apakah foto bisa langsung di memori (tanpa file sementara)
       const estDispatchCount =
         ((channel === 'wa' || channel === 'both') ? (targetPengurusIds.length + targetGroupIds.length) : 0) +
         ((channel === 'email' || channel === 'both') ? targetPengurusIds.length : 0);
@@ -2655,8 +2693,8 @@ function doPost(e) {
 
       // Foto tidak disimpan permanen di Google Drive:
       // - Untuk Email saja (kirim segera & selesai dalam 1 siklus): langsung Blob di memori (0 sentuhan Drive).
-      // - Untuk WA (ReChat membutuhkan URL gambar publik sementara) atau jadwal/antrean panjang:
-      //   buat file sementara di luar folder Dokumen dan hapus otomatis segera setelah selesai terkirim.
+      // - Untuk WA (ReChat memerlukan URL gambar sementara) atau jadwal/antrean panjang:
+      //   buat file sementara di luar folder Dokumen lalu hapus otomatis segera setelah terkirim.
       let inlineBlob = null;
       if (imageBase64) {
         const cleanFileName = sanitizeDriveFileName_(imageName || 'Lampiran_Broadcast.jpg');
@@ -2684,6 +2722,9 @@ function doPost(e) {
 
       const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
       const bcId = generateId_('BRC');
+      if (clientRequestId) {
+        cache.put('brc_req_' + clientRequestId, bcId, 600);
+      }
       const normalizedJadwal = modeKirim === 'terjadwal' ? jadwalKirim.replace('T', ' ').slice(0, 16) : '';
 
       const rowObj = {
@@ -2707,17 +2748,25 @@ function doPost(e) {
         Total_Target: estDispatchCount,
         Total_Terkirim: 0,
         Total_Gagal: 0,
+        Total_Pending: estDispatchCount,
+        Total_Dibaca: 0,
         Log_Hasil: modeKirim === 'terjadwal'
-          ? ('Dijadwalkan pada ' + normalizedJadwal + ' WITA (jeda ' + delayDetik + ' detik/pesan)')
-          : '',
+          ? ('Dijadwalkan pada ' + normalizedJadwal + ' WITA (jeda ' + formatDelayHuman_(delayDetik) + ')')
+          : 'Menyiapkan antrean pengiriman...',
         Dibuat_Oleh: role === 'superadmin' ? 'Super Admin' : 'Admin',
         Dibuat_Pada: nowStr,
         Dikirim_Pada: ''
       };
 
-      appendRowInSs_(ss, SHEETS.BROADCAST_QUEUE, rowObj);
+      // Ciptakan seluruh baris penerima secara deterministik & terdeduplikasi di BROADCAST_LOG sebelum kirim
+      const seededLogs = seedBroadcastLogRows_(ss, rowObj);
+      rowObj.Total_Target = seededLogs.length;
+      rowObj.Total_Pending = seededLogs.length;
 
+      // Kunci worker lease SEBELUM menulis baris status "Diproses" ke sheet agar trigger 1-menit tidak pernah bentrok
       if (modeKirim === 'terjadwal') {
+        appendRowInSs_(ss, SHEETS.BROADCAST_QUEUE, rowObj);
+        SpreadsheetApp.flush();
         try {
           if (!hasBroadcastTrigger_()) {
             pasangTriggerBroadcast_internal_();
@@ -2726,20 +2775,41 @@ function doPost(e) {
         writeLog_(role.toUpperCase(), 'scheduleBroadcast', bcId + ' — ' + judul + ' @ ' + normalizedJadwal + ' WITA (jeda ' + delayDetik + 's)');
         return jsonOut_({
           ok: true,
-          message: 'Broadcast berhasil dijadwalkan pada ' + normalizedJadwal + ' WITA dengan jeda ' + delayDetik + ' detik antar pesan.',
+          message: 'Broadcast berhasil dijadwalkan pada ' + normalizedJadwal + ' WITA dengan jeda ' + formatDelayHuman_(delayDetik) + '.',
           data: mapBroadcastRow_(rowObj)
         });
       }
 
-      // Kirim segera: anggaran eksekusi interaktif 45 detik agar respons UI cepat;
-      // jika masih ada sisa antrean (mis. jeda 60 detik x banyak target), otomatis dilanjutkan trigger latar belakang.
-      const finalRow = executeBroadcastRow_(ss, rowObj, {
-        maxRuntimeMs: 45000,
-        inlineBlob: inlineBlob
-      });
+      const workerId = 'POST_' + Utilities.getUuid();
+      const acquired = acquireBroadcastWorkerLease_(workerId, 90000);
+
+      appendRowInSs_(ss, SHEETS.BROADCAST_QUEUE, rowObj);
+      SpreadsheetApp.flush();
+
+      if (!acquired) {
+        // Worker latar belakang sedang aktif; antrekan agar dilanjutkan otomatis tanpa tabrakan/duplikasi
+        ensureContinuationTrigger_();
+        writeLog_(role.toUpperCase(), 'queueBroadcast', bcId + ' — masuk antrean pekerja latar belakang');
+        return jsonOut_({
+          ok: true,
+          message: 'Broadcast masuk antrean dan sedang diproses otomatis secara berurutan (anti-duplikat).',
+          data: mapBroadcastRow_(rowObj)
+        });
+      }
+
+      let finalRow = rowObj;
+      try {
+        finalRow = executeBroadcastRow_(ss, rowObj, {
+          maxRuntimeMs: 42000,
+          inlineBlob: inlineBlob,
+          workerId: workerId
+        });
+      } finally {
+        releaseBroadcastWorkerLease_(workerId);
+      }
 
       const statusMsg = finalRow.Status === 'Diproses'
-        ? ('Pengiriman berjalan: ' + finalRow.Total_Terkirim + '/' + finalRow.Total_Target + ' pesan terkirim. Sisa antrean dilanjutkan otomatis setiap ' + delayDetik + ' detik di latar belakang.')
+        ? ('Pengiriman berjalan: ' + finalRow.Total_Terkirim + '/' + finalRow.Total_Target + ' terkirim (sisa ' + finalRow.Total_Pending + ' pending dilanjutkan otomatis setiap ' + formatDelayHuman_(delayDetik) + ').')
         : ('Broadcast selesai diproses: ' + finalRow.Status + ' (' + finalRow.Total_Terkirim + ' terkirim, ' + finalRow.Total_Gagal + ' gagal).');
 
       writeLog_(role.toUpperCase(), 'sendBroadcast', bcId + ' — ' + finalRow.Status + ' (' + finalRow.Total_Terkirim + '/' + finalRow.Total_Target + ', jeda ' + delayDetik + 's)');
@@ -2747,6 +2817,47 @@ function doPost(e) {
         ok: true,
         message: statusMsg,
         data: mapBroadcastRow_(finalRow)
+      });
+    }
+
+    if (action === 'getBroadcastDetail') {
+      const broadcastId = String(payload.broadcastId || '').trim();
+      if (!broadcastId) {
+        return jsonOut_({ ok: false, error: 'ID broadcast wajib diisi.' });
+      }
+      const ss = getSpreadsheet_();
+      ensureBroadcastSheets_(ss);
+      const isSuper = role === 'superadmin';
+      const bRow = findRowInSs_(ss, SHEETS.BROADCAST_QUEUE, 'ID_Broadcast', broadcastId);
+      const recipients = getBroadcastLogRowsForId_(broadcastId, isSuper);
+      return jsonOut_({
+        ok: true,
+        data: {
+          broadcast: bRow ? mapBroadcastRow_(bRow) : null,
+          recipients: recipients
+        }
+      });
+    }
+
+    if (action === 'syncBroadcastStatuses') {
+      const broadcastId = String(payload.broadcastId || '').trim();
+      if (!broadcastId) {
+        return jsonOut_({ ok: false, error: 'ID broadcast wajib diisi.' });
+      }
+      const ss = getSpreadsheet_();
+      ensureBroadcastSheets_(ss);
+      const isSuper = role === 'superadmin';
+      const syncRes = syncBroadcastRechatStatuses_(ss, broadcastId);
+      const bRow = findRowInSs_(ss, SHEETS.BROADCAST_QUEUE, 'ID_Broadcast', broadcastId);
+      const recipients = getBroadcastLogRowsForId_(broadcastId, isSuper);
+      return jsonOut_({
+        ok: true,
+        message: syncRes.message,
+        data: {
+          updatedCount: syncRes.updatedCount,
+          broadcast: bRow ? mapBroadcastRow_(bRow) : null,
+          recipients: recipients
+        }
       });
     }
 
@@ -2772,6 +2883,7 @@ function doPost(e) {
         Log_Hasil: (existing.Log_Hasil ? String(existing.Log_Hasil) + ' | ' : '') + 'Dibatalkan oleh ' + (role === 'superadmin' ? 'Super Admin' : 'Admin')
       };
       updateRowByIdInSs_(ss, SHEETS.BROADCAST_QUEUE, 'ID_Broadcast', id, patch);
+      SpreadsheetApp.flush();
       syncContinuationTriggerState_(ss);
       const updated = Object.assign({}, existing, patch);
       writeLog_(role.toUpperCase(), 'cancelScheduledBroadcast', id);
@@ -2787,6 +2899,8 @@ function doPost(e) {
         trashTempBroadcastFileNow_(String(existing.Image_Drive_File_ID).trim());
       }
       const deleted = deleteRowByIdInSs_(ss, SHEETS.BROADCAST_QUEUE, 'ID_Broadcast', id);
+      deleteRowsByColumnInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Broadcast', id);
+      SpreadsheetApp.flush();
       syncContinuationTriggerState_(ss);
       writeLog_(role.toUpperCase(), 'deleteBroadcastItem', id + ' (deleted=' + deleted + ')');
       return jsonOut_({ ok: deleted, error: deleted ? undefined : 'Riwayat broadcast tidak ditemukan.' });
@@ -2798,7 +2912,7 @@ function doPost(e) {
         ok: true,
         message: count > 0
           ? (count + ' antrean broadcast berhasil diproses/dilanjutkan.')
-          : 'Tidak ada jadwal atau antrean broadcast yang perlu diproses saat ini.',
+          : 'Tidak ada jadwal atau antrean broadcast yang jatuh tempo saat ini.',
         data: { processed: count }
       });
     }
@@ -3762,10 +3876,29 @@ function ensureBroadcastSheets_(ss) {
         'Total_Target',
         'Total_Terkirim',
         'Total_Gagal',
+        'Total_Pending',
+        'Total_Dibaca',
         'Log_Hasil',
         'Dibuat_Oleh',
         'Dibuat_Pada',
         'Dikirim_Pada'
+      ]
+    },
+    {
+      name: SHEETS.BROADCAST_LOG,
+      headers: [
+        'ID_Log',
+        'ID_Broadcast',
+        'Channel_Item',
+        'Nama_Penerima',
+        'Unit_Info',
+        'Tujuan',
+        'Status_Kirim',
+        'ReChat_Message_ID',
+        'ReChat_Status',
+        'Waktu_Kirim',
+        'Waktu_Dibaca',
+        'Keterangan'
       ]
     }
   ];
@@ -3788,10 +3921,40 @@ function ensureBroadcastSheets_(ss) {
   });
 }
 
+function uniqueStrings_(arr) {
+  const seen = {};
+  const out = [];
+  (arr || []).forEach(function (x) {
+    const val = String(x || '').trim();
+    if (!val || seen[val]) return;
+    seen[val] = true;
+    out.push(val);
+  });
+  return out;
+}
+
+function formatDelayHuman_(seconds) {
+  const s = Math.max(0, Math.round(Number(seconds || 0)));
+  if (s === 0) return 'tanpa jeda';
+  if (s < 60) return s + ' detik';
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem > 0 ? (m + ' menit ' + rem + ' detik') : (m + ' menit');
+}
+
+function getOrCreateWebhookToken_() {
+  const props = PropertiesService.getScriptProperties();
+  let token = String(props.getProperty('RECHAT_WEBHOOK_TOKEN') || '').trim();
+  if (!token) {
+    token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '').slice(0, 12);
+    props.setProperty('RECHAT_WEBHOOK_TOKEN', token);
+  }
+  return token;
+}
+
 function extractRechatKey_(rawInput) {
   const val = String(rawInput || '').trim();
   if (!val) return '';
-  // Jika pengguna menempel URL lengkap https://www.rechat.id/api/v1/<KEY>/messages, ekstrak key-nya saja
   const m = val.match(/\/api\/v1\/([^/\s]+)\/messages/i);
   if (m && m[1]) return m[1].trim();
   return val;
@@ -3800,7 +3963,6 @@ function extractRechatKey_(rawInput) {
 function sanitizeRechatApiUrl_(rawUrl) {
   const val = String(rawUrl || '').trim();
   if (!val) return DEFAULT_RECHAT_API_URL;
-  // Normalisasi ke endpoint aman berbasis header Authorization jika URL menempelkan key
   if (/^https:\/\/www\.rechat\.id\/api\/v1\/[^/\s]+\/messages$/i.test(val)) {
     return DEFAULT_RECHAT_API_URL;
   }
@@ -3826,22 +3988,26 @@ function hasBroadcastTrigger_() {
   }
 }
 
-function getBroadcastConfigStatus_() {
+function getBroadcastConfigStatus_(includeSensitive) {
+  const isSuper = includeSensitive !== false;
   const settingsMap = getSettingsMap_();
   const props = PropertiesService.getScriptProperties();
   const apiKey = String(props.getProperty('RECHAT_API_KEY') || '').trim();
   let aliases = [];
-  try {
-    aliases = GmailApp.getAliases() || [];
-  } catch (ignore) {}
+  if (isSuper) {
+    try {
+      aliases = GmailApp.getAliases() || [];
+    } catch (ignore) {}
+  }
   return {
     rechatConfigured: Boolean(apiKey),
-    rechatKeyMasked: maskSecret_(apiKey),
-    rechatApiUrl: sanitizeRechatApiUrl_(settingsMap.RECHAT_API_URL || DEFAULT_RECHAT_API_URL),
+    rechatKeyMasked: isSuper ? maskSecret_(apiKey) : '',
+    rechatApiUrl: isSuper ? sanitizeRechatApiUrl_(settingsMap.RECHAT_API_URL || DEFAULT_RECHAT_API_URL) : '',
     emailAlias: String(settingsMap.EMAIL_ALIAS_PENGIRIM || DEFAULT_EMAIL_ALIAS).trim() || DEFAULT_EMAIL_ALIAS,
     emailSenderName: String(settingsMap.EMAIL_NAMA_PENGIRIM || DEFAULT_EMAIL_SENDER_NAME).trim() || DEFAULT_EMAIL_SENDER_NAME,
     triggerActive: hasBroadcastTrigger_(),
-    availableEmailAliases: aliases
+    availableEmailAliases: isSuper ? aliases : [],
+    webhookToken: isSuper ? getOrCreateWebhookToken_() : ''
   };
 }
 
@@ -3859,6 +4025,13 @@ function mapWaGroupRow_(r) {
 function mapBroadcastRow_(r) {
   const rawP = String(r.Target_Pengurus_IDs || '').trim();
   const rawG = String(r.Target_Group_IDs || '').trim();
+  const totalTarget = Number(r.Total_Target || 0);
+  const totalTerkirim = Number(r.Total_Terkirim || 0);
+  const totalGagal = Number(r.Total_Gagal || 0);
+  const hasPendingCol = r.Total_Pending !== '' && r.Total_Pending !== undefined && r.Total_Pending !== null;
+  const totalPending = hasPendingCol
+    ? Number(r.Total_Pending || 0)
+    : Math.max(0, totalTarget - totalTerkirim - totalGagal);
   return {
     id: String(r.ID_Broadcast || ''),
     judul: String(r.Judul || ''),
@@ -3876,14 +4049,50 @@ function mapBroadcastRow_(r) {
     jadwalKirim: String(r.Jadwal_Kirim || ''),
     delayDetik: Number(r.Delay_Detik || 0),
     status: String(r.Status || 'Terjadwal'),
-    totalTarget: Number(r.Total_Target || 0),
-    totalTerkirim: Number(r.Total_Terkirim || 0),
-    totalGagal: Number(r.Total_Gagal || 0),
+    totalTarget: totalTarget,
+    totalTerkirim: totalTerkirim,
+    totalGagal: totalGagal,
+    totalPending: totalPending,
+    totalDibaca: Number(r.Total_Dibaca || 0),
     logHasil: String(r.Log_Hasil || ''),
     dibuatOleh: String(r.Dibuat_Oleh || ''),
     dibuatPada: String(r.Dibuat_Pada || ''),
     dikirimPada: String(r.Dikirim_Pada || '')
   };
+}
+
+function mapBroadcastLogRow_(r, includeSensitive) {
+  const channelItem = String(r.Channel_Item || '');
+  let tujuan = String(r.Tujuan || '');
+  if (!includeSensitive && channelItem === 'WA Grup') {
+    tujuan = 'Grup WhatsApp (Terlindungi)';
+  }
+  return {
+    id: String(r.ID_Log || ''),
+    broadcastId: String(r.ID_Broadcast || ''),
+    channelItem: channelItem,
+    namaPenerima: String(r.Nama_Penerima || ''),
+    unitInfo: String(r.Unit_Info || ''),
+    tujuan: tujuan,
+    statusKirim: String(r.Status_Kirim || 'Pending'),
+    rechatMessageId: String(r.ReChat_Message_ID || ''),
+    rechatStatus: String(r.ReChat_Status || ''),
+    waktuKirim: String(r.Waktu_Kirim || ''),
+    waktuDibaca: String(r.Waktu_Dibaca || ''),
+    keterangan: String(r.Keterangan || '')
+  };
+}
+
+function getBroadcastLogRowsForId_(broadcastId, includeSensitive) {
+  const allLogs = readRowsOptional_(SHEETS.BROADCAST_LOG);
+  const needle = String(broadcastId || '').trim();
+  const out = [];
+  for (let i = 0; i < allLogs.length; i++) {
+    if (String(allLogs[i].ID_Broadcast || '').trim() === needle) {
+      out.push(mapBroadcastLogRow_(allLogs[i], includeSensitive));
+    }
+  }
+  return out;
 }
 
 function personalizeTemplate_(text, pengurusRow, unitCode) {
@@ -3903,6 +4112,72 @@ function escapeHtmlEmail_(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/\n/g, '<br>');
+}
+
+/**
+ * Atomic Worker Lease berbasis ScriptProperties (menggunakan micro-ScriptLock < 100ms).
+ * Menghindari bug non-reentrant ScriptLock ketika fungsi pembantu menulis ke Spreadsheet.
+ */
+function acquireBroadcastWorkerLease_(workerId, leaseMs) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return false;
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const raw = props.getProperty('BROADCAST_WORKER_LEASE');
+    const now = Date.now();
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.workerId !== workerId && Number(parsed.expiresAt || 0) > now) {
+          return false;
+        }
+      } catch (ignore) {}
+    }
+    props.setProperty('BROADCAST_WORKER_LEASE', JSON.stringify({
+      workerId: workerId,
+      expiresAt: now + Math.max(30000, Number(leaseMs || 300000))
+    }));
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function renewBroadcastWorkerLease_(workerId, leaseMs) {
+  if (!workerId) return;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(3000)) return;
+  try {
+    const props = PropertiesService.getScriptProperties();
+    props.setProperty('BROADCAST_WORKER_LEASE', JSON.stringify({
+      workerId: workerId,
+      expiresAt: Date.now() + Math.max(30000, Number(leaseMs || 300000))
+    }));
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function releaseBroadcastWorkerLease_(workerId) {
+  if (!workerId) return;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return;
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const raw = props.getProperty('BROADCAST_WORKER_LEASE');
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.workerId === workerId) {
+          props.deleteProperty('BROADCAST_WORKER_LEASE');
+        }
+      } catch (ignore) {
+        props.deleteProperty('BROADCAST_WORKER_LEASE');
+      }
+    }
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -3933,9 +4208,6 @@ function trashTempBroadcastFileNow_(fileId) {
   } catch (ignore) {}
 }
 
-/**
- * Antrekan penghapusan otomatis file media sementara setelah jeda aman (mis. 10 menit agar ReChat selesai mengunduh gambar).
- */
 function queueTempBroadcastFileCleanup_(fileId, delayMinutes) {
   const cleanId = String(fileId || '').trim();
   if (!cleanId) return;
@@ -4004,7 +4276,6 @@ function bersihkanMediaSementaraBroadcast() {
   } catch (ignore) {
     remaining = [];
   }
-  // Hapus trigger pembersih lama, pasang lagi hanya jika masih ada media yang menunggu masa tenggang
   try {
     ScriptApp.getProjectTriggers().forEach(function (t) {
       if (t.getHandlerFunction() === 'bersihkanMediaSementaraBroadcast') {
@@ -4059,21 +4330,15 @@ function syncContinuationTriggerState_(ss) {
   } catch (ignore) {}
 }
 
-function executeBroadcastRow_(ss, rowObj, options) {
-  const opts = options || {};
-  const maxRuntimeMs = Number(opts.maxRuntimeMs || 240000);
-  const startedAt = Date.now();
+/**
+ * Mengisi ledger penerima BROADCAST_LOG secara deterministik & terdeduplikasi untuk 1 broadcast.
+ */
+function seedBroadcastLogRows_(ss, rowObj) {
+  ensureBroadcastSheets_(ss);
+  const bcId = String(rowObj.ID_Broadcast || '').trim();
   const channel = String(rowObj.Channel || 'wa').toLowerCase();
-  const delayDetik = Math.min(300, Math.max(0, Math.round(Number(rowObj.Delay_Detik || 0))));
-
-  const targetPIds = String(rowObj.Target_Pengurus_IDs || '')
-    .split(',')
-    .map(function (x) { return x.trim(); })
-    .filter(Boolean);
-  const targetGIds = String(rowObj.Target_Group_IDs || '')
-    .split(',')
-    .map(function (x) { return x.trim(); })
-    .filter(Boolean);
+  const targetPIds = uniqueStrings_(String(rowObj.Target_Pengurus_IDs || '').split(','));
+  const targetGIds = uniqueStrings_(String(rowObj.Target_Group_IDs || '').split(','));
 
   const allPengurus = readRows_(SHEETS.PENGURUS);
   const allUnits = readRows_(SHEETS.UNIT);
@@ -4081,7 +4346,6 @@ function executeBroadcastRow_(ss, rowObj, options) {
   allUnits.forEach(function (u) {
     unitCodeById[String(u.ID_Unit || '').trim()] = String(u.Kode_Unit || u.Nama_Unit || '').trim();
   });
-
   const pengurusById = {};
   allPengurus.forEach(function (p) {
     pengurusById[String(p.ID_Pengurus || '').trim()] = p;
@@ -4096,58 +4360,225 @@ function executeBroadcastRow_(ss, rowObj, options) {
   const selectedPengurus = targetPIds.map(function (id) { return pengurusById[id]; }).filter(Boolean);
   const selectedGroups = targetGIds.map(function (id) { return groupById[id]; }).filter(Boolean);
 
+  const seenKey = {};
+  const logObjs = [];
+
+  if (channel === 'wa' || channel === 'both') {
+    selectedPengurus.forEach(function (p) {
+      const waNum = normalizeWaNumber_(p.WhatsApp || '');
+      const pid = String(p.ID_Pengurus || '').trim();
+      const dedupKey = 'wa_personal__' + (waNum || pid);
+      if (seenKey[dedupKey]) return;
+      seenKey[dedupKey] = true;
+      const unitCode = unitCodeById[String(p.ID_Unit || '').trim()] || String(p.Nama_Unit || '');
+      logObjs.push({
+        ID_Log: bcId + '__' + dedupKey,
+        ID_Broadcast: bcId,
+        Channel_Item: 'WA Personal',
+        Nama_Penerima: String(p.Nama_Lengkap || ''),
+        Unit_Info: unitCode + (p.Amanah ? (' · ' + String(p.Amanah)) : ''),
+        Tujuan: waNum || ('(WA kosong:' + pid + ')'),
+        Status_Kirim: 'Pending',
+        ReChat_Message_ID: '',
+        ReChat_Status: '',
+        Waktu_Kirim: '',
+        Waktu_Dibaca: '',
+        Keterangan: ''
+      });
+    });
+
+    selectedGroups.forEach(function (g) {
+      const gid = String(g.Group_ID_WA || '').trim();
+      const idG = String(g.ID_Grup || '').trim();
+      const dedupKey = 'wa_group__' + (gid || idG);
+      if (seenKey[dedupKey]) return;
+      seenKey[dedupKey] = true;
+      logObjs.push({
+        ID_Log: bcId + '__' + dedupKey,
+        ID_Broadcast: bcId,
+        Channel_Item: 'WA Grup',
+        Nama_Penerima: String(g.Nama_Grup || 'Grup WA'),
+        Unit_Info: String(g.Keterangan || 'Grup WhatsApp'),
+        Tujuan: gid || ('(ID grup kosong:' + idG + ')'),
+        Status_Kirim: 'Pending',
+        ReChat_Message_ID: '',
+        ReChat_Status: '',
+        Waktu_Kirim: '',
+        Waktu_Dibaca: '',
+        Keterangan: ''
+      });
+    });
+  }
+
+  if (channel === 'email' || channel === 'both') {
+    selectedPengurus.forEach(function (p) {
+      const email = String(p.Email || '').trim().toLowerCase();
+      const pid = String(p.ID_Pengurus || '').trim();
+      const dedupKey = 'email__' + (email || pid);
+      if (seenKey[dedupKey]) return;
+      seenKey[dedupKey] = true;
+      const unitCode = unitCodeById[String(p.ID_Unit || '').trim()] || String(p.Nama_Unit || '');
+      logObjs.push({
+        ID_Log: bcId + '__' + dedupKey,
+        ID_Broadcast: bcId,
+        Channel_Item: 'Email',
+        Nama_Penerima: String(p.Nama_Lengkap || ''),
+        Unit_Info: unitCode + (p.Amanah ? (' · ' + String(p.Amanah)) : ''),
+        Tujuan: email || ('(Email kosong:' + pid + ')'),
+        Status_Kirim: 'Pending',
+        ReChat_Message_ID: '',
+        ReChat_Status: '',
+        Waktu_Kirim: '',
+        Waktu_Dibaca: '',
+        Keterangan: ''
+      });
+    });
+  }
+
+  if (logObjs.length > 0) {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const sheet = ss.getSheetByName(SHEETS.BROADCAST_LOG);
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function (h) {
+        return String(h).trim();
+      });
+      const matrix = logObjs.map(function (obj) {
+        return headers.map(function (h) {
+          return obj.hasOwnProperty(h) ? obj[h] : '';
+        });
+      });
+      sheet.getRange(sheet.getLastRow() + 1, 1, matrix.length, headers.length).setValues(matrix);
+      SpreadsheetApp.flush();
+    } finally {
+      lock.releaseLock();
+    }
+  }
+
+  return logObjs;
+}
+
+function summarizeBroadcastLogStats_(broadcastId) {
+  const rows = readRowsOptional_(SHEETS.BROADCAST_LOG).filter(function (r) {
+    return String(r.ID_Broadcast || '').trim() === String(broadcastId || '').trim();
+  });
+  let totalTarget = rows.length;
+  let totalTerkirim = 0;
+  let totalGagal = 0;
+  let totalPending = 0;
+  let totalDibaca = 0;
+  const errorNotes = [];
+
+  rows.forEach(function (r) {
+    const st = String(r.Status_Kirim || 'Pending').trim();
+    if (st === 'Dibaca') {
+      totalTerkirim += 1;
+      totalDibaca += 1;
+    } else if (st === 'Terkirim' || st === 'Tersampaikan') {
+      totalTerkirim += 1;
+    } else if (st === 'Gagal') {
+      totalGagal += 1;
+      if (r.Keterangan) {
+        errorNotes.push(String(r.Nama_Penerima || '') + ': ' + String(r.Keterangan));
+      }
+    } else {
+      // Pending atau Diproses
+      totalPending += 1;
+    }
+  });
+
+  return {
+    rows: rows,
+    totalTarget: totalTarget,
+    totalTerkirim: totalTerkirim,
+    totalGagal: totalGagal,
+    totalPending: totalPending,
+    totalDibaca: totalDibaca,
+    errorNotes: errorNotes
+  };
+}
+
+function executeBroadcastRow_(ss, rowObj, options) {
+  const opts = options || {};
+  const maxRuntimeMs = Number(opts.maxRuntimeMs || 220000);
+  const workerId = opts.workerId || '';
+  const startedAt = Date.now();
+  const bcId = String(rowObj.ID_Broadcast || '').trim();
+  const channel = String(rowObj.Channel || 'wa').toLowerCase();
+  const delayDetik = Math.min(3600, Math.max(0, Math.round(Number(rowObj.Delay_Detik || 0))));
+
+  // Verifikasi ulang status terbaru di sheet (jika dibatalkan oleh admin saat menunggu, segera berhenti)
+  const freshRow = findRowInSs_(ss, SHEETS.BROADCAST_QUEUE, 'ID_Broadcast', bcId) || rowObj;
+  const currentQueueStatus = String(freshRow.Status || '').trim();
+  if (currentQueueStatus === 'Dibatalkan' || currentQueueStatus === 'Terkirim' || currentQueueStatus === 'Sebagian Gagal' || currentQueueStatus === 'Gagal') {
+    return freshRow;
+  }
+
+  // Pastikan baris penerima BROADCAST_LOG sudah tersedia (kompatibel jika broadcast dibuat dari versi lama)
+  let logRows = readRowsOptional_(SHEETS.BROADCAST_LOG).filter(function (r) {
+    return String(r.ID_Broadcast || '').trim() === bcId;
+  });
+  if (logRows.length === 0) {
+    seedBroadcastLogRows_(ss, freshRow);
+    logRows = readRowsOptional_(SHEETS.BROADCAST_LOG).filter(function (r) {
+      return String(r.ID_Broadcast || '').trim() === bcId;
+    });
+  }
+
+  // Muat nextRunAtMs dari Progress_Json untuk delay panjang (misal 1 menit, 5 menit, 10 menit)
+  let nextRunAtMs = 0;
+  if (freshRow.Progress_Json) {
+    try {
+      const parsed = JSON.parse(String(freshRow.Progress_Json));
+      if (parsed && parsed.nextRunAtMs) {
+        nextRunAtMs = Number(parsed.nextRunAtMs || 0);
+      }
+    } catch (ignore) {}
+  }
+
+  const pendingLogs = logRows.filter(function (r) {
+    return String(r.Status_Kirim || '').trim() === 'Pending';
+  });
+
+  if (pendingLogs.length > 0 && nextRunAtMs > Date.now()) {
+    const remainingWait = nextRunAtMs - Date.now();
+    if (remainingWait + 5000 > maxRuntimeMs) {
+      // Belum waktunya kirim pesan berikutnya (misal delay 5 menit/10 menit); keluar cepat & biarkan trigger berikutnya yang kirim
+      ensureContinuationTrigger_();
+      return freshRow;
+    }
+    renewBroadcastWorkerLease_(workerId, remainingWait + 60000);
+    Utilities.sleep(remainingWait);
+  }
+
+  // Peta data pengurus & unit untuk personalisasi {nama}, {panggilan}, {unit}, {amanah}
+  const allPengurus = readRows_(SHEETS.PENGURUS);
+  const allUnits = readRows_(SHEETS.UNIT);
+  const unitCodeById = {};
+  allUnits.forEach(function (u) {
+    unitCodeById[String(u.ID_Unit || '').trim()] = String(u.Kode_Unit || u.Nama_Unit || '').trim();
+  });
+  const pengurusByWa = {};
+  const pengurusByEmail = {};
+  allPengurus.forEach(function (p) {
+    const wa = normalizeWaNumber_(p.WhatsApp || '');
+    const em = String(p.Email || '').trim().toLowerCase();
+    if (wa && !pengurusByWa[wa]) pengurusByWa[wa] = p;
+    if (em && !pengurusByEmail[em]) pengurusByEmail[em] = p;
+  });
+
   const settingsMap = getSettingsMap_();
   const rechatApiUrl = sanitizeRechatApiUrl_(settingsMap.RECHAT_API_URL || DEFAULT_RECHAT_API_URL);
   const rechatApiKey = String(PropertiesService.getScriptProperties().getProperty('RECHAT_API_KEY') || '').trim();
   const emailAlias = String(settingsMap.EMAIL_ALIAS_PENGIRIM || DEFAULT_EMAIL_ALIAS).trim() || DEFAULT_EMAIL_ALIAS;
   const emailSenderName = String(settingsMap.EMAIL_NAMA_PENGIRIM || DEFAULT_EMAIL_SENDER_NAME).trim() || DEFAULT_EMAIL_SENDER_NAME;
 
-  const imageUrl = String(rowObj.Image_URL || '').trim();
-  const imageFileId = String(rowObj.Image_Drive_File_ID || '').trim();
-  const pesanWaRaw = String(rowObj.Pesan_WA || '').trim();
-  const emailSubjectRaw = String(rowObj.Email_Subject || rowObj.Judul || 'Informasi DUWD DPP WI').trim();
-  const emailBodyRaw = String(rowObj.Email_Body || pesanWaRaw).trim();
+  const imageUrl = String(freshRow.Image_URL || '').trim();
+  const imageFileId = String(freshRow.Image_Drive_File_ID || '').trim();
+  const pesanWaRaw = String(freshRow.Pesan_WA || '').trim();
+  const emailSubjectRaw = String(freshRow.Email_Subject || freshRow.Judul || 'Informasi DUWD DPP WI').trim();
+  const emailBodyRaw = String(freshRow.Email_Body || pesanWaRaw).trim();
 
-  // Susun daftar tugas pengiriman secara deterministik agar bisa dilanjutkan dengan aman tanpa duplikasi
-  const tasks = [];
-  if (channel === 'wa' || channel === 'both') {
-    selectedPengurus.forEach(function (p) {
-      tasks.push({ kind: 'wa_personal', pengurus: p });
-    });
-    selectedGroups.forEach(function (g) {
-      tasks.push({ kind: 'wa_group', group: g });
-    });
-  }
-  if (channel === 'email' || channel === 'both') {
-    selectedPengurus.forEach(function (p) {
-      tasks.push({ kind: 'email', pengurus: p });
-    });
-  }
-
-  // Muat progres terakhir bila ini adalah lanjutan antrean berjeda
-  let progress = {
-    nextIdx: 0,
-    nextRunAtMs: 0,
-    sent: 0,
-    failed: 0,
-    logs: []
-  };
-  if (rowObj.Progress_Json) {
-    try {
-      const parsed = JSON.parse(String(rowObj.Progress_Json));
-      if (parsed && typeof parsed === 'object') {
-        progress.nextIdx = Number(parsed.nextIdx || 0);
-        progress.nextRunAtMs = Number(parsed.nextRunAtMs || 0);
-        progress.sent = Number(parsed.sent || 0);
-        progress.failed = Number(parsed.failed || 0);
-        progress.logs = Array.isArray(parsed.logs) ? parsed.logs : [];
-      }
-    } catch (ignore) {}
-  }
-
-  const totalTarget = tasks.length;
-
-  // Cek kesiapan alias Gmail & lampiran blob Email (jika kanal menyertakan email)
   let aliasReady = false;
   let emailAttachment = opts.inlineBlob || null;
   if (channel === 'email' || channel === 'both') {
@@ -4159,117 +4590,161 @@ function executeBroadcastRow_(ss, rowObj, options) {
     aliasReady = availableAliases.some(function (a) {
       return String(a || '').trim().toLowerCase() === aliasLower;
     });
-    if (!aliasReady && progress.nextIdx === 0 && selectedPengurus.length > 0) {
-      progress.logs.push('Catatan Email: Alias "' + emailAlias + '" belum terdeteksi di Gmail "Send mail as", memakai alamat akun utama.');
-    }
     if (!emailAttachment && imageFileId) {
       try {
         const tmpFile = DriveApp.getFileById(imageFileId);
         const origBlob = tmpFile.getBlob();
-        if (rowObj.Image_Name) {
-          origBlob.setName(String(rowObj.Image_Name));
+        if (freshRow.Image_Name) {
+          origBlob.setName(String(freshRow.Image_Name));
         }
         emailAttachment = origBlob;
-      } catch (attErr) {
-        if (progress.nextIdx === 0) {
-          progress.logs.push('Peringatan lampiran foto Email: ' + attErr.message);
-        }
-      }
+      } catch (ignore) {}
     }
   }
 
-  // Tunggu sisa jeda dari siklus sebelumnya bila perlu dan masih muat di anggaran waktu
-  if (progress.nextRunAtMs > Date.now() && progress.nextIdx < totalTarget) {
-    const remainingWait = progress.nextRunAtMs - Date.now();
-    if (remainingWait + 4000 > maxRuntimeMs) {
-      ensureContinuationTrigger_();
-      return rowObj;
-    }
-    Utilities.sleep(remainingWait);
-  }
-
+  const cache = CacheService.getScriptCache();
   let sentInThisRun = 0;
   let pausedForLater = false;
+  let nextScheduledMs = 0;
 
-  for (let idx = progress.nextIdx; idx < totalTarget; idx++) {
-    // Jika bukan pengiriman pertama pada siklus ini dan jeda > 0, terapkan jeda antar pesan
+  for (let i = 0; i < pendingLogs.length; i++) {
+    const logItem = pendingLogs[i];
+    const logId = String(logItem.ID_Log || '').trim();
+
+    // Terapkan jeda antar pesan sebelum pengiriman ke-2 dst. pada siklus ini
     if (sentInThisRun > 0 && delayDetik > 0) {
       const waitMs = delayDetik * 1000;
       const elapsed = Date.now() - startedAt;
-      if (elapsed + waitMs + 4000 > maxRuntimeMs) {
-        progress.nextIdx = idx;
-        progress.nextRunAtMs = Date.now() + waitMs;
+      if (elapsed + waitMs + 5000 > maxRuntimeMs) {
         pausedForLater = true;
+        nextScheduledMs = Date.now() + waitMs;
         break;
       }
+      renewBroadcastWorkerLease_(workerId, waitMs + 60000);
       Utilities.sleep(waitMs);
     } else if (sentInThisRun > 0) {
-      const elapsedNoDelay = Date.now() - startedAt;
-      if (elapsedNoDelay + 4000 > maxRuntimeMs) {
-        progress.nextIdx = idx;
-        progress.nextRunAtMs = Date.now();
+      if (Date.now() - startedAt + 5000 > maxRuntimeMs) {
         pausedForLater = true;
+        nextScheduledMs = Date.now();
         break;
       }
     }
 
-    const task = tasks[idx];
+    // Cek ulang apakah broadcast dibatalkan di tengah proses
+    const liveQueue = findRowInSs_(ss, SHEETS.BROADCAST_QUEUE, 'ID_Broadcast', bcId);
+    if (liveQueue && String(liveQueue.Status || '').trim() === 'Dibatalkan') {
+      return liveQueue;
+    }
+
+    // GUARD ANTI-DUPLIKAT: cek CacheService + status aktual di sheet SEBELUM kirim
+    const dedupCacheKey = 'brc_sent_' + logId;
+    if (cache.get(dedupCacheKey)) {
+      continue;
+    }
+    const freshLog = findRowInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Log', logId);
+    if (!freshLog || String(freshLog.Status_Kirim || '').trim() !== 'Pending') {
+      continue;
+    }
+
+    // MARK-BEFORE-SEND: tandai di Cache (6 jam) dan ubah status baris menjadi Diproses + flush SEBELUM panggil API!
+    cache.put(dedupCacheKey, '1', 21600);
+    updateRowByIdInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Log', logId, {
+      Status_Kirim: 'Diproses'
+    });
+    SpreadsheetApp.flush();
+
+    const chItem = String(logItem.Channel_Item || '').trim();
+    const tujuan = String(logItem.Tujuan || '').trim();
+    const sendTimeStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
     let didNetworkSend = false;
 
-    if (task.kind === 'wa_personal') {
-      const p = task.pengurus;
-      const waNum = normalizeWaNumber_(p.WhatsApp || '');
-      if (!waNum || waNum.length < 9) {
-        progress.failed += 1;
-        progress.logs.push('WA dilewati (' + String(p.Nama_Lengkap || '') + '): nomor tidak valid');
+    if (chItem === 'WA Personal') {
+      const waNum = normalizeWaNumber_(tujuan);
+      if (!waNum || waNum.length < 9 || tujuan.indexOf('(') === 0) {
+        updateRowByIdInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Log', logId, {
+          Status_Kirim: 'Gagal',
+          Waktu_Kirim: sendTimeStr,
+          Keterangan: 'Nomor WhatsApp tidak valid'
+        });
       } else if (!rechatApiKey) {
-        progress.failed += 1;
-        progress.logs.push('WA GAGAL (' + String(p.Nama_Lengkap || '') + '): API Key ReChat belum dikonfigurasi');
+        updateRowByIdInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Log', logId, {
+          Status_Kirim: 'Gagal',
+          Waktu_Kirim: sendTimeStr,
+          Keterangan: 'API Key ReChat belum dikonfigurasi'
+        });
       } else {
-        const unitCode = unitCodeById[String(p.ID_Unit || '').trim()] || String(p.Nama_Unit || '');
+        const p = pengurusByWa[waNum] || null;
+        const unitCode = p ? (unitCodeById[String(p.ID_Unit || '').trim()] || String(p.Nama_Unit || '')) : '';
         const bodyText = personalizeTemplate_(pesanWaRaw, p, unitCode);
         const waPayload = imageUrl
           ? { recipient_type: 'individual', to: waNum, type: 'image', image: { link: imageUrl, caption: bodyText } }
           : { recipient_type: 'individual', to: waNum, type: 'text', text: { body: bodyText } };
-        const sendRes = dispatchSingleRechatMessage_(rechatApiUrl, rechatApiKey, waPayload, String(p.Nama_Lengkap || waNum));
+        const sendRes = dispatchSingleRechatMessage_(rechatApiUrl, rechatApiKey, waPayload, String(logItem.Nama_Penerima || waNum));
         didNetworkSend = true;
         if (sendRes.ok) {
-          progress.sent += 1;
+          updateRowByIdInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Log', logId, {
+            Status_Kirim: 'Terkirim',
+            ReChat_Message_ID: sendRes.messageId || '',
+            ReChat_Status: sendRes.rechatStatus || 'pending',
+            Waktu_Kirim: sendTimeStr,
+            Keterangan: ''
+          });
         } else {
-          progress.failed += 1;
-          progress.logs.push(sendRes.log);
+          updateRowByIdInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Log', logId, {
+            Status_Kirim: 'Gagal',
+            ReChat_Status: 'error',
+            Waktu_Kirim: sendTimeStr,
+            Keterangan: sendRes.log
+          });
         }
       }
-    } else if (task.kind === 'wa_group') {
-      const g = task.group;
-      const gid = String(g.Group_ID_WA || '').trim();
-      if (!gid) {
-        progress.failed += 1;
-        progress.logs.push('WA Grup dilewati (' + String(g.Nama_Grup || '') + '): ID grup kosong');
+    } else if (chItem === 'WA Grup') {
+      if (!tujuan || tujuan.indexOf('(') === 0) {
+        updateRowByIdInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Log', logId, {
+          Status_Kirim: 'Gagal',
+          Waktu_Kirim: sendTimeStr,
+          Keterangan: 'ID Grup WhatsApp kosong'
+        });
       } else if (!rechatApiKey) {
-        progress.failed += 1;
-        progress.logs.push('WA Grup GAGAL (' + String(g.Nama_Grup || '') + '): API Key ReChat belum dikonfigurasi');
+        updateRowByIdInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Log', logId, {
+          Status_Kirim: 'Gagal',
+          Waktu_Kirim: sendTimeStr,
+          Keterangan: 'API Key ReChat belum dikonfigurasi'
+        });
       } else {
         const waPayload = imageUrl
-          ? { recipient_type: 'group', to: gid, type: 'image', image: { link: imageUrl, caption: pesanWaRaw } }
-          : { recipient_type: 'group', to: gid, type: 'text', text: { body: pesanWaRaw } };
-        const sendRes = dispatchSingleRechatMessage_(rechatApiUrl, rechatApiKey, waPayload, 'Grup ' + String(g.Nama_Grup || gid));
+          ? { recipient_type: 'group', to: tujuan, type: 'image', image: { link: imageUrl, caption: pesanWaRaw } }
+          : { recipient_type: 'group', to: tujuan, type: 'text', text: { body: pesanWaRaw } };
+        const sendRes = dispatchSingleRechatMessage_(rechatApiUrl, rechatApiKey, waPayload, String(logItem.Nama_Penerima || tujuan));
         didNetworkSend = true;
         if (sendRes.ok) {
-          progress.sent += 1;
+          updateRowByIdInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Log', logId, {
+            Status_Kirim: 'Terkirim',
+            ReChat_Message_ID: sendRes.messageId || '',
+            ReChat_Status: sendRes.rechatStatus || 'pending',
+            Waktu_Kirim: sendTimeStr,
+            Keterangan: ''
+          });
         } else {
-          progress.failed += 1;
-          progress.logs.push(sendRes.log);
+          updateRowByIdInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Log', logId, {
+            Status_Kirim: 'Gagal',
+            ReChat_Status: 'error',
+            Waktu_Kirim: sendTimeStr,
+            Keterangan: sendRes.log
+          });
         }
       }
-    } else if (task.kind === 'email') {
-      const p = task.pengurus;
-      const recipientEmail = String(p.Email || '').trim().toLowerCase();
+    } else if (chItem === 'Email') {
+      const recipientEmail = tujuan.toLowerCase();
       if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(recipientEmail)) {
-        progress.failed += 1;
-        progress.logs.push('Email dilewati (' + String(p.Nama_Lengkap || '') + '): belum mengisi email');
+        updateRowByIdInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Log', logId, {
+          Status_Kirim: 'Gagal',
+          Waktu_Kirim: sendTimeStr,
+          Keterangan: 'Pengurus belum mengisi alamat email'
+        });
       } else {
-        const unitCode = unitCodeById[String(p.ID_Unit || '').trim()] || String(p.Nama_Unit || '');
+        const p = pengurusByEmail[recipientEmail] || null;
+        const unitCode = p ? (unitCodeById[String(p.ID_Unit || '').trim()] || String(p.Nama_Unit || '')) : '';
         const subjectFinal = personalizeTemplate_(emailSubjectRaw, p, unitCode);
         const bodyFinal = personalizeTemplate_(emailBodyRaw, p, unitCode);
         const htmlBody =
@@ -4295,76 +4770,81 @@ function executeBroadcastRow_(ss, rowObj, options) {
         didNetworkSend = true;
         try {
           GmailApp.sendEmail(recipientEmail, subjectFinal, bodyFinal, mailOptions);
-          progress.sent += 1;
+          updateRowByIdInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Log', logId, {
+            Status_Kirim: 'Terkirim',
+            ReChat_Status: 'sent',
+            Waktu_Kirim: sendTimeStr,
+            Keterangan: aliasReady ? ('Via ' + emailAlias) : 'Via akun Gmail utama'
+          });
         } catch (mailErr) {
-          progress.failed += 1;
-          progress.logs.push('Email GAGAL ke ' + recipientEmail + ': ' + mailErr.message);
+          updateRowByIdInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Log', logId, {
+            Status_Kirim: 'Gagal',
+            ReChat_Status: 'error',
+            Waktu_Kirim: sendTimeStr,
+            Keterangan: mailErr.message
+          });
         }
       }
     }
 
-    progress.nextIdx = idx + 1;
+    SpreadsheetApp.flush();
     if (didNetworkSend) {
       sentInThisRun += 1;
-    }
-
-    // Simpan checkpoint berkala agar progres langsung terpantau & aman dari duplikasi
-    if (didNetworkSend && (delayDetik >= 10 || sentInThisRun % 5 === 0) && progress.nextIdx < totalTarget) {
-      updateRowByIdInSs_(ss, SHEETS.BROADCAST_QUEUE, 'ID_Broadcast', rowObj.ID_Broadcast, {
-        Status: 'Diproses',
-        Total_Target: totalTarget,
-        Total_Terkirim: progress.sent,
-        Total_Gagal: progress.failed,
-        Progress_Json: JSON.stringify(progress),
-        Log_Hasil: ('Sedang mengirim (' + progress.nextIdx + '/' + totalTarget + ', jeda ' + delayDetik + ' detik)' + (progress.logs.length ? ' | ' + progress.logs.join(' | ') : '')).slice(0, 45000)
-      });
+      renewBroadcastWorkerLease_(workerId, 90000);
     }
   }
 
-  if (pausedForLater && progress.nextIdx < totalTarget) {
+  // Hitung ulang statistik aktual langsung dari BROADCAST_LOG
+  const stats = summarizeBroadcastLogStats_(bcId);
+
+  if (pausedForLater || stats.totalPending > 0) {
     const pausePatch = {
       Status: 'Diproses',
-      Total_Target: totalTarget,
-      Total_Terkirim: progress.sent,
-      Total_Gagal: progress.failed,
-      Progress_Json: JSON.stringify(progress),
-      Log_Hasil: ('Mengirim bertahap: ' + progress.nextIdx + '/' + totalTarget + ' diproses (jeda ' + delayDetik + ' detik/pesan)' + (progress.logs.length ? ' | ' + progress.logs.join(' | ') : '')).slice(0, 45000)
+      Total_Target: stats.totalTarget,
+      Total_Terkirim: stats.totalTerkirim,
+      Total_Gagal: stats.totalGagal,
+      Total_Pending: stats.totalPending,
+      Total_Dibaca: stats.totalDibaca,
+      Progress_Json: JSON.stringify({ nextRunAtMs: nextScheduledMs || (Date.now() + delayDetik * 1000) }),
+      Log_Hasil: ('Mengirim bertahap (' + stats.totalTerkirim + ' terkirim, ' + stats.totalPending + ' pending, ' + stats.totalGagal + ' gagal · jeda ' + formatDelayHuman_(delayDetik) + ')' +
+        (stats.errorNotes.length ? ' | ' + stats.errorNotes.slice(0, 5).join(' | ') : '')).slice(0, 45000)
     };
-    updateRowByIdInSs_(ss, SHEETS.BROADCAST_QUEUE, 'ID_Broadcast', rowObj.ID_Broadcast, pausePatch);
+    updateRowByIdInSs_(ss, SHEETS.BROADCAST_QUEUE, 'ID_Broadcast', bcId, pausePatch);
+    SpreadsheetApp.flush();
     ensureContinuationTrigger_();
-    return Object.assign({}, rowObj, pausePatch);
+    return Object.assign({}, freshRow, pausePatch);
   }
 
-  // Semua tugas selesai!
+  // Semua penerima selesai diproses
   let finalStatus = 'Terkirim';
-  if (progress.sent === 0 && progress.failed > 0) {
+  if (stats.totalTerkirim === 0 && stats.totalGagal > 0) {
     finalStatus = 'Gagal';
-  } else if (progress.sent > 0 && progress.failed > 0) {
+  } else if (stats.totalTerkirim > 0 && stats.totalGagal > 0) {
     finalStatus = 'Sebagian Gagal';
-  } else if (totalTarget === 0) {
+  } else if (stats.totalTarget === 0) {
     finalStatus = 'Gagal';
-    progress.logs.push('Tidak ada target valid yang dapat dikirim.');
   }
 
-  // Hapus file media sementara agar TIDAK tersimpan di Google Drive
   if (imageFileId) {
     if (channel === 'email') {
       trashTempBroadcastFileNow_(imageFileId);
     } else {
-      // Beri jeda 10 menit agar antrean ReChat sempat mengunduh gambar, lalu otomatis dihapus
       queueTempBroadcastFileCleanup_(imageFileId, 10);
     }
   }
 
   const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
-  const summaryLog = 'Selesai (jeda ' + delayDetik + ' detik/pesan): ' + progress.sent + ' terkirim, ' + progress.failed + ' gagal.' +
-    (progress.logs.length ? ' | ' + progress.logs.join(' | ') : '');
+  const summaryLog = 'Selesai (jeda ' + formatDelayHuman_(delayDetik) + '): ' +
+    stats.totalTerkirim + ' terkirim, ' + stats.totalGagal + ' gagal.' +
+    (stats.errorNotes.length ? ' | ' + stats.errorNotes.slice(0, 10).join(' | ') : '');
 
-  const patch = {
+  const finalPatch = {
     Status: finalStatus,
-    Total_Target: totalTarget,
-    Total_Terkirim: progress.sent,
-    Total_Gagal: progress.failed,
+    Total_Target: stats.totalTarget,
+    Total_Terkirim: stats.totalTerkirim,
+    Total_Gagal: stats.totalGagal,
+    Total_Pending: 0,
+    Total_Dibaca: stats.totalDibaca,
     Progress_Json: '',
     Image_Drive_File_ID: '',
     Image_URL: '',
@@ -4372,9 +4852,10 @@ function executeBroadcastRow_(ss, rowObj, options) {
     Dikirim_Pada: nowStr
   };
 
-  updateRowByIdInSs_(ss, SHEETS.BROADCAST_QUEUE, 'ID_Broadcast', rowObj.ID_Broadcast, patch);
+  updateRowByIdInSs_(ss, SHEETS.BROADCAST_QUEUE, 'ID_Broadcast', bcId, finalPatch);
+  SpreadsheetApp.flush();
   syncContinuationTriggerState_(ss);
-  return Object.assign({}, rowObj, patch);
+  return Object.assign({}, freshRow, finalPatch);
 }
 
 function dispatchSingleRechatMessage_(rechatApiUrl, rechatApiKey, messagePayload, label) {
@@ -4391,15 +4872,159 @@ function dispatchSingleRechatMessage_(rechatApiUrl, rechatApiKey, messagePayload
     const code = resp.getResponseCode();
     const txt = resp.getContentText();
     if (code >= 200 && code < 300) {
-      return { ok: true, log: '' };
+      let messageId = '';
+      let rechatStatus = 'pending';
+      try {
+        const parsed = JSON.parse(txt);
+        if (parsed && Array.isArray(parsed.messages) && parsed.messages.length > 0) {
+          messageId = String(parsed.messages[0].id || '').trim();
+          rechatStatus = String(parsed.messages[0].status || 'pending').trim();
+        } else if (parsed && parsed.id) {
+          messageId = String(parsed.id).trim();
+          rechatStatus = String(parsed.status || 'pending').trim();
+        }
+      } catch (ignore) {}
+      return { ok: true, messageId: messageId, rechatStatus: rechatStatus, log: '' };
     }
     if (code === 429) {
-      return { ok: false, log: 'WA GAGAL (' + label + ', HTTP 429): Kuota harian ReChat habis.' };
+      return { ok: false, messageId: '', rechatStatus: 'error', log: 'Kuota harian ReChat habis (HTTP 429)' };
     }
-    return { ok: false, log: 'WA GAGAL (' + label + ', HTTP ' + code + '): ' + txt.slice(0, 140) };
+    return { ok: false, messageId: '', rechatStatus: 'error', log: 'ReChat HTTP ' + code + ': ' + txt.slice(0, 120) };
   } catch (err) {
-    return { ok: false, log: 'WA ERROR (' + label + '): ' + err.message };
+    return { ok: false, messageId: '', rechatStatus: 'error', log: 'Error jaringan (' + label + '): ' + err.message };
   }
+}
+
+function mapRechatStatusToKirim_(rawStatus, currentStatus) {
+  const s = String(rawStatus || '').trim().toLowerCase();
+  if (s === 'read' || s === 'played') return 'Dibaca';
+  if (s === 'delivered') return 'Tersampaikan';
+  if (s === 'sent') return 'Terkirim';
+  if (s === 'error' || s === 'failed') return 'Gagal';
+  if (s === 'pending' || s === 'sending') return currentStatus === 'Gagal' ? 'Gagal' : 'Terkirim';
+  return currentStatus || 'Terkirim';
+}
+
+function syncBroadcastRechatStatuses_(ss, broadcastId) {
+  const rechatApiKey = String(PropertiesService.getScriptProperties().getProperty('RECHAT_API_KEY') || '').trim();
+  if (!rechatApiKey) {
+    return { updatedCount: 0, message: 'API Key ReChat belum dikonfigurasi.' };
+  }
+  const settingsMap = getSettingsMap_();
+  const baseUrl = sanitizeRechatApiUrl_(settingsMap.RECHAT_API_URL || DEFAULT_RECHAT_API_URL).replace(/\/+$/, '');
+  const logs = readRowsOptional_(SHEETS.BROADCAST_LOG).filter(function (r) {
+    return String(r.ID_Broadcast || '').trim() === String(broadcastId || '').trim() &&
+      String(r.ReChat_Message_ID || '').trim() !== '' &&
+      String(r.Status_Kirim || '').trim() !== 'Dibaca' &&
+      String(r.Status_Kirim || '').trim() !== 'Gagal';
+  });
+
+  if (logs.length === 0) {
+    return { updatedCount: 0, message: 'Semua status WA pada broadcast ini sudah mutakhir atau belum memiliki ID pesan ReChat.' };
+  }
+
+  let updatedCount = 0;
+  const nowStr = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
+  const maxCheck = Math.min(logs.length, 40);
+
+  for (let i = 0; i < maxCheck; i++) {
+    const item = logs[i];
+    const msgId = String(item.ReChat_Message_ID || '').trim();
+    if (!msgId) continue;
+    try {
+      const checkUrl = baseUrl + '/' + encodeURIComponent(msgId);
+      const resp = UrlFetchApp.fetch(checkUrl, {
+        method: 'get',
+        headers: { Authorization: 'Bearer ' + rechatApiKey },
+        muteHttpExceptions: true
+      });
+      if (resp.getResponseCode() >= 200 && resp.getResponseCode() < 300) {
+        const parsed = JSON.parse(resp.getContentText() || '{}');
+        const newRechatStatus = String(
+          (parsed && parsed.status) ||
+          (parsed && parsed.data && parsed.data.status) ||
+          (parsed && parsed.message && parsed.message.status) ||
+          ''
+        ).trim().toLowerCase();
+        if (newRechatStatus) {
+          const nextStatusKirim = mapRechatStatusToKirim_(newRechatStatus, String(item.Status_Kirim || 'Terkirim'));
+          const patch = {
+            ReChat_Status: newRechatStatus,
+            Status_Kirim: nextStatusKirim
+          };
+          if (nextStatusKirim === 'Dibaca' && !item.Waktu_Dibaca) {
+            patch.Waktu_Dibaca = nowStr;
+          }
+          updateRowByIdInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Log', item.ID_Log, patch);
+          updatedCount += 1;
+        }
+      }
+    } catch (ignore) {}
+  }
+
+  if (updatedCount > 0) {
+    const stats = summarizeBroadcastLogStats_(broadcastId);
+    updateRowByIdInSs_(ss, SHEETS.BROADCAST_QUEUE, 'ID_Broadcast', broadcastId, {
+      Total_Target: stats.totalTarget,
+      Total_Terkirim: stats.totalTerkirim,
+      Total_Gagal: stats.totalGagal,
+      Total_Pending: stats.totalPending,
+      Total_Dibaca: stats.totalDibaca
+    });
+    SpreadsheetApp.flush();
+  }
+
+  return {
+    updatedCount: updatedCount,
+    message: updatedCount > 0
+      ? ('Status ' + updatedCount + ' pesan WhatsApp berhasil diperbarui dari ReChat.')
+      : 'Belum ada perubahan status baru dari ReChat saat ini.'
+  };
+}
+
+function applyRechatWebhookStatus_(data) {
+  const msgId = String((data && data.id) || '').trim();
+  const rawStatus = String((data && data.status) || '').trim().toLowerCase();
+  const ALLOWED_STATUS = {
+    pending: true,
+    sending: true,
+    sent: true,
+    delivered: true,
+    read: true,
+    played: true,
+    error: true,
+    failed: true
+  };
+  if (!msgId || !ALLOWED_STATUS[rawStatus]) return false;
+
+  const ss = getSpreadsheet_();
+  ensureBroadcastSheets_(ss);
+  const logRow = findRowInSs_(ss, SHEETS.BROADCAST_LOG, 'ReChat_Message_ID', msgId);
+  if (!logRow) return false;
+
+  const nextStatus = mapRechatStatusToKirim_(rawStatus, String(logRow.Status_Kirim || 'Terkirim'));
+  const patch = {
+    ReChat_Status: rawStatus,
+    Status_Kirim: nextStatus
+  };
+  if (nextStatus === 'Dibaca' && !logRow.Waktu_Dibaca) {
+    patch.Waktu_Dibaca = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm:ss');
+  }
+  updateRowByIdInSs_(ss, SHEETS.BROADCAST_LOG, 'ID_Log', logRow.ID_Log, patch);
+
+  const bcId = String(logRow.ID_Broadcast || '').trim();
+  if (bcId) {
+    const stats = summarizeBroadcastLogStats_(bcId);
+    updateRowByIdInSs_(ss, SHEETS.BROADCAST_QUEUE, 'ID_Broadcast', bcId, {
+      Total_Target: stats.totalTarget,
+      Total_Terkirim: stats.totalTerkirim,
+      Total_Gagal: stats.totalGagal,
+      Total_Pending: stats.totalPending,
+      Total_Dibaca: stats.totalDibaca
+    });
+  }
+  SpreadsheetApp.flush();
+  return true;
 }
 
 /**
@@ -4413,10 +5038,11 @@ function lanjutkanAntreanBroadcast() {
 /**
  * Fungsi terjadwal (Time-driven Trigger setiap 5 menit) untuk memproses antrean Broadcast terjadwal (WITA)
  * serta melanjutkan antrean berjeda panjang dan membersihkan media sementara.
+ * Dilindungi Atomic Worker Lease agar tidak pernah mengeksekusi ganda secara bersamaan.
  */
 function prosesJadwalBroadcast() {
-  const lock = LockService.getScriptLock();
-  if (!lock.tryLock(1000)) {
+  const workerId = 'TRIG_' + Utilities.getUuid();
+  if (!acquireBroadcastWorkerLease_(workerId, 260000)) {
     return 0;
   }
   try {
@@ -4426,7 +5052,7 @@ function prosesJadwalBroadcast() {
     const rows = readRowsOptional_(SHEETS.BROADCAST_QUEUE);
     const nowComparable = Utilities.formatDate(new Date(), 'Asia/Makassar', 'yyyy-MM-dd HH:mm');
     const batchStartedAt = Date.now();
-    const totalBudgetMs = 240000; // 4 menit (aman di bawah batas 6 menit GAS)
+    const totalBudgetMs = 210000; // 3,5 menit (aman di bawah batas 6 menit GAS)
     let processed = 0;
 
     // 1. Prioritaskan melanjutkan antrean berstatus "Diproses" (broadcast berjeda panjang)
@@ -4435,7 +5061,8 @@ function prosesJadwalBroadcast() {
       if (String(r.Status || '').trim() !== 'Diproses') continue;
       const remaining = totalBudgetMs - (Date.now() - batchStartedAt);
       if (remaining < 15000) break;
-      executeBroadcastRow_(ss, r, { maxRuntimeMs: remaining });
+      renewBroadcastWorkerLease_(workerId, remaining + 60000);
+      executeBroadcastRow_(ss, r, { maxRuntimeMs: remaining, workerId: workerId });
       processed += 1;
     }
 
@@ -4451,8 +5078,10 @@ function prosesJadwalBroadcast() {
       updateRowByIdInSs_(ss, SHEETS.BROADCAST_QUEUE, 'ID_Broadcast', r.ID_Broadcast, {
         Status: 'Diproses'
       });
+      SpreadsheetApp.flush();
       r.Status = 'Diproses';
-      executeBroadcastRow_(ss, r, { maxRuntimeMs: remaining });
+      renewBroadcastWorkerLease_(workerId, remaining + 60000);
+      executeBroadcastRow_(ss, r, { maxRuntimeMs: remaining, workerId: workerId });
       processed += 1;
     }
 
@@ -4462,7 +5091,7 @@ function prosesJadwalBroadcast() {
     }
     return processed;
   } finally {
-    lock.releaseLock();
+    releaseBroadcastWorkerLease_(workerId);
   }
 }
 
@@ -4491,6 +5120,7 @@ function pasangTriggerBroadcast() {
   } catch (ignore) {}
   return msg;
 }
+
 
 
 

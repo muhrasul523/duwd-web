@@ -1,10 +1,15 @@
 import {
   AlertCircle,
   CalendarClock,
+  Check,
+  CheckCheck,
   CheckCircle2,
   Clock,
+  Copy,
+  Eye,
   ImagePlus,
   KeyRound,
+  Lock,
   Mail,
   MessageSquare,
   Pencil,
@@ -25,17 +30,20 @@ import {
   cancelScheduledBroadcastRecord,
   deleteBroadcastItemRecord,
   deleteWaGroupRecord,
+  fetchBroadcastDetailRecord,
   installBroadcastTriggerRemote,
   runDueBroadcastsNowRecord,
   saveBroadcastConfigRecord,
   saveWaGroupRecord,
   sendOrScheduleBroadcastRecord,
+  syncBroadcastStatusesRecord,
 } from '../services/orgService';
 import type {
   BroadcastChannel,
   BroadcastConfigStatus,
   BroadcastItem,
   BroadcastModeKirim,
+  BroadcastRecipientLogItem,
   PengurusItem,
   UnitItem,
   UserRole,
@@ -148,7 +156,26 @@ function formatDurationEstimate(totalSeconds: number): string {
   return remMins > 0 ? `± ${hrs} jam ${remMins} menit` : `± ${hrs} jam`;
 }
 
-const DELAY_PRESETS = [0, 1, 5, 10, 30, 60];
+function formatDelayLabel(sec?: number): string {
+  const s = Math.max(0, Math.round(Number(sec) || 0));
+  if (s <= 0) return 'Tanpa jeda';
+  if (s < 60) return `${s} detik`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem > 0 ? `${m} mnt ${rem} dtk` : `${m} menit`;
+}
+
+const DELAY_PRESETS: Array<{ sec: number; label: string }> = [
+  { sec: 0, label: 'Tanpa Jeda' },
+  { sec: 1, label: '1 dtk' },
+  { sec: 5, label: '5 dtk' },
+  { sec: 15, label: '15 dtk' },
+  { sec: 30, label: '30 dtk' },
+  { sec: 60, label: '1 menit' },
+  { sec: 300, label: '5 menit' },
+  { sec: 600, label: '10 menit' },
+  { sec: 900, label: '15 menit' },
+];
 
 function getDefaultScheduleDateTime(): { date: string; time: string } {
   const next = new Date(Date.now() + 30 * 60 * 1000);
@@ -205,9 +232,11 @@ export function BroadcastView({
   const [scheduleDate, setScheduleDate] = useState(initialSched.date);
   const [scheduleTime, setScheduleTime] = useState(initialSched.time);
   const [delayDetik, setDelayDetik] = useState<number>(5);
+  const [customDelayUnit, setCustomDelayUnit] = useState<'detik' | 'menit'>('detik');
   const [submittingBroadcast, setSubmittingBroadcast] = useState(false);
+  const submittingRef = useRef(false);
 
-  // WA Groups CRUD modal
+  // WA Groups CRUD modal (Super Admin only)
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<WaGroupItem | null>(null);
   const [groupNameInput, setGroupNameInput] = useState('');
@@ -216,7 +245,7 @@ export function BroadcastView({
   const [savingGroup, setSavingGroup] = useState(false);
   const [groupError, setGroupError] = useState('');
 
-  // Broadcast Config Modal (Super Admin)
+  // Broadcast Config Modal (Super Admin only)
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [cfgRechatKey, setCfgRechatKey] = useState('');
   const [cfgRechatUrl, setCfgRechatUrl] = useState(
@@ -230,11 +259,26 @@ export function BroadcastView({
   );
   const [savingConfig, setSavingConfig] = useState(false);
   const [installingTrigger, setInstallingTrigger] = useState(false);
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
 
   // History filter & actions
   const [historyFilter, setHistoryFilter] = useState<string>('ALL');
   const [runningDue, setRunningDue] = useState(false);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+
+  // Detail Penerima Broadcast Modal
+  const [detailModalItem, setDetailModalItem] = useState<BroadcastItem | null>(null);
+  const [detailRecipients, setDetailRecipients] = useState<BroadcastRecipientLogItem[]>([]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const [detailStatusFilter, setDetailStatusFilter] = useState<
+    'ALL' | 'Dibaca' | 'Terkirim' | 'Pending' | 'Gagal'
+  >('ALL');
+  const [detailSearch, setDetailSearch] = useState('');
+  const [syncingDetailStatus, setSyncingDetailStatus] = useState(false);
+  const [detailSyncMessage, setDetailSyncMessage] = useState('');
+
+  const effectiveSubTab: BroadcastSubTab = !isSuperAdmin && subTab === 'groups' ? 'compose' : subTab;
 
   const unitById = useMemo(() => {
     const map = new Map<string, UnitItem>();
@@ -360,6 +404,7 @@ export function BroadcastView({
 
   const handleSendBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current || submittingBroadcast) return;
     setNotice(null);
 
     if (!webAppUrl.trim()) {
@@ -412,6 +457,7 @@ export function BroadcastView({
       return;
     }
 
+    submittingRef.current = true;
     setSubmittingBroadcast(true);
     try {
       let imageBase64 = '';
@@ -437,10 +483,12 @@ export function BroadcastView({
         summaryParts.push(`${effectiveGroupIds.length} Grup WA`);
       }
 
-      const safeDelay = Math.min(300, Math.max(0, Math.round(Number(delayDetik) || 0)));
+      const safeDelay = Math.min(3600, Math.max(0, Math.round(Number(delayDetik) || 0)));
+      const clientRequestId = `brc_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 
       const res = await sendOrScheduleBroadcastRecord(
         {
+          clientRequestId,
           judul: judul.trim() || emailSubject.trim() || 'Broadcast DUWD DPP WI',
           channel,
           targetPengurusIds: effectivePengurusIds,
@@ -465,16 +513,19 @@ export function BroadcastView({
         return;
       }
 
-      onUpdateBroadcastQueue([res.item, ...broadcastQueue]);
+      onUpdateBroadcastQueue([
+        res.item,
+        ...broadcastQueue.filter((b) => b.id !== res.item!.id),
+      ]);
       setNotice({
         ok: true,
         text:
           res.message ||
           (modeKirim === 'terjadwal'
-            ? `Broadcast dijadwalkan pada ${jadwalKirim} WITA (jeda ${safeDelay} detik/pesan).`
+            ? `Broadcast dijadwalkan pada ${jadwalKirim} WITA (jeda ${formatDelayLabel(safeDelay)}/pesan).`
             : res.item.status === 'Diproses'
-              ? `Pengiriman dimulai (${res.item.totalTerkirim}/${res.item.totalTarget}) dan sisa pesan dilanjutkan otomatis sesuai jeda ${safeDelay} detik.`
-              : 'Broadcast selesai dikirim.'),
+              ? `Pengiriman dimulai (${res.item.totalTerkirim}/${res.item.totalTarget}) dan sisa pesan dilanjutkan otomatis sesuai jeda ${formatDelayLabel(safeDelay)}.`
+              : 'Broadcast selesai dikirim (1 pesan per penerima).'),
       });
 
       // Reset form compose
@@ -488,6 +539,7 @@ export function BroadcastView({
       if (photoInputRef.current) photoInputRef.current.value = '';
       setSubTab('history');
     } finally {
+      submittingRef.current = false;
       setSubmittingBroadcast(false);
     }
   };
@@ -651,12 +703,132 @@ export function BroadcastView({
   };
 
   const handleDeleteHistory = async (id: string) => {
+    if (!isSuperAdmin) return;
     const res = await deleteBroadcastItemRecord(id, activePin, webAppUrl);
     if (res.ok) {
       onUpdateBroadcastQueue(broadcastQueue.filter((b) => b.id !== id));
+      if (detailModalItem?.id === id) setDetailModalItem(null);
       setNotice({ ok: true, text: 'Riwayat broadcast dihapus.' });
     } else {
       setNotice({ ok: false, text: res.error || 'Gagal menghapus riwayat.' });
+    }
+  };
+
+  const openBroadcastDetailModal = async (item: BroadcastItem) => {
+    setDetailModalItem(item);
+    setDetailRecipients([]);
+    setDetailError('');
+    setDetailSyncMessage('');
+    setDetailStatusFilter('ALL');
+    setDetailSearch('');
+    setLoadingDetail(true);
+    try {
+      const res = await fetchBroadcastDetailRecord(item.id, activePin, webAppUrl);
+      if (res.ok) {
+        setDetailRecipients(res.recipients);
+        if (res.broadcast) {
+          setDetailModalItem(res.broadcast);
+          onUpdateBroadcastQueue(
+            broadcastQueue.map((b) => (b.id === res.broadcast!.id ? res.broadcast! : b)),
+          );
+        }
+      } else {
+        setDetailError(res.error || 'Gagal memuat rincian penerima broadcast.');
+      }
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const handleSyncDetailStatuses = async () => {
+    if (!detailModalItem) return;
+    setSyncingDetailStatus(true);
+    setDetailSyncMessage('');
+    setDetailError('');
+    try {
+      const res = await syncBroadcastStatusesRecord(detailModalItem.id, activePin, webAppUrl);
+      if (res.ok) {
+        if (res.recipients) setDetailRecipients(res.recipients);
+        if (res.broadcast) {
+          setDetailModalItem(res.broadcast);
+          onUpdateBroadcastQueue(
+            broadcastQueue.map((b) => (b.id === res.broadcast!.id ? res.broadcast! : b)),
+          );
+        }
+        setDetailSyncMessage(
+          res.message ||
+            `Sinkronisasi status WA selesai (${res.updatedCount || 0} status diperbarui).`,
+        );
+      } else {
+        setDetailError(res.error || 'Gagal mengecek status terbaru dari ReChat.');
+      }
+    } finally {
+      setSyncingDetailStatus(false);
+    }
+  };
+
+  const detailSummaryStats = useMemo(() => {
+    let dibaca = 0;
+    let terkirim = 0;
+    let pending = 0;
+    let gagal = 0;
+    detailRecipients.forEach((r) => {
+      if (r.statusKirim === 'Dibaca') {
+        dibaca += 1;
+        terkirim += 1;
+      } else if (r.statusKirim === 'Terkirim' || r.statusKirim === 'Tersampaikan') {
+        terkirim += 1;
+      } else if (r.statusKirim === 'Gagal') {
+        gagal += 1;
+      } else {
+        pending += 1;
+      }
+    });
+    return { total: detailRecipients.length, dibaca, terkirim, pending, gagal };
+  }, [detailRecipients]);
+
+  const filteredDetailRecipients = useMemo(() => {
+    const q = detailSearch.trim().toLowerCase();
+    return detailRecipients.filter((r) => {
+      if (detailStatusFilter === 'Dibaca' && r.statusKirim !== 'Dibaca') return false;
+      if (
+        detailStatusFilter === 'Terkirim' &&
+        r.statusKirim !== 'Terkirim' &&
+        r.statusKirim !== 'Tersampaikan' &&
+        r.statusKirim !== 'Dibaca'
+      ) {
+        return false;
+      }
+      if (
+        detailStatusFilter === 'Pending' &&
+        r.statusKirim !== 'Pending' &&
+        r.statusKirim !== 'Diproses'
+      ) {
+        return false;
+      }
+      if (detailStatusFilter === 'Gagal' && r.statusKirim !== 'Gagal') return false;
+      if (q) {
+        const hay = `${r.namaPenerima} ${r.unitInfo || ''} ${r.tujuan} ${r.channelItem} ${r.statusKirim} ${r.keterangan || ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [detailRecipients, detailStatusFilter, detailSearch]);
+
+  const webhookFullUrl = useMemo(() => {
+    if (!isSuperAdmin || !webAppUrl.trim() || !broadcastConfig.webhookToken) return '';
+    const sep = webAppUrl.includes('?') ? '&' : '?';
+    return `${webAppUrl.trim()}${sep}webhookToken=${encodeURIComponent(broadcastConfig.webhookToken)}`;
+  }, [isSuperAdmin, webAppUrl, broadcastConfig.webhookToken]);
+
+  const handleCopyWebhookUrl = async () => {
+    if (!webhookFullUrl) return;
+    try {
+      await navigator.clipboard.writeText(webhookFullUrl);
+      setCopiedWebhook(true);
+      setTimeout(() => setCopiedWebhook(false), 2000);
+    } catch {
+      // Fallback diabaikan jika browser memblokir clipboard
     }
   };
 
@@ -721,8 +893,12 @@ export function BroadcastView({
             </div>
             <div className="mt-0.5 truncate text-xs font-bold text-[#07525E] dark:text-[#E6F4F7]">
               {broadcastConfig.rechatConfigured
-                ? `Terhubung (${broadcastConfig.rechatKeyMasked})`
-                : 'API Key Belum Disimpan'}
+                ? isSuperAdmin && broadcastConfig.rechatKeyMasked
+                  ? `Terhubung (${broadcastConfig.rechatKeyMasked})`
+                  : 'Terhubung & Siap Digunakan'
+                : isSuperAdmin
+                  ? 'API Key Belum Disimpan'
+                  : 'Belum Dikonfigurasi Super Admin'}
             </div>
           </div>
           {broadcastConfig.rechatConfigured ? (
@@ -741,14 +917,16 @@ export function BroadcastView({
               {broadcastConfig.emailAlias || 'dppwiduwd@gmail.com'}
             </div>
             <div className="text-[10px] text-[#526A70] dark:text-[#8DA8B0]">
-              {emailAliasVerified
-                ? 'Alias terverifikasi di Gmail'
-                : 'Pastikan alias aktif di Gmail "Send mail as"'}
+              {isSuperAdmin
+                ? emailAliasVerified
+                  ? 'Alias terverifikasi di Gmail'
+                  : 'Pastikan alias aktif di Gmail "Send mail as"'
+                : 'Email resmi pengiriman broadcast DUWD'}
             </div>
           </div>
           <Mail
             className={`h-5 w-5 shrink-0 ${
-              emailAliasVerified
+              emailAliasVerified || !isSuperAdmin
                 ? 'text-emerald-600 dark:text-emerald-400'
                 : 'text-[#0C7A89] dark:text-[#3EC1D3]'
             }`}
@@ -758,15 +936,19 @@ export function BroadcastView({
         <div className="glass-surface flex items-center justify-between gap-3 px-4 py-3">
           <div className="min-w-0">
             <div className="text-[11px] font-semibold text-[#526A70] dark:text-[#8DA8B0]">
-              Penjadwal Otomatis (Trigger 5 Menit)
+              Penjadwal &amp; Antrean Otomatis
             </div>
             <div className="mt-0.5 text-xs font-bold text-[#07525E] dark:text-[#E6F4F7]">
-              {broadcastConfig.triggerActive ? 'Aktif Otomatis (WITA)' : 'Belum Diaktifkan'}
+              {broadcastConfig.triggerActive
+                ? 'Aktif Otomatis (WITA)'
+                : isSuperAdmin
+                  ? 'Belum Diaktifkan'
+                  : 'Menunggu Aktivasi Super Admin'}
             </div>
           </div>
           {broadcastConfig.triggerActive ? (
             <Clock className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-          ) : (
+          ) : isSuperAdmin ? (
             <button
               type="button"
               onClick={handleInstallTrigger}
@@ -775,6 +957,8 @@ export function BroadcastView({
             >
               {installingTrigger ? 'Memasang...' : 'Aktifkan'}
             </button>
+          ) : (
+            <Lock className="h-4 w-4 shrink-0 text-[#526A70] dark:text-[#8DA8B0]" />
           )}
         </div>
       </div>
@@ -799,51 +983,60 @@ export function BroadcastView({
       )}
 
       {/* Sub-navigation Tabs */}
-      <div className="mt-5 inline-flex flex-wrap items-center gap-1 rounded-xl bg-[#EBF5F8]/90 p-1 dark:bg-[#0D2A33]">
-        <button
-          type="button"
-          onClick={() => setSubTab('compose')}
-          className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors ${
-            subTab === 'compose'
-              ? 'bg-white text-[#07525E] shadow-xs dark:bg-[#13424F] dark:text-[#E6F4F7]'
-              : 'text-[#526A70] hover:text-[#07525E] dark:text-[#9BB5BC]'
-          }`}
-        >
-          <Send className="h-3.5 w-3.5" />
-          <span>Kirim / Jadwalkan</span>
-        </button>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex flex-wrap items-center gap-1 rounded-xl bg-[#EBF5F8]/90 p-1 dark:bg-[#0D2A33]">
+          <button
+            type="button"
+            onClick={() => setSubTab('compose')}
+            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors ${
+              effectiveSubTab === 'compose'
+                ? 'bg-white text-[#07525E] shadow-xs dark:bg-[#13424F] dark:text-[#E6F4F7]'
+                : 'text-[#526A70] hover:text-[#07525E] dark:text-[#9BB5BC]'
+            }`}
+          >
+            <Send className="h-3.5 w-3.5" />
+            <span>Kirim / Jadwalkan</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setSubTab('groups')}
-          className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors ${
-            subTab === 'groups'
-              ? 'bg-white text-[#07525E] shadow-xs dark:bg-[#13424F] dark:text-[#E6F4F7]'
-              : 'text-[#526A70] hover:text-[#07525E] dark:text-[#9BB5BC]'
-          }`}
-        >
-          <Users className="h-3.5 w-3.5" />
-          <span>Grup WhatsApp ({waGroups.length})</span>
-        </button>
+          {isSuperAdmin && (
+            <button
+              type="button"
+              onClick={() => setSubTab('groups')}
+              className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors ${
+                effectiveSubTab === 'groups'
+                  ? 'bg-white text-[#07525E] shadow-xs dark:bg-[#13424F] dark:text-[#E6F4F7]'
+                  : 'text-[#526A70] hover:text-[#07525E] dark:text-[#9BB5BC]'
+              }`}
+            >
+              <Users className="h-3.5 w-3.5" />
+              <span>Kelola Grup WA ({waGroups.length})</span>
+            </button>
+          )}
 
-        <button
-          type="button"
-          onClick={() => setSubTab('history')}
-          className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors ${
-            subTab === 'history'
-              ? 'bg-white text-[#07525E] shadow-xs dark:bg-[#13424F] dark:text-[#E6F4F7]'
-              : 'text-[#526A70] hover:text-[#07525E] dark:text-[#9BB5BC]'
-          }`}
-        >
-          <CalendarClock className="h-3.5 w-3.5" />
-          <span>
-            Riwayat &amp; Antrean ({broadcastQueue.length})
-          </span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setSubTab('history')}
+            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors ${
+              effectiveSubTab === 'history'
+                ? 'bg-white text-[#07525E] shadow-xs dark:bg-[#13424F] dark:text-[#E6F4F7]'
+                : 'text-[#526A70] hover:text-[#07525E] dark:text-[#9BB5BC]'
+            }`}
+          >
+            <CalendarClock className="h-3.5 w-3.5" />
+            <span>Riwayat &amp; Antrean ({broadcastQueue.length})</span>
+          </button>
+        </div>
+
+        {!isSuperAdmin && (
+          <div className="inline-flex items-center gap-1.5 rounded-lg bg-[#F4FAFB] px-3 py-1.5 text-[11px] text-[#526A70] dark:bg-[#0B232B] dark:text-[#9BB5BC]">
+            <Lock className="h-3.5 w-3.5 text-[#0C7A89] dark:text-[#3EC1D3]" />
+            <span>Pengaturan API, Token, dan ID Grup hanya dikelola Super Admin.</span>
+          </div>
+        )}
       </div>
 
       {/* TAB 1: COMPOSE BROADCAST */}
-      {subTab === 'compose' && (
+      {effectiveSubTab === 'compose' && (
         <form onSubmit={handleSendBroadcast} className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* Left: Pesan, Kanal, Lampiran Foto, Waktu */}
           <div className="glass-surface-strong space-y-5 p-6 lg:col-span-7">
@@ -1144,51 +1337,80 @@ export function BroadcastView({
                 </div>
 
                 <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                  {DELAY_PRESETS.map((sec) => {
-                    const active = delayDetik === sec;
+                  {DELAY_PRESETS.map((preset) => {
+                    const active = delayDetik === preset.sec;
                     return (
                       <button
-                        key={sec}
+                        key={preset.sec}
                         type="button"
-                        onClick={() => setDelayDetik(sec)}
+                        onClick={() => {
+                          setDelayDetik(preset.sec);
+                          setCustomDelayUnit(preset.sec >= 60 && preset.sec % 60 === 0 ? 'menit' : 'detik');
+                        }}
                         className={`cursor-pointer rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
                           active
                             ? 'border-[#0C7A89] bg-[#07525E] text-white dark:border-[#3EC1D3] dark:bg-[#0C7A89]'
                             : 'border-[#07525E]/15 bg-white text-[#355158] hover:bg-[#EBF5F8] dark:border-[#3EC1D3]/20 dark:bg-[#071A20] dark:text-[#A9C2C9]'
                         }`}
                       >
-                        {sec === 0 ? 'Tanpa Jeda' : `${sec} detik`}
+                        {preset.label}
                       </button>
                     );
                   })}
+                </div>
 
-                  <div className="ml-auto flex items-center gap-1.5">
+                <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-[#07525E]/10 pt-2.5 dark:border-[#3EC1D3]/12">
+                  <span className="text-[11px] text-[#526A70] dark:text-[#8DA8B0]">
+                    Jeda aktif: <strong className="text-[#07525E] dark:text-[#E6F4F7]">{formatDelayLabel(delayDetik)}</strong> / pesan
+                  </span>
+                  <div className="flex items-center gap-1.5">
                     <span className="text-[11px] font-medium text-[#526A70] dark:text-[#8DA8B0]">
                       Kustom:
                     </span>
                     <input
                       type="number"
                       min={0}
-                      max={300}
+                      max={customDelayUnit === 'menit' ? 60 : 3600}
                       step={1}
-                      value={delayDetik}
+                      value={
+                        customDelayUnit === 'menit'
+                          ? Math.round(delayDetik / 60)
+                          : delayDetik
+                      }
                       onChange={(e) => {
                         const val = Number(e.target.value);
-                        if (Number.isNaN(val)) {
+                        if (Number.isNaN(val) || val < 0) {
                           setDelayDetik(0);
+                          return;
+                        }
+                        if (customDelayUnit === 'menit') {
+                          setDelayDetik(Math.min(3600, Math.round(val) * 60));
                         } else {
-                          setDelayDetik(Math.min(300, Math.max(0, Math.round(val))));
+                          setDelayDetik(Math.min(3600, Math.round(val)));
                         }
                       }}
                       className="w-16 rounded-lg border border-[#07525E]/20 bg-white px-2 py-1 text-center font-mono text-xs font-semibold text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
                     />
-                    <span className="text-[11px] text-[#526A70] dark:text-[#8DA8B0]">detik</span>
+                    <select
+                      value={customDelayUnit}
+                      onChange={(e) => {
+                        const nextUnit = e.target.value === 'menit' ? 'menit' : 'detik';
+                        setCustomDelayUnit(nextUnit);
+                        if (nextUnit === 'menit' && delayDetik > 0 && delayDetik < 60) {
+                          setDelayDetik(60);
+                        }
+                      }}
+                      className="rounded-lg border border-[#07525E]/20 bg-white px-2 py-1 text-xs font-semibold text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                    >
+                      <option value="detik">detik</option>
+                      <option value="menit">menit</option>
+                    </select>
                   </div>
                 </div>
 
                 {targetCounts.estimatedSeconds > 45 && (
                   <p className="mt-2 text-[11px] leading-relaxed text-[#526A70] dark:text-[#9BB5BC]">
-                    Karena total durasi lebih dari 45 detik, pesan tahap awal dikirim segera lalu sisa antrean dilanjutkan otomatis di latar belakang sesuai jeda agar tidak terkena batas waktu server.
+                    Pengiriman dengan jeda panjang dijalankan bertahap secara otomatis di latar belakang dengan kunci anti-duplikat, sehingga setiap penerima dijamin hanya menerima tepat 1 pesan.
                   </p>
                 )}
               </div>
@@ -1401,22 +1623,36 @@ export function BroadcastView({
                       Target Grup WhatsApp
                     </h2>
                     <p className="text-[11px] text-[#526A70] dark:text-[#8DA8B0]">
-                      Pilih 1 atau beberapa grup tujuan (ID <span className="font-mono">@g.us</span>).
+                      {isSuperAdmin ? (
+                        <>
+                          Pilih 1 atau beberapa grup tujuan (ID <span className="font-mono">@g.us</span>).
+                        </>
+                      ) : (
+                        'Pilih 1 atau beberapa grup tujuan yang tersedia.'
+                      )}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={openCreateGroupModal}
-                    className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-[#EBF5F8] px-2.5 py-1.5 text-[11px] font-semibold text-[#07525E] hover:bg-[#DCEEF4] dark:bg-[#113540] dark:text-[#E6F4F7]"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Tambah Grup</span>
-                  </button>
+                  {isSuperAdmin && (
+                    <button
+                      type="button"
+                      onClick={openCreateGroupModal}
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-[#EBF5F8] px-2.5 py-1.5 text-[11px] font-semibold text-[#07525E] hover:bg-[#DCEEF4] dark:bg-[#113540] dark:text-[#E6F4F7]"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Tambah Grup</span>
+                    </button>
+                  )}
                 </div>
 
                 {waGroups.length === 0 ? (
                   <div className="mt-3 rounded-xl border border-dashed border-[#07525E]/20 px-4 py-5 text-center text-xs text-[#526A70] dark:border-[#3EC1D3]/25 dark:text-[#8DA8B0]">
-                    Belum ada Grup WhatsApp tersimpan. Klik <strong>Tambah Grup</strong> untuk mendaftarkan nama &amp; ID grup.
+                    {isSuperAdmin ? (
+                      <>
+                        Belum ada Grup WhatsApp tersimpan. Klik <strong>Tambah Grup</strong> untuk mendaftarkan nama &amp; ID grup.
+                      </>
+                    ) : (
+                      'Belum ada Grup WhatsApp yang didaftarkan oleh Super Admin.'
+                    )}
                   </div>
                 ) : (
                   <div className="mt-3 max-h-52 space-y-1.5 overflow-y-auto">
@@ -1441,9 +1677,15 @@ export function BroadcastView({
                             <div className="font-bold text-[#07525E] dark:text-[#E6F4F7]">
                               {g.namaGrup}
                             </div>
-                            <div className="truncate font-mono text-[10px] text-[#526A70] dark:text-[#8DA8B0]">
-                              {g.groupId}
-                            </div>
+                            {isSuperAdmin && g.groupId ? (
+                              <div className="truncate font-mono text-[10px] text-[#526A70] dark:text-[#8DA8B0]">
+                                {g.groupId}
+                              </div>
+                            ) : (
+                              <div className="truncate text-[10px] text-[#526A70] dark:text-[#8DA8B0]">
+                                {g.keterangan || 'Grup WhatsApp Terdaftar'}
+                              </div>
+                            )}
                           </div>
                         </label>
                       );
@@ -1456,8 +1698,8 @@ export function BroadcastView({
         </form>
       )}
 
-      {/* TAB 2: MANAJEMEN GRUP WHATSAPP */}
-      {subTab === 'groups' && (
+      {/* TAB 2: MANAJEMEN GRUP WHATSAPP (KHUSUS SUPER ADMIN) */}
+      {effectiveSubTab === 'groups' && isSuperAdmin && (
         <div className="mt-5 glass-surface-strong overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#07525E]/10 px-5 py-4 dark:border-[#3EC1D3]/15">
             <div>
@@ -1537,7 +1779,7 @@ export function BroadcastView({
       )}
 
       {/* TAB 3: RIWAYAT & ANTREAN JADWAL */}
-      {subTab === 'history' && (
+      {effectiveSubTab === 'history' && (
         <div className="mt-5 glass-surface-strong overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#07525E]/10 px-5 py-4 dark:border-[#3EC1D3]/15">
             <div className="flex flex-wrap items-center gap-1.5">
@@ -1598,8 +1840,17 @@ export function BroadcastView({
                       )
                     : 0;
 
+                const pendingCount =
+                  typeof item.totalPending === 'number'
+                    ? item.totalPending
+                    : Math.max(0, item.totalTarget - item.totalTerkirim - item.totalGagal);
+                const dibacaCount = Number(item.totalDibaca || 0);
+
                 return (
-                  <div key={item.id} className="p-5">
+                  <div
+                    key={item.id}
+                    className="p-5 transition-colors hover:bg-[#F8FBFC]/80 dark:hover:bg-[#0B232B]/70"
+                  >
                     <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
@@ -1618,7 +1869,11 @@ export function BroadcastView({
                           {typeof item.delayDetik === 'number' && (
                             <span className="inline-flex items-center gap-1 rounded-md bg-[#F4FAFB] px-2 py-0.5 font-mono text-[11px] font-semibold text-[#355158] dark:bg-[#0D2B33] dark:text-[#9BB5BC]">
                               <Clock className="h-3 w-3" />
-                              <span>{item.delayDetik > 0 ? `Jeda ${item.delayDetik} dtk` : 'Tanpa jeda'}</span>
+                              <span>
+                                {item.delayDetik > 0
+                                  ? `Jeda ${formatDelayLabel(item.delayDetik)}`
+                                  : 'Tanpa jeda'}
+                              </span>
                             </span>
                           )}
                           {item.imageName && (
@@ -1629,9 +1884,13 @@ export function BroadcastView({
                           )}
                         </div>
 
-                        <h3 className="mt-2 text-sm font-bold text-[#07525E] dark:text-[#E6F4F7]">
+                        <button
+                          type="button"
+                          onClick={() => void openBroadcastDetailModal(item)}
+                          className="mt-2 block cursor-pointer text-left text-sm font-bold text-[#07525E] hover:text-[#0C7A89] hover:underline dark:text-[#E6F4F7] dark:hover:text-[#3EC1D3]"
+                        >
                           {item.judul}
-                        </h3>
+                        </button>
 
                         <p className="mt-1 line-clamp-2 text-xs text-[#355158] dark:text-[#B4CCD3]">
                           {item.pesanWa || item.emailBody}
@@ -1652,13 +1911,37 @@ export function BroadcastView({
                           </div>
                         )}
 
-                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#526A70] dark:text-[#8DA8B0]">
+                        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#526A70] dark:text-[#8DA8B0]">
                           <span>Target: {item.targetSummary}</span>
                           <span>&middot;</span>
-                          <span className="font-mono">
+                          <span className="font-mono font-semibold text-emerald-700 dark:text-emerald-400">
                             Terkirim: {item.totalTerkirim}/{item.totalTarget}
-                            {item.totalGagal > 0 ? ` (Gagal: ${item.totalGagal})` : ''}
                           </span>
+                          {dibacaCount > 0 && (
+                            <>
+                              <span>&middot;</span>
+                              <span className="inline-flex items-center gap-1 font-mono font-semibold text-sky-700 dark:text-sky-400">
+                                <CheckCheck className="h-3.5 w-3.5" />
+                                <span>Dibaca: {dibacaCount}</span>
+                              </span>
+                            </>
+                          )}
+                          {pendingCount > 0 && item.status !== 'Dibatalkan' && (
+                            <>
+                              <span>&middot;</span>
+                              <span className="font-mono text-[#0C7A89] dark:text-[#3EC1D3]">
+                                Pending: {pendingCount}
+                              </span>
+                            </>
+                          )}
+                          {item.totalGagal > 0 && (
+                            <>
+                              <span>&middot;</span>
+                              <span className="font-mono font-semibold text-red-700 dark:text-red-400">
+                                Gagal: {item.totalGagal}
+                              </span>
+                            </>
+                          )}
                           {item.jadwalKirim && (
                             <>
                               <span>&middot;</span>
@@ -1682,9 +1965,9 @@ export function BroadcastView({
                               onClick={() =>
                                 setExpandedLogId((prev) => (prev === item.id ? null : item.id))
                               }
-                              className="cursor-pointer text-[11px] font-semibold text-[#0C7A89] hover:underline dark:text-[#3EC1D3]"
+                              className="cursor-pointer text-[11px] font-semibold text-[#526A70] hover:text-[#0C7A89] hover:underline dark:text-[#8DA8B0] dark:hover:text-[#3EC1D3]"
                             >
-                              {expandedLogId === item.id ? 'Sembunyikan Log' : 'Lihat Detail Log'}
+                              {expandedLogId === item.id ? 'Sembunyikan Ringkasan Log' : 'Ringkasan Log Cepat'}
                             </button>
                             {expandedLogId === item.id && (
                               <div className="mt-1.5 rounded-lg bg-[#F4FAFB] p-2.5 font-mono text-[11px] text-[#355158] dark:bg-[#081C22] dark:text-[#A9C2C9]">
@@ -1695,7 +1978,16 @@ export function BroadcastView({
                         )}
                       </div>
 
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void openBroadcastDetailModal(item)}
+                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#0C7A89]/30 bg-[#EBF5F8] px-3 py-1.5 text-xs font-semibold text-[#07525E] hover:bg-[#DCEEF4] dark:border-[#3EC1D3]/30 dark:bg-[#113540] dark:text-[#E6F4F7]"
+                        >
+                          <Eye className="h-3.5 w-3.5 text-[#0C7A89] dark:text-[#3EC1D3]" />
+                          <span>Detail Penerima</span>
+                        </button>
+
                         {(item.status === 'Terjadwal' || item.status === 'Diproses') && (
                           <button
                             type="button"
@@ -1706,14 +1998,17 @@ export function BroadcastView({
                             <span>Batalkan</span>
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => void handleDeleteHistory(item.id)}
-                          className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#07525E]/15 px-2.5 py-1.5 text-xs font-semibold text-[#526A70] hover:text-red-700 dark:border-[#3EC1D3]/20 dark:text-[#9BB5BC] dark:hover:text-red-400"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          <span>Hapus</span>
-                        </button>
+
+                        {isSuperAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteHistory(item.id)}
+                            className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#07525E]/15 px-2.5 py-1.5 text-xs font-semibold text-[#526A70] hover:text-red-700 dark:border-[#3EC1D3]/20 dark:text-[#9BB5BC] dark:hover:text-red-400"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Hapus</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1724,8 +2019,8 @@ export function BroadcastView({
         </div>
       )}
 
-      {/* MODAL TAMBAH / EDIT GRUP WA */}
-      {groupModalOpen && (
+      {/* MODAL TAMBAH / EDIT GRUP WA (KHUSUS SUPER ADMIN) */}
+      {groupModalOpen && isSuperAdmin && (
         <div
           role="dialog"
           aria-modal="true"
@@ -1911,6 +2206,39 @@ export function BroadcastView({
                 </div>
               </div>
 
+              {webhookFullUrl && (
+                <div className="rounded-xl border border-[#07525E]/15 bg-[#F4FAFB] p-3 dark:border-[#3EC1D3]/20 dark:bg-[#081C22]">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-[#07525E] dark:text-[#E6F4F7]">
+                      URL Webhook Status Pesan ReChat (Opsional)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyWebhookUrl()}
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-white px-2 py-1 text-[10px] font-semibold text-[#07525E] shadow-xs hover:bg-[#EBF5F8] dark:bg-[#113540] dark:text-[#E6F4F7]"
+                    >
+                      {copiedWebhook ? (
+                        <>
+                          <Check className="h-3 w-3 text-emerald-600" />
+                          <span>Tersalin</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" />
+                          <span>Salin URL</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="mt-1.5 break-all rounded-lg bg-white/90 px-2.5 py-1.5 font-mono text-[10px] text-[#355158] dark:bg-[#051318] dark:text-[#9BB5BC]">
+                    {webhookFullUrl}
+                  </div>
+                  <p className="mt-1.5 text-[10px] leading-relaxed text-[#526A70] dark:text-[#8DA8B0]">
+                    Tempel di menu ReChat &rarr; Webhook (centang <strong>Status pesan terkirim / gagal</strong>) agar status terkirim/dibaca terupdate otomatis secara real-time.
+                  </p>
+                </div>
+              )}
+
               <div className="flex justify-end gap-2 border-t border-[#07525E]/10 pt-4 dark:border-[#3EC1D3]/15">
                 <button
                   type="button"
@@ -1928,6 +2256,305 @@ export function BroadcastView({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DETAIL PENERIMA & STATUS BACA BROADCAST */}
+      {detailModalItem && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#042D35]/55 p-3 backdrop-blur-sm sm:p-5 dark:bg-black/75"
+        >
+          <div className="glass-surface-strong flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden bg-white dark:bg-[#0B2229]">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-[#07525E]/12 px-5 py-4 dark:border-[#3EC1D3]/15">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-[#EBF5F8] px-2 py-0.5 text-[11px] font-bold uppercase text-[#07525E] dark:bg-[#113540] dark:text-[#3EC1D3]">
+                    {detailModalItem.channel === 'both'
+                      ? 'WA & Email'
+                      : detailModalItem.channel === 'email'
+                        ? 'Email'
+                        : 'WhatsApp'}
+                  </span>
+                  <span className="rounded-md bg-[#F4FAFB] px-2 py-0.5 font-mono text-[11px] font-semibold text-[#355158] dark:bg-[#0D2B33] dark:text-[#9BB5BC]">
+                    {detailModalItem.status}
+                  </span>
+                  {typeof detailModalItem.delayDetik === 'number' && (
+                    <span className="font-mono text-[11px] text-[#526A70] dark:text-[#8DA8B0]">
+                      &middot; Jeda {formatDelayLabel(detailModalItem.delayDetik)}
+                    </span>
+                  )}
+                </div>
+                <h2 className="mt-1.5 truncate text-base font-bold text-[#07525E] dark:text-[#E6F4F7]">
+                  Detail Penerima: {detailModalItem.judul}
+                </h2>
+                <p className="mt-0.5 text-[11px] text-[#526A70] dark:text-[#9BB5BC]">
+                  Dibuat {detailModalItem.dibuatPada}
+                  {detailModalItem.dikirimPada ? ` · Selesai ${detailModalItem.dikirimPada}` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailModalItem(null)}
+                className="cursor-pointer rounded-lg p-1.5 text-[#526A70] hover:bg-[#EBF5F8] dark:text-[#9BB5BC] dark:hover:bg-[#113540]"
+                aria-label="Tutup detail"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Summary Stat Strip */}
+            <div className="grid grid-cols-2 gap-2.5 border-b border-[#07525E]/10 bg-[#F8FBFC] px-5 py-3.5 sm:grid-cols-4 dark:border-[#3EC1D3]/12 dark:bg-[#081C22]">
+              <div className="rounded-xl border border-emerald-500/20 bg-white px-3.5 py-2.5 dark:bg-[#0C262E]">
+                <div className="text-[10px] font-semibold text-[#526A70] dark:text-[#8DA8B0]">
+                  Terkirim / Tersampaikan
+                </div>
+                <div className="mt-0.5 font-mono text-lg font-bold text-emerald-700 dark:text-emerald-400">
+                  {detailRecipients.length > 0
+                    ? detailSummaryStats.terkirim
+                    : detailModalItem.totalTerkirim}
+                </div>
+              </div>
+              <div className="rounded-xl border border-sky-500/20 bg-white px-3.5 py-2.5 dark:bg-[#0C262E]">
+                <div className="text-[10px] font-semibold text-[#526A70] dark:text-[#8DA8B0]">
+                  Sudah Dibaca (Read)
+                </div>
+                <div className="mt-0.5 font-mono text-lg font-bold text-sky-700 dark:text-sky-400">
+                  {detailRecipients.length > 0
+                    ? detailSummaryStats.dibaca
+                    : Number(detailModalItem.totalDibaca || 0)}
+                </div>
+              </div>
+              <div className="rounded-xl border border-[#0C7A89]/20 bg-white px-3.5 py-2.5 dark:bg-[#0C262E]">
+                <div className="text-[10px] font-semibold text-[#526A70] dark:text-[#8DA8B0]">
+                  Masih Pending
+                </div>
+                <div className="mt-0.5 font-mono text-lg font-bold text-[#0C7A89] dark:text-[#3EC1D3]">
+                  {detailRecipients.length > 0
+                    ? detailSummaryStats.pending
+                    : Number(detailModalItem.totalPending || 0)}
+                </div>
+              </div>
+              <div className="rounded-xl border border-red-500/20 bg-white px-3.5 py-2.5 dark:bg-[#0C262E]">
+                <div className="text-[10px] font-semibold text-[#526A70] dark:text-[#8DA8B0]">
+                  Gagal Kirim
+                </div>
+                <div className="mt-0.5 font-mono text-lg font-bold text-red-700 dark:text-red-400">
+                  {detailRecipients.length > 0
+                    ? detailSummaryStats.gagal
+                    : detailModalItem.totalGagal}
+                </div>
+              </div>
+            </div>
+
+            {/* Filter & Sync Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[#07525E]/10 px-5 py-3 dark:border-[#3EC1D3]/12">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(
+                  [
+                    { id: 'ALL', label: `Semua (${detailSummaryStats.total})` },
+                    { id: 'Dibaca', label: `Dibaca (${detailSummaryStats.dibaca})` },
+                    { id: 'Terkirim', label: `Terkirim (${detailSummaryStats.terkirim})` },
+                    { id: 'Pending', label: `Pending (${detailSummaryStats.pending})` },
+                    { id: 'Gagal', label: `Gagal (${detailSummaryStats.gagal})` },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setDetailStatusFilter(tab.id)}
+                    className={`cursor-pointer rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${
+                      detailStatusFilter === tab.id
+                        ? 'bg-[#07525E] text-white dark:bg-[#0C7A89]'
+                        : 'bg-[#EBF5F8] text-[#355158] hover:bg-[#DCEEF4] dark:bg-[#0D2A33] dark:text-[#A9C2C9]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-[#526A70]" />
+                  <input
+                    type="text"
+                    value={detailSearch}
+                    onChange={(e) => setDetailSearch(e.target.value)}
+                    placeholder="Cari nama / tujuan..."
+                    className="w-44 rounded-lg border border-[#07525E]/15 bg-white py-1.5 pr-2.5 pl-8 text-xs text-[#0F2429] focus:border-[#0C7A89] focus:outline-none dark:border-[#3EC1D3]/25 dark:bg-[#071A20] dark:text-[#E6F4F7]"
+                  />
+                </div>
+
+                {(detailModalItem.channel === 'wa' || detailModalItem.channel === 'both') && (
+                  <button
+                    type="button"
+                    onClick={() => void handleSyncDetailStatuses()}
+                    disabled={syncingDetailStatus || loadingDetail}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#0C7A89] to-[#07525E] px-3 py-1.5 text-xs font-semibold text-white shadow-xs disabled:opacity-60"
+                  >
+                    <CheckCheck
+                      className={`h-3.5 w-3.5 ${syncingDetailStatus ? 'animate-pulse' : ''}`}
+                    />
+                    <span>
+                      {syncingDetailStatus ? 'Mengecek ReChat...' : 'Cek Status WA (ReChat)'}
+                    </span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => void openBroadcastDetailModal(detailModalItem)}
+                  disabled={loadingDetail}
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#07525E]/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#07525E] hover:bg-[#F4FAFB] disabled:opacity-60 dark:border-[#3EC1D3]/25 dark:bg-[#0D2B33] dark:text-[#E6F4F7]"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingDetail ? 'animate-spin' : ''}`} />
+                  <span>Muat Ulang</span>
+                </button>
+              </div>
+            </div>
+
+            {detailSyncMessage && (
+              <div className="border-b border-[#0C7A89]/20 bg-[#ECF6F2] px-5 py-2 text-xs font-medium text-[#07525E] dark:bg-[#0D2E36] dark:text-[#BCEAF0]">
+                {detailSyncMessage}
+              </div>
+            )}
+
+            {detailError && (
+              <div className="border-b border-amber-500/30 bg-amber-50 px-5 py-2 text-xs font-medium text-amber-900 dark:bg-amber-950/60 dark:text-amber-200">
+                {detailError}
+              </div>
+            )}
+
+            {/* Recipient Table Body */}
+            <div className="flex-1 overflow-y-auto">
+              {loadingDetail ? (
+                <div className="flex items-center justify-center gap-2 py-14 text-xs font-medium text-[#526A70] dark:text-[#9BB5BC]">
+                  <RefreshCw className="h-4 w-4 animate-spin text-[#0C7A89]" />
+                  <span>Memuat daftar penerima broadcast...</span>
+                </div>
+              ) : detailRecipients.length === 0 ? (
+                <div className="px-6 py-12 text-center">
+                  <p className="text-xs font-semibold text-[#07525E] dark:text-[#E6F4F7]">
+                    Rincian per penerima belum tersedia untuk broadcast ini.
+                  </p>
+                  <p className="mt-1 text-[11px] text-[#526A70] dark:text-[#9BB5BC]">
+                    Broadcast yang dibuat sebelum pembaruan pelacakan per penerima hanya memiliki ringkasan log umum.
+                  </p>
+                  {detailModalItem.logHasil && (
+                    <div className="mx-auto mt-3 max-w-xl rounded-xl bg-[#F4FAFB] p-3 text-left font-mono text-[11px] text-[#355158] dark:bg-[#081C22] dark:text-[#A9C2C9]">
+                      {detailModalItem.logHasil}
+                    </div>
+                  )}
+                </div>
+              ) : filteredDetailRecipients.length === 0 ? (
+                <div className="px-6 py-12 text-center text-xs text-[#526A70] dark:text-[#9BB5BC]">
+                  Tidak ada penerima yang cocok dengan filter atau kata kunci pencarian.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="duwd-zebra-table w-full border-collapse text-left text-xs">
+                    <thead>
+                      <tr className="sticky top-0 z-10 border-b border-[#07525E]/10 bg-[#F4FAFB] text-[11px] font-semibold text-[#526A70] dark:border-[#3EC1D3]/15 dark:bg-[#0C2730] dark:text-[#9BB5BC]">
+                        <th className="px-4 py-2.5">No</th>
+                        <th className="px-3 py-2.5">Penerima</th>
+                        <th className="px-3 py-2.5">Kanal</th>
+                        <th className="px-3 py-2.5">Tujuan</th>
+                        <th className="px-3 py-2.5">Status</th>
+                        <th className="px-3 py-2.5">Waktu Kirim / Dibaca</th>
+                        <th className="px-4 py-2.5">Keterangan</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#07525E]/8 dark:divide-[#3EC1D3]/10">
+                      {filteredDetailRecipients.map((r, idx) => {
+                        const badgeClass =
+                          r.statusKirim === 'Dibaca'
+                            ? 'bg-sky-100 text-sky-800 dark:bg-sky-950/80 dark:text-sky-300'
+                            : r.statusKirim === 'Tersampaikan'
+                              ? 'bg-teal-100 text-teal-800 dark:bg-teal-950/80 dark:text-teal-300'
+                              : r.statusKirim === 'Terkirim'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300'
+                                : r.statusKirim === 'Gagal'
+                                  ? 'bg-red-100 text-red-800 dark:bg-red-950/70 dark:text-red-300'
+                                  : r.statusKirim === 'Diproses'
+                                    ? 'bg-cyan-100 text-cyan-900 dark:bg-cyan-950/70 dark:text-cyan-200'
+                                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+
+                        return (
+                          <tr key={r.id}>
+                            <td className="px-4 py-2.5 font-mono text-[11px] text-[#526A70]">
+                              {idx + 1}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <div className="font-semibold text-[#0F2429] dark:text-[#E6F4F7]">
+                                {r.namaPenerima}
+                              </div>
+                              {r.unitInfo && (
+                                <div className="text-[10px] text-[#526A70] dark:text-[#8DA8B0]">
+                                  {r.unitInfo}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 whitespace-nowrap">
+                              <span className="rounded-md bg-[#EBF5F8] px-2 py-0.5 text-[10px] font-semibold text-[#07525E] dark:bg-[#113540] dark:text-[#3EC1D3]">
+                                {r.channelItem}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 font-mono text-[11px] text-[#355158] dark:text-[#B4CCD3]">
+                              {r.tujuan}
+                            </td>
+                            <td className="px-3 py-2.5 whitespace-nowrap">
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold ${badgeClass}`}
+                              >
+                                {r.statusKirim === 'Dibaca' || r.statusKirim === 'Tersampaikan' ? (
+                                  <CheckCheck className="h-3.5 w-3.5" />
+                                ) : r.statusKirim === 'Terkirim' ? (
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                ) : r.statusKirim === 'Gagal' ? (
+                                  <XCircle className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Clock className="h-3.5 w-3.5" />
+                                )}
+                                <span>{r.statusKirim}</span>
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 font-mono text-[11px] text-[#526A70] dark:text-[#9BB5BC]">
+                              {r.waktuKirim ? <div>Kirim: {r.waktuKirim}</div> : <div>-</div>}
+                              {r.waktuDibaca && (
+                                <div className="font-semibold text-sky-700 dark:text-sky-400">
+                                  Baca: {r.waktuDibaca}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-[11px] text-[#526A70] dark:text-[#9BB5BC]">
+                              {r.keterangan || (r.rechatStatus ? `ReChat: ${r.rechatStatus}` : '-')}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#07525E]/10 bg-[#F8FBFC] px-5 py-3 text-[11px] text-[#526A70] dark:border-[#3EC1D3]/15 dark:bg-[#081C22] dark:text-[#8DA8B0]">
+              <span>
+                Catatan: Status <strong>Dibaca</strong> pada WhatsApp mengikuti pembaruan status dari ReChat API/Webhook (email tidak memiliki indikator baca standar).
+              </span>
+              <button
+                type="button"
+                onClick={() => setDetailModalItem(null)}
+                className="cursor-pointer rounded-lg bg-[#07525E] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#0C7A89]"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}

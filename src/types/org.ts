@@ -305,6 +305,29 @@ export type BroadcastStatus =
   | 'Gagal'
   | 'Dibatalkan';
 
+export type BroadcastRecipientStatus =
+  | 'Pending'
+  | 'Diproses'
+  | 'Terkirim'
+  | 'Tersampaikan'
+  | 'Dibaca'
+  | 'Gagal';
+
+export interface BroadcastRecipientLogItem {
+  id: string;
+  broadcastId: string;
+  channelItem: 'WA Personal' | 'WA Grup' | 'Email' | string;
+  namaPenerima: string;
+  unitInfo?: string;
+  tujuan: string;
+  statusKirim: BroadcastRecipientStatus;
+  rechatMessageId?: string;
+  rechatStatus?: string;
+  waktuKirim?: string;
+  waktuDibaca?: string;
+  keterangan?: string;
+}
+
 export interface BroadcastItem {
   id: string;
   judul: string;
@@ -320,11 +343,13 @@ export interface BroadcastItem {
   imageName?: string;
   modeKirim: BroadcastModeKirim;
   jadwalKirim?: string; // YYYY-MM-DD HH:mm (WITA)
-  delayDetik?: number; // Jeda antar pesan dalam detik (0 - 300)
+  delayDetik?: number; // Jeda antar pesan dalam detik (0 - 3600)
   status: BroadcastStatus;
   totalTarget: number;
   totalTerkirim: number;
   totalGagal: number;
+  totalPending?: number;
+  totalDibaca?: number;
   logHasil?: string;
   dibuatOleh: string;
   dibuatPada: string;
@@ -339,6 +364,7 @@ export interface BroadcastConfigStatus {
   emailSenderName: string;
   triggerActive: boolean;
   availableEmailAliases?: string[];
+  webhookToken?: string;
 }
 
 export interface PendataanLookupResult {
